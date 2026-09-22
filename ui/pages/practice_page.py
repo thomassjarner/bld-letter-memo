@@ -156,7 +156,7 @@ class PracticePage(ft.Column):
                 button,
             ], spacing=8),
             padding=16,
-            border=ft.border.all(1, ft.Colors.OUTLINE),
+            border=ft.Border.all(1, ft.Colors.OUTLINE),
             border_radius=10,
             width=340,
         )
@@ -209,7 +209,7 @@ class PracticePage(ft.Column):
                 ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._show_menu),
                 ft.Text("Practice — Blind Timer", size=20, weight=ft.FontWeight.BOLD),
             ]),
-            ft.Container(self.scramble_text, padding=12, border=ft.border.all(1, ft.Colors.OUTLINE), border_radius=8),
+            ft.Container(self.scramble_text, padding=12, border=ft.Border.all(1, ft.Colors.OUTLINE), border_radius=8),
             ft.Row(
                 [self.previous_scramble_button, self.new_scramble_button],
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -541,7 +541,7 @@ class PracticePage(ft.Column):
                         ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip="Delete solve", on_click=lambda e, i=idx: self._delete_solve(i)),
                     ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     padding=8,
-                    border=ft.border.all(1, ft.Colors.OUTLINE),
+                    border=ft.Border.all(1, ft.Colors.OUTLINE),
                     border_radius=6,
                 )
             )

@@ -84,7 +84,7 @@ def build_sticker_grid(
                     spacing=6,
                 ),
                 padding=12,
-                border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
+                border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
                 border_radius=10,
             )
         )
@@ -94,7 +94,7 @@ def build_sticker_grid(
         details = "; ".join(f"{letter}: {', '.join(stickers)}" for letter, stickers in duplicates.items())
         warning = ft.Container(
             content=ft.Text(f"⚠ Duplicate letters assigned: {details}", color=ft.Colors.RED, size=12),
-            padding=ft.padding.only(bottom=8),
+            padding=ft.Padding.only(bottom=8),
         )
 
     children = [warning] if warning else []

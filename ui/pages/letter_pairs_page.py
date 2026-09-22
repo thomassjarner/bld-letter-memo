@@ -67,7 +67,7 @@ class LetterPairsPage(ft.Column):
                         ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=220),
                     ]
                 ),
-                padding=ft.padding.symmetric(horizontal=8),
+                padding=ft.Padding.symmetric(horizontal=8),
             ),
             ft.Divider(height=1),
             self.rows_view,
@@ -168,7 +168,7 @@ class LetterPairsPage(ft.Column):
         status_chip = ft.Container(
             content=ft.Text("Active" if is_active else "Inactive", size=12, color=ft.Colors.WHITE),
             bgcolor=ft.Colors.GREEN_600 if is_active else ft.Colors.GREY_500,
-            padding=ft.padding.symmetric(horizontal=8, vertical=3),
+            padding=ft.Padding.symmetric(horizontal=8, vertical=3),
             border_radius=12,
         )
 
@@ -185,7 +185,7 @@ class LetterPairsPage(ft.Column):
                 ],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=ft.padding.symmetric(horizontal=8, vertical=2),
+            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
             bgcolor=None if is_active else ft.Colors.GREY_100,
             opacity=1.0 if is_active else 0.75,
         )

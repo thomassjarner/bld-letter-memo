@@ -46,7 +46,7 @@ class LetterSchemesPage(ft.Column):
         sidebar = ft.Container(
             width=260,
             padding=12,
-            border=ft.border.only(right=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
+            border=ft.Border.only(right=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
             content=ft.Column(
                 [
                     ft.Text("Schemes", weight=ft.FontWeight.BOLD, size=16),
@@ -126,7 +126,7 @@ class LetterSchemesPage(ft.Column):
             self._build_orientation_settings(scheme),
             tabs,
             ft.Row([buffer_picker]),
-            ft.Container(content=grid, padding=ft.padding.only(top=12)),
+            ft.Container(content=grid, padding=ft.Padding.only(top=12)),
             ft.Divider(),
             self._build_advanced_settings(scheme),
             self.settings_message,
@@ -184,7 +184,7 @@ class LetterSchemesPage(ft.Column):
             subtitle=ft.Text("Cycle breaks, twist/flip handling, and memo/execution order", size=12),
             controls=[
                 ft.Container(
-                    padding=ft.padding.only(left=16, right=16, bottom=12),
+                    padding=ft.Padding.only(left=16, right=16, bottom=12),
                     content=ft.Column([
                         ft.Row([
                             ft.Text("Order", weight=ft.FontWeight.BOLD),
@@ -222,7 +222,7 @@ class LetterSchemesPage(ft.Column):
             title=ft.Text(f"{title} tracing — {mode_label}"),
             controls=[
                 ft.Container(
-                    padding=ft.padding.only(left=16, right=16, bottom=12),
+                    padding=ft.Padding.only(left=16, right=16, bottom=12),
                     content=ft.Column([
                         ft.Row([
                             mode,

@@ -110,7 +110,7 @@ def main(page: ft.Page):
 
     sidebar = ft.Container(
         width=220,
-        padding=ft.padding.only(top=8, bottom=4),
+        padding=ft.Padding.only(top=8, bottom=4),
         content=ft.Column(
             [nav_rail, ft.Container(save_status, padding=8)],
             expand=True,
