@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+.DS_Store
+build/
+dist/
+
+# The app deliberately stores user data OUTSIDE this repo (in the OS
+# user-data directory), so nothing app-data-related should ever end up
+# here. These lines are just a safety net in case that ever changes.
+data.json
+*.corrupt-backup.json
+data.backup.json
