@@ -50,52 +50,57 @@ class LetterPairsPage(ft.Column):
         self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
         self.progress_bar = ft.ProgressBar(width=220, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.rows_view = ft.Column(spacing=2)
+        self.rows_view = ft.ListView(
+            expand=True,
+            spacing=2,
+            padding=ft.Padding.only(right=4),
+            scroll=ft.ScrollMode.ALWAYS,
+            build_controls_on_demand=True,
+        )
         self._word_fields: list[ft.TextField] = []
         self._editing_alias_pair: str | None = None
 
-        # One explicit ListView owns scrolling for the entire Letter Pairs page.
-        # This is more reliable in Flet static-web than nesting an expanding list
-        # inside a custom Column which itself tries to scroll.
-        self.page_scroll = ft.ListView(
-            expand=True,
-            spacing=12,
-            padding=ft.Padding.all(4),
-            scroll=ft.ScrollMode.ALWAYS,
-        )
-        self.page_scroll.controls = [
-            ft.Row(
-                [
-                    self.search_field,
-                    self.search_pairs,
-                    self.search_words,
-                    self.scheme_filter,
-                    self.status_filter,
-                ],
-                wrap=True,
-            ),
-            ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
-            self.duplicate_warning,
-            ft.Text(
-                "Tip: double-click a pair label to change how it is displayed (for example AB → ØB).",
-                size=11,
-                color=ft.Colors.ON_SURFACE_VARIANT,
-            ),
-            ft.Container(
-                content=ft.Row(
+        self.filters_area = ft.Column(
+            [
+                ft.Row(
                     [
-                        ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD), width=70),
-                        ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD), expand=True),
-                        ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD), width=90),
-                        ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=220),
-                    ]
+                        self.search_field,
+                        self.search_pairs,
+                        self.search_words,
+                        self.scheme_filter,
+                        self.status_filter,
+                    ],
+                    wrap=True,
                 ),
-                padding=ft.Padding.symmetric(horizontal=8),
+                ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
+                self.duplicate_warning,
+                ft.Text(
+                    "Tip: double-click a pair label to edit how it is displayed (for example AB → ØB).",
+                    size=11,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+            ],
+            spacing=8,
+        )
+        self.table_header = ft.Container(
+            content=ft.Row(
+                [
+                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD), width=70),
+                    ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD), expand=True),
+                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD), width=90),
+                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=220),
+                ]
             ),
+            padding=ft.Padding.symmetric(horizontal=8),
+        )
+        # Only the rows list scrolls. The filters and headings remain fixed.
+        # This gives ListView a bounded viewport inside the expanding page.
+        self.controls = [
+            self.filters_area,
+            self.table_header,
             ft.Divider(height=1),
             self.rows_view,
         ]
-        self.controls = [self.page_scroll]
         self.refresh(update=False)
 
     def refresh(self, update: bool = True):
@@ -210,6 +215,7 @@ class LetterPairsPage(ft.Column):
                     dense=True,
                     autofocus=True,
                     max_length=8,
+                    capitalization=ft.TextCapitalization.CHARACTERS,
                     tooltip=f"Underlying pair: {pair}",
                     on_blur=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
                     on_submit=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
@@ -259,7 +265,7 @@ class LetterPairsPage(ft.Column):
         if self._editing_alias_pair != pair:
             return
         self._editing_alias_pair = None
-        self.state.set_pair_alias(pair, value or "")
+        self.state.set_pair_alias(pair, (value or "").upper())
         self.refresh()
 
     def _word_changed(self, pair: str, value: str):

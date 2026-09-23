@@ -69,6 +69,7 @@ def build_sticker_grid(
                     label=sticker,
                     width=72,
                     max_length=1,
+                    capitalization=ft.TextCapitalization.CHARACTERS,
                     text_align=ft.TextAlign.CENTER,
                     border_color=ft.Colors.RED if sticker in duplicated_stickers else None,
                     on_change=lambda e, s=sticker: on_letter_change(s, e.control.value),

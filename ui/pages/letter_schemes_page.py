@@ -1,6 +1,6 @@
 import flet as ft
 
-from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER, CATEGORY_STICKER_ORDER
+from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
 from core.tracer import STANDARD_CORNER_PRIORITY, STANDARD_EDGE_PRIORITY
 from ui.components.buffer_picker import build_buffer_picker
 from ui.components.sticker_grid import build_sticker_grid
@@ -120,20 +120,43 @@ class LetterSchemesPage(ft.Column):
             self.body_scroll.controls = [ft.Text("Create a scheme to get started.", italic=True)]
             return
 
-        cat = scheme.corners if self.selected_category == "corners" else scheme.edges
-
+        tab_index = {"edges": 0, "corners": 1, "preferences": 2}[self.selected_category]
         tabs = ft.Tabs(
-            length=2,
-            selected_index=0 if self.selected_category == "corners" else 1,
+            length=3,
+            selected_index=tab_index,
             on_change=self._on_tab_change,
             content=ft.TabBar(
                 tabs=[
-                    ft.Tab(label="Corners"),
                     ft.Tab(label="Edges"),
+                    ft.Tab(label="Corners"),
+                    ft.Tab(label="Preferences"),
                 ]
             ),
         )
 
+        common = [
+            ft.Row(
+                [
+                    ft.Text(scheme.name, size=20, weight=ft.FontWeight.BOLD),
+                    self.rename_field,
+                    ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme),
+                ]
+            ),
+            tabs,
+        ]
+
+        if self.selected_category == "preferences":
+            self._sticker_fields = {}
+            self._sticker_order = []
+            self.body_scroll.controls = common + [
+                self._build_orientation_settings(scheme),
+                ft.Divider(),
+                self._build_preferences(scheme),
+                self.settings_message,
+            ]
+            return
+
+        cat = scheme.corners if self.selected_category == "corners" else scheme.edges
         buffer_picker = build_buffer_picker(
             self.selected_category, cat.buffer_sticker,
             lambda sticker: self._set_buffer(sticker),
@@ -146,23 +169,11 @@ class LetterSchemesPage(ft.Column):
             on_field_focus=self._on_sticker_focus,
             field_registry=self._sticker_fields,
         )
-        # Preserve the exact sticker order while skipping the physical buffer.
         self._sticker_order = [s for s in CATEGORY_STICKER_ORDER[self.selected_category] if s in self._sticker_fields]
 
-        self.body_scroll.controls = [
-            ft.Row(
-                [
-                    ft.Text(scheme.name, size=20, weight=ft.FontWeight.BOLD),
-                    self.rename_field,
-                    ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme),
-                ]
-            ),
-            self._build_orientation_settings(scheme),
-            tabs,
+        self.body_scroll.controls = common + [
             ft.Row([buffer_picker]),
             ft.Container(content=grid, padding=ft.Padding.only(top=12)),
-            ft.Divider(),
-            self._build_advanced_settings(scheme),
             self.settings_message,
         ]
 
@@ -192,13 +203,14 @@ class LetterSchemesPage(ft.Column):
             front,
         ], wrap=True)
 
-    def _build_advanced_settings(self, scheme):
+    def _build_preferences(self, scheme):
         memo_field = ft.TextField(
             label="Memo",
             hint_text="CE",
             value=scheme.memo_order,
             width=90,
             max_length=2,
+            capitalization=ft.TextCapitalization.CHARACTERS,
             on_submit=lambda e: self._save_order("memo", e.control),
             on_blur=lambda e: self._save_order("memo", e.control),
         )
@@ -208,31 +220,30 @@ class LetterSchemesPage(ft.Column):
             value=scheme.execution_order,
             width=90,
             max_length=2,
+            capitalization=ft.TextCapitalization.CHARACTERS,
             on_submit=lambda e: self._save_order("execution", e.control),
             on_blur=lambda e: self._save_order("execution", e.control),
         )
 
-        return ft.ExpansionTile(
-            expanded=self._advanced_expanded,
-            on_change=lambda e: setattr(self, "_advanced_expanded", bool(e.control.expanded)),
-            title=ft.Text("Advanced settings"),
-            subtitle=ft.Text("Cycle breaks, twist/flip handling, and memo/execution order", size=12),
-            controls=[
-                ft.Container(
-                    padding=ft.Padding.only(left=16, right=16, bottom=12),
-                    content=ft.Column([
-                        ft.Row([
-                            ft.Text("Order", weight=ft.FontWeight.BOLD),
-                            memo_field,
-                            ft.Text("/"),
-                            exec_field,
-                            ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                        ], wrap=True),
-                        self._build_category_advanced(scheme, "corners"),
-                        self._build_category_advanced(scheme, "edges"),
-                    ], spacing=8),
-                )
+        return ft.Column(
+            [
+                ft.Text("Preferences", size=18, weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "Tracing preferences are scheme-specific and are used automatically by Scramble Memo and future practice tools.",
+                    size=11,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+                ft.Row([
+                    ft.Text("Order", weight=ft.FontWeight.BOLD),
+                    memo_field,
+                    ft.Text("/"),
+                    exec_field,
+                    ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ], wrap=True),
+                self._build_category_advanced(scheme, "corners"),
+                self._build_category_advanced(scheme, "edges"),
             ],
+            spacing=10,
         )
 
     def _build_category_advanced(self, scheme, category: str):
@@ -367,7 +378,8 @@ class LetterSchemesPage(ft.Column):
         self.refresh()
 
     def _on_tab_change(self, e):
-        self.selected_category = "corners" if e.control.selected_index == 0 else "edges"
+        self.selected_category = {0: "edges", 1: "corners", 2: "preferences"}.get(e.control.selected_index, "edges")
+        self._focused_sticker = None
         self._refresh_body()
         self.update()
 
@@ -381,13 +393,17 @@ class LetterSchemesPage(ft.Column):
 
     def _set_letter(self, sticker: str, value: str):
         scheme = self.state.active_scheme
-        if scheme is None:
+        if scheme is None or self.selected_category not in {"corners", "edges"}:
             return
-        # Deliberately does NOT rebuild the grid here: rebuilding on every
-        # keystroke would steal focus from the field the user is typing in.
+        value = (value or "").upper()
+        field = self._sticker_fields.get(sticker)
+        if field is not None and field.value != value:
+            field.value = value
+            if field.page is not None:
+                field.update()
+        # Do not rebuild the grid on every keypress; that would steal focus.
         self.state.set_sticker_letter(scheme, self.selected_category, sticker, value)
-        # One entered letter advances immediately to the next editable sticker.
-        if (value or "").strip():
+        if value.strip():
             self._focus_adjacent_sticker(sticker, +1)
 
     def _on_sticker_focus(self, sticker: str):
@@ -488,7 +504,7 @@ class LetterSchemesPage(ft.Column):
         scheme = self.state.active_scheme
         if scheme is None:
             return
-        self._advanced_expanded = True
+        self.selected_category = "preferences"
         self._category_advanced_expanded[category] = True
         self.state.set_orientation_memo_mode(scheme, category, value)
         self.refresh()
@@ -497,7 +513,7 @@ class LetterSchemesPage(ft.Column):
         scheme = self.state.active_scheme
         if scheme is None:
             return
-        self._advanced_expanded = True
+        self.selected_category = "preferences"
         self._category_advanced_expanded[category] = True
         self.state.set_cycle_break_sticker(scheme, category, piece, sticker)
         self.refresh()
@@ -511,7 +527,7 @@ class LetterSchemesPage(ft.Column):
         if other < 0 or other >= len(priority):
             return
         priority[index], priority[other] = priority[other], priority[index]
-        self._advanced_expanded = True
+        self.selected_category = "preferences"
         self._category_advanced_expanded[category] = True
         self.state.set_cycle_break_priority(scheme, category, priority)
         self.refresh()
@@ -520,7 +536,7 @@ class LetterSchemesPage(ft.Column):
         scheme = self.state.active_scheme
         if scheme is None:
             return
-        self._advanced_expanded = True
+        self.selected_category = "preferences"
         self._category_advanced_expanded[category] = True
         self.state.reset_tracing_preferences(scheme, category)
         self.refresh()

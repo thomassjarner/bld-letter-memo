@@ -1,3 +1,18 @@
+# BLD Letter Memo Web 2.9
+
+Changes in this build:
+- Letter Scheme now has three tabs: Edges, Corners, Preferences.
+- Buffer selection stays inside Edges/Corners.
+- Memo orientation and the former Advanced Settings content live under Preferences.
+- Scheme letters automatically use uppercase.
+- Pair display aliases automatically use uppercase, while mnemonic words remain exactly as typed.
+- Pair alias editing only saves on Enter/blur, avoiding per-keystroke refreshes.
+- Letter Pairs now uses a dedicated expanding ListView for the rows, with filters/header fixed above it.
+
+Regression status:
+- 4/4 gold-standard scramble tests pass.
+
+
 # BLD Letter Memo Web 2.8
 
 This build adds:
