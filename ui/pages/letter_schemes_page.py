@@ -18,10 +18,13 @@ COLOR_LABELS = {
 OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 
 
+@ft.control
 class LetterSchemesPage(ft.Column):
-    def __init__(self, state: AppState):
-        super().__init__(expand=True, spacing=0)
-        self.state = state
+    state: AppState | None = None
+
+    def init(self):
+        self.expand = True
+        self.spacing = 0
         # Edges first is only a UI/data-entry preference. It does not affect
         # memo/execution order.
         self.selected_category = "edges"
@@ -100,9 +103,15 @@ class LetterSchemesPage(ft.Column):
         cat = scheme.corners if self.selected_category == "corners" else scheme.edges
 
         tabs = ft.Tabs(
+            length=2,
             selected_index=0 if self.selected_category == "corners" else 1,
             on_change=self._on_tab_change,
-            tabs=[ft.Tab(text="Corners"), ft.Tab(text="Edges")],
+            content=ft.TabBar(
+                tabs=[
+                    ft.Tab(label="Corners"),
+                    ft.Tab(label="Edges"),
+                ]
+            ),
         )
 
         buffer_picker = build_buffer_picker(
@@ -142,14 +151,14 @@ class LetterSchemesPage(ft.Column):
             label="Top color",
             width=150,
             value=scheme.memo_up,
-            options=[ft.dropdown.Option(c, COLOR_LABELS[c]) for c in COLOR_LABELS],
+            options=[ft.DropdownOption(c, COLOR_LABELS[c]) for c in COLOR_LABELS],
             on_select=self._orientation_up_changed,
         )
         front = ft.Dropdown(
             label="Front color",
             width=150,
             value=scheme.memo_front if scheme.memo_front in front_options else front_options[0],
-            options=[ft.dropdown.Option(c, COLOR_LABELS[c]) for c in front_options],
+            options=[ft.DropdownOption(c, COLOR_LABELS[c]) for c in front_options],
             on_select=self._orientation_front_changed,
         )
         return ft.Row([
@@ -209,8 +218,8 @@ class LetterSchemesPage(ft.Column):
             width=235,
             value=cat.orientation_memo,
             options=[
-                ft.dropdown.Option("visual", f"Visualize {noun}"),
-                ft.dropdown.Option("trace", f"Trace / shoot {noun}"),
+                ft.DropdownOption("visual", f"Visualize {noun}"),
+                ft.DropdownOption("trace", f"Trace / shoot {noun}"),
             ],
             on_select=lambda e, c=category: self._orientation_mode_changed(c, e.control.value),
         )
@@ -271,7 +280,7 @@ class LetterSchemesPage(ft.Column):
             for sticker in stickers:
                 letter = cat.stickers.get(sticker, "")
                 label = f"{sticker} ({letter})" if letter and letter != "BUFFER" else sticker
-                options.append(ft.dropdown.Option(sticker, label))
+                options.append(ft.DropdownOption(sticker, label))
             rows.append(
                 ft.Row([
                     ft.Container(ft.Text(f"{i + 1}. {piece}", weight=ft.FontWeight.BOLD), width=85),

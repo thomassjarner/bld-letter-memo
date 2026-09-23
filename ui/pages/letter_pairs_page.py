@@ -4,10 +4,13 @@ from core.pairs import get_active_pairs
 from ui.state import AppState
 
 
+@ft.control
 class LetterPairsPage(ft.Column):
-    def __init__(self, state: AppState):
-        super().__init__(expand=True, spacing=12)
-        self.state = state
+    state: AppState | None = None
+
+    def init(self):
+        self.expand = True
+        self.spacing = 12
         self.search_field = ft.TextField(
             hint_text="Search letter pairs...",
             width=260,
@@ -24,17 +27,17 @@ class LetterPairsPage(ft.Column):
             width=210,
             value="__all__",
             label="Letter scheme",
-            options=[ft.dropdown.Option("__all__", "All letter schemes")],
+            options=[ft.DropdownOption("__all__", "All letter schemes")],
             on_select=self._on_search_change,
         )
         self.status_filter = ft.Dropdown(
             width=175,
             value="all",
             options=[
-                ft.dropdown.Option("all", "All pairs"),
-                ft.dropdown.Option("active", "Active"),
-                ft.dropdown.Option("inactive", "Inactive"),
-                ft.dropdown.Option("missing", "Missing words"),
+                ft.DropdownOption("all", "All pairs"),
+                ft.DropdownOption("active", "Active"),
+                ft.DropdownOption("inactive", "Inactive"),
+                ft.DropdownOption("missing", "Missing words"),
             ],
             on_select=self._on_search_change,
         )
@@ -81,8 +84,8 @@ class LetterPairsPage(ft.Column):
         if selected_scheme != "__all__" and selected_scheme not in self.state.data.schemes:
             selected_scheme = "__all__"
             self.scheme_filter.value = "__all__"
-        self.scheme_filter.options = [ft.dropdown.Option("__all__", "All letter schemes")] + [
-            ft.dropdown.Option(name, name) for name in scheme_names
+        self.scheme_filter.options = [ft.DropdownOption("__all__", "All letter schemes")] + [
+            ft.DropdownOption(name, name) for name in scheme_names
         ]
 
         if selected_scheme == "__all__":

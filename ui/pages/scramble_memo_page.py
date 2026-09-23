@@ -3,10 +3,13 @@ import flet as ft
 from core.tracer import ScrambleTracer, ScrambleError
 
 
+@ft.control
 class ScrambleMemoPage(ft.Column):
-    def __init__(self, state):
-        super().__init__(expand=True, scroll=ft.ScrollMode.AUTO)
-        self.state = state
+    state: object | None = None
+
+    def init(self):
+        self.expand = True
+        self.scroll = ft.ScrollMode.AUTO
         self.tracer = ScrambleTracer()
         self.scramble = ft.TextField(
             label="Scramble",

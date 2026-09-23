@@ -54,6 +54,7 @@ def _wca_average(solves, count: int):
     return int(round(sum(remaining) / len(remaining)))
 
 
+@ft.control
 class PracticePage(ft.Column):
     """Practice hub plus Blind Timer.
 
@@ -72,11 +73,12 @@ class PracticePage(ft.Column):
     HOLD_ARM_SECONDS = 0.35
     SPACE_KEYS = (" ", "Space")
 
-    def __init__(self, page: ft.Page, state, open_memo_callback=None):
-        super().__init__(expand=True, scroll=ft.ScrollMode.AUTO)
-        self.page_ref = page
-        self.state = state
-        self.open_memo_callback = open_memo_callback
+    state: object | None = None
+    open_memo_callback: object | None = None
+
+    def init(self):
+        self.expand = True
+        self.scroll = ft.ScrollMode.AUTO
         self.generator = ScrambleGenerator()
 
         self.mode = "menu"
@@ -279,7 +281,7 @@ class PracticePage(ft.Column):
             self.timer_text.value = "0.00"
             self.timer_text.color = None
             self._safe_update()
-            self.page_ref.run_task(self._arm_after_delay)
+            self.page.run_task(self._arm_after_delay)
 
     def _on_key_up(self, e: ft.KeyUpEvent):
         if not self.active or self.mode != "timer":
@@ -336,7 +338,7 @@ class PracticePage(ft.Column):
         self.dnf_button.disabled = True
         self.memo_button.disabled = True
         self._safe_update()
-        self.page_ref.run_task(self._tick_loop)
+        self.page.run_task(self._tick_loop)
 
     def _stop_timer(self, now: float):
         elapsed = max(0.0, now - self.started_at)
@@ -504,7 +506,7 @@ class PracticePage(ft.Column):
 
     def _copy_text(self, text: str, message: str = "Copied"):
         try:
-            self.page_ref.set_clipboard(text)
+            self.page.set_clipboard(text)
             self._show_copy_notice(message)
             self._focus_keyboard_listener()
         except Exception:
@@ -516,7 +518,7 @@ class PracticePage(ft.Column):
         self.copy_notice.value = message
         self.copy_notice.opacity = 1
         self._safe_update()
-        self.page_ref.run_task(self._fade_copy_notice, token)
+        self.page.run_task(self._fade_copy_notice, token)
 
     async def _fade_copy_notice(self, token: int):
         await asyncio.sleep(3.0)
@@ -549,7 +551,7 @@ class PracticePage(ft.Column):
 
     def _confirm_reset(self, e=None):
         def close(dialog):
-            self.page_ref.close(dialog)
+            self.page.close(dialog)
 
         def reset(dialog):
             self.state.reset_practice_session()
@@ -567,4 +569,4 @@ class PracticePage(ft.Column):
                 ft.TextButton("Reset", on_click=lambda e: reset(dialog)),
             ],
         )
-        self.page_ref.open(dialog)
+        self.page.open(dialog)
