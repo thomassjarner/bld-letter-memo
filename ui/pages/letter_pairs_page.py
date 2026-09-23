@@ -16,6 +16,7 @@ class LetterPairsPage(ft.Column):
     def init(self):
         self.expand = True
         self.spacing = 12
+        self.scroll = ft.ScrollMode.AUTO
         self.search_field = ft.TextField(
             hint_text="Search letter pairs...",
             width=260,
@@ -50,7 +51,7 @@ class LetterPairsPage(ft.Column):
         self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
         self.progress_bar = ft.ProgressBar(width=220, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.rows_view = ft.ListView(expand=True, spacing=2)
+        self.rows_view = ft.Column(spacing=2)
         self._word_fields: list[ft.TextField] = []
 
         self.controls = [

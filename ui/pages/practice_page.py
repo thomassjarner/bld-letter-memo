@@ -55,6 +55,20 @@ def _wca_average(solves, count: int):
     return int(round(sum(remaining) / len(remaining)))
 
 
+
+def _best_wca_average(solves, count: int):
+    """Best valid WCA-style average of `count` across the current session."""
+    if len(solves) < count:
+        return None
+    best = None
+    for end in range(count, len(solves) + 1):
+        value = _wca_average(solves[end-count:end], count)
+        if value is None or value == "DNF":
+            continue
+        if best is None or value < best:
+            best = value
+    return best
+
 @ft.control
 class PracticePage(ft.Column):
     @property
@@ -492,6 +506,8 @@ class PracticePage(ft.Column):
         successes = sum(1 for s in solves if not s.dnf)
         ao5 = _wca_average(solves, 5)
         ao12 = _wca_average(solves, 12)
+        best_ao5 = _best_wca_average(solves, 5)
+        best_ao12 = _best_wca_average(solves, 12)
         best = min((_effective_centiseconds(s) for s in solves if not s.dnf), default=None)
 
         def fmt_avg(value):
@@ -504,7 +520,8 @@ class PracticePage(ft.Column):
         self.stats_text.value = (
             f"Successful / total: {successes}/{len(solves)}    "
             f"Ao5: {fmt_avg(ao5)}    Ao12: {fmt_avg(ao12)}    "
-            f"Best: {_format_centiseconds(best) if best is not None else '—'}"
+            f"Best single: {_format_centiseconds(best) if best is not None else '—'}    "
+            f"Best Ao5: {fmt_avg(best_ao5)}    Best Ao12: {fmt_avg(best_ao12)}"
         )
 
         rows = []

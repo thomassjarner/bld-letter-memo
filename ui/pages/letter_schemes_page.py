@@ -40,7 +40,7 @@ class LetterSchemesPage(ft.Column):
         # page. Replacing the whole Column on every setting change reset its
         # scroll position to the top, which made Advanced settings painful to
         # edit. Updating its controls in place preserves the viewport.
-        self.body_scroll = ft.Column(spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
+        self.body_scroll = ft.ListView(expand=True, spacing=12, padding=0)
         self.body_area = ft.Container(expand=True, padding=16, content=self.body_scroll)
         self.settings_message = ft.Text("", size=12, color=ft.Colors.ERROR)
         self._advanced_expanded = False
