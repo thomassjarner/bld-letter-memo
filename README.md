@@ -1,3 +1,17 @@
+# BLD Letter Memo Web 2.8
+
+This build adds:
+- explicit web scrolling for Letter Schemes and Letter Pairs;
+- inline editable pair aliases on double-click;
+- automatic focus advance while entering scheme letters;
+- Backspace-to-previous-cell behavior for scheme entry;
+- Practice keyboard shortcuts: D = DNF, + or 2 = +2;
+- restored click-on-time copy for `time - scramble`;
+- copy confirmation fades after 2 seconds.
+
+The gold-standard scramble regression tests pass.
+
+
 # BLD Letter Memo
 
 A [Flet](https://flet.dev) app (desktop **and** browser, same codebase) for

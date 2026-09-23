@@ -27,6 +27,8 @@ def build_sticker_grid(
     category: str,
     category_scheme: CategoryScheme,
     on_letter_change,
+    on_field_focus=None,
+    field_registry=None,
 ) -> ft.Control:
     """
     on_letter_change(sticker: str, new_value: str) -> None
@@ -70,7 +72,10 @@ def build_sticker_grid(
                     text_align=ft.TextAlign.CENTER,
                     border_color=ft.Colors.RED if sticker in duplicated_stickers else None,
                     on_change=lambda e, s=sticker: on_letter_change(s, e.control.value),
+                    on_focus=(lambda e, s=sticker: on_field_focus(s)) if on_field_focus else None,
                 )
+                if field_registry is not None:
+                    field_registry[sticker] = field
                 cell = field
             cells.append(cell)
 

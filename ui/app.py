@@ -110,6 +110,14 @@ async def main(page: ft.Page):
     # changes and it happens to be visible.
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
 
+    def on_page_keyboard(e):
+        # Sticker-entry Backspace behavior is only active while Letter Schemes
+        # is the visible page, so it cannot interfere with the Practice timer.
+        if content_area is not None and content_area.content is schemes_page:
+            schemes_page.handle_keyboard_event(e)
+
+    page.on_keyboard_event = on_page_keyboard
+
     sidebar = ft.Container(
         width=220,
         padding=ft.Padding.only(top=8, bottom=4),

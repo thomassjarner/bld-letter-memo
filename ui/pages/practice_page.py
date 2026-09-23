@@ -329,6 +329,17 @@ class PracticePage(ft.Column):
             self._stop_timer(now)
             return
 
+        # After a solve has stopped, quick keyboard result shortcuts:
+        # D = DNF; + or 2 = +2. Space remains reserved for arming the next solve.
+        key = (e.key or "").upper()
+        if self.last_solve_index is not None and not self.holding_space:
+            if key == "D":
+                self._mark_last("dnf")
+                return
+            if e.key in {"+", "2", "Add", "NumpadAdd"}:
+                self._mark_last("plus2")
+                return
+
         if e.key in self.SPACE_KEYS and not self.holding_space:
             self.holding_space = True
             self.armed = False
@@ -573,9 +584,12 @@ class PracticePage(ft.Column):
                 ft.Container(
                     ft.Row([
                         ft.Text(f"#{idx + 1}", width=50),
-                        ft.GestureDetector(
-                            content=ft.Text(result, width=90, weight=ft.FontWeight.BOLD, color=result_color),
-                            on_tap=lambda e, s=solve: self._copy_time_and_scramble(s),
+                        ft.Container(
+                            content=ft.Text(result, weight=ft.FontWeight.BOLD, color=result_color),
+                            width=100,
+                            padding=ft.Padding.symmetric(horizontal=4, vertical=6),
+                            tooltip="Click to copy time + scramble",
+                            on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
                         ),
                         ft.GestureDetector(
                             content=ft.Text(solve.scramble, expand=True, max_lines=2, tooltip="Click to copy scramble"),
@@ -610,7 +624,7 @@ class PracticePage(ft.Column):
         self.page.run_task(self._fade_copy_notice, token)
 
     async def _fade_copy_notice(self, token: int):
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(2.0)
         if token != self._copy_notice_token:
             return
         try:

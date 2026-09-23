@@ -1,6 +1,6 @@
 import flet as ft
 
-from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
+from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER, CATEGORY_STICKER_ORDER
 from core.tracer import STANDARD_CORNER_PRIORITY, STANDARD_EDGE_PRIORITY
 from ui.components.buffer_picker import build_buffer_picker
 from ui.components.sticker_grid import build_sticker_grid
@@ -35,7 +35,7 @@ class LetterSchemesPage(ft.Column):
         self.selected_category = "edges"
         self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=200, on_submit=self._create_scheme)
         self.rename_field = ft.TextField(hint_text="Rename active scheme", width=200, on_submit=self._rename_scheme)
-        self.scheme_list_view = ft.ListView(expand=True, spacing=2)
+        self.scheme_list_view = ft.ListView(expand=True, spacing=2, scroll=ft.ScrollMode.AUTO)
         # Keep one scrollable body control mounted for the lifetime of the
         # page. Replacing the whole Column on every setting change reset its
         # scroll position to the top, which made Advanced settings painful to
@@ -44,10 +44,14 @@ class LetterSchemesPage(ft.Column):
             expand=True,
             spacing=12,
             padding=ft.Padding.all(16),
+            scroll=ft.ScrollMode.ALWAYS,
         )
         self.settings_message = ft.Text("", size=12, color=ft.Colors.ERROR)
         self._advanced_expanded = False
         self._category_advanced_expanded = {"corners": False, "edges": False}
+        self._sticker_fields = {}
+        self._sticker_order = []
+        self._focused_sticker = None
         self.controls = [self._build_layout()]
         self.refresh(update=False)
 
@@ -135,10 +139,15 @@ class LetterSchemesPage(ft.Column):
             lambda sticker: self._set_buffer(sticker),
         )
 
+        self._sticker_fields = {}
         grid = build_sticker_grid(
             self.selected_category, cat,
             lambda sticker, value: self._set_letter(sticker, value),
+            on_field_focus=self._on_sticker_focus,
+            field_registry=self._sticker_fields,
         )
+        # Preserve the exact sticker order while skipping the physical buffer.
+        self._sticker_order = [s for s in CATEGORY_STICKER_ORDER[self.selected_category] if s in self._sticker_fields]
 
         self.body_scroll.controls = [
             ft.Row(
@@ -377,6 +386,62 @@ class LetterSchemesPage(ft.Column):
         # Deliberately does NOT rebuild the grid here: rebuilding on every
         # keystroke would steal focus from the field the user is typing in.
         self.state.set_sticker_letter(scheme, self.selected_category, sticker, value)
+        # One entered letter advances immediately to the next editable sticker.
+        if (value or "").strip():
+            self._focus_adjacent_sticker(sticker, +1)
+
+    def _on_sticker_focus(self, sticker: str):
+        self._focused_sticker = sticker
+
+    def _focus_control(self, control):
+        try:
+            if self.page is not None and control is not None:
+                self.page.run_task(control.focus)
+        except Exception:
+            pass
+
+    def _focus_adjacent_sticker(self, sticker: str, delta: int):
+        try:
+            idx = self._sticker_order.index(sticker)
+        except ValueError:
+            return
+        target_idx = idx + delta
+        if 0 <= target_idx < len(self._sticker_order):
+            target = self._sticker_order[target_idx]
+            self._focused_sticker = target
+            self._focus_control(self._sticker_fields.get(target))
+
+    def handle_keyboard_event(self, e):
+        """Scheme-entry keyboard helper used by the app-level key router.
+
+        If Backspace is pressed in an already-empty sticker box, erase the
+        previous box and move focus back to it. Normal Backspace inside a
+        non-empty box is left to the TextField itself.
+        """
+        if getattr(e, "key", "") != "Backspace" or not self._focused_sticker:
+            return
+        current = self._sticker_fields.get(self._focused_sticker)
+        if current is None or (current.value or ""):
+            return
+        try:
+            idx = self._sticker_order.index(self._focused_sticker)
+        except ValueError:
+            return
+        if idx <= 0:
+            return
+        prev_sticker = self._sticker_order[idx - 1]
+        prev = self._sticker_fields.get(prev_sticker)
+        if prev is None:
+            return
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        self.state.set_sticker_letter(scheme, self.selected_category, prev_sticker, "")
+        prev.value = ""
+        if prev.page is not None:
+            prev.update()
+        self._focused_sticker = prev_sticker
+        self._focus_control(prev)
 
     def _orientation_up_changed(self, e):
         scheme = self.state.active_scheme

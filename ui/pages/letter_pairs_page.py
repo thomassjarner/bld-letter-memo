@@ -52,6 +52,7 @@ class LetterPairsPage(ft.Column):
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.rows_view = ft.Column(spacing=2)
         self._word_fields: list[ft.TextField] = []
+        self._editing_alias_pair: str | None = None
 
         # One explicit ListView owns scrolling for the entire Letter Pairs page.
         # This is more reliable in Flet static-web than nesting an expanding list
@@ -60,6 +61,7 @@ class LetterPairsPage(ft.Column):
             expand=True,
             spacing=12,
             padding=ft.Padding.all(4),
+            scroll=ft.ScrollMode.ALWAYS,
         )
         self.page_scroll.controls = [
             ft.Row(
@@ -200,13 +202,28 @@ class LetterPairsPage(ft.Column):
         self._word_fields.append(field)
 
         display_pair = self.state.get_pair_display(pair)
-        pair_label = ft.GestureDetector(
-            content=ft.Container(
-                ft.Text(display_pair, weight=ft.FontWeight.BOLD, tooltip=f"Underlying pair: {pair}"),
+        if self._editing_alias_pair == pair:
+            pair_label = ft.Container(
+                ft.TextField(
+                    value=display_pair,
+                    width=68,
+                    dense=True,
+                    autofocus=True,
+                    max_length=8,
+                    tooltip=f"Underlying pair: {pair}",
+                    on_blur=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
+                    on_submit=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
+                ),
                 width=70,
-            ),
-            on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
-        )
+            )
+        else:
+            pair_label = ft.GestureDetector(
+                content=ft.Container(
+                    ft.Text(display_pair, weight=ft.FontWeight.BOLD, tooltip=f"Underlying pair: {pair}"),
+                    width=70,
+                ),
+                on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
+            )
 
         status_chip = ft.Container(
             content=ft.Text("Active" if is_active else "Inactive", size=12, color=ft.Colors.WHITE),
@@ -234,44 +251,16 @@ class LetterPairsPage(ft.Column):
         )
 
     def _edit_pair_alias(self, pair: str):
-        current = self.state.get_pair_display(pair)
-        field = ft.TextField(
-            label=f"Display label for {pair}",
-            value="" if current == pair else current,
-            hint_text=pair,
-            autofocus=True,
-            max_length=8,
-        )
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Edit displayed letter pair"),
-            content=ft.Column(
-                [
-                    ft.Text(
-                        f"This only changes how {pair} is displayed. The pair remains {pair} internally, so searches for either form still work.",
-                        size=12,
-                    ),
-                    field,
-                    ft.Text("Leave it blank to restore the original pair.", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                ],
-                tight=True,
-            ),
-            actions=[],
-        )
+        self._editing_alias_pair = pair
+        self.refresh()
 
-        def cancel(e):
-            self.page.close(dialog)
-
-        def save(e):
-            self.state.set_pair_alias(pair, field.value or "")
-            self.page.close(dialog)
-            self.refresh()
-
-        dialog.actions = [
-            ft.TextButton("Cancel", on_click=cancel),
-            ft.ElevatedButton("Save", on_click=save),
-        ]
-        self.page.show_dialog(dialog)
+    def _save_pair_alias_inline(self, pair: str, value: str):
+        # on_submit can be followed by on_blur; guard against saving twice.
+        if self._editing_alias_pair != pair:
+            return
+        self._editing_alias_pair = None
+        self.state.set_pair_alias(pair, value or "")
+        self.refresh()
 
     def _word_changed(self, pair: str, value: str):
         self.state.set_word(pair, value)
