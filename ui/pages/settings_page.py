@@ -13,7 +13,7 @@ from ui.state import AppState
 class SettingsPage(ft.Column):
     def __init__(self, page: ft.Page, state: AppState, theme_callback=None):
         super().__init__(expand=True, spacing=12)
-        self.page = page
+        self.page_ref = page
         self.state = state
         self.theme_callback = theme_callback
         self.status_text = ft.Text("")
@@ -21,7 +21,7 @@ class SettingsPage(ft.Column):
         self._current_dialog: ft.AlertDialog | None = None
 
         self.file_picker = ft.FilePicker(on_result=self._import_file_selected)
-        self.page.overlay.append(self.file_picker)
+        self.page_ref.overlay.append(self.file_picker)
 
         self.dark_mode_switch = ft.Switch(
             label="Dark mode",
@@ -105,19 +105,19 @@ class SettingsPage(ft.Column):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         self._current_dialog = dialog
-        self.page.open(dialog)
+        self.page_ref.open(dialog)
 
     def _close_dialog(self, e):
         if self._current_dialog is not None:
-            self.page.close(self._current_dialog)
+            self.page_ref.close(self._current_dialog)
         self._pending_import = None
 
     def _confirm_import(self, e):
         path = self._pending_import
         if self._current_dialog is not None:
-            self.page.close(self._current_dialog)
+            self.page_ref.close(self._current_dialog)
         if path is None:
-            self.page.update()
+            self.page_ref.update()
             return
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -133,4 +133,4 @@ class SettingsPage(ft.Column):
         except (OSError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
             self.status_text.value = f"Could not import that backup: {exc}"
         self._pending_import = None
-        self.page.update()
+        self.page_ref.update()
