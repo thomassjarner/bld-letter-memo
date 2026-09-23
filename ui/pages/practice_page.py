@@ -221,7 +221,7 @@ class PracticePage(ft.Column):
                     alignment=ft.MainAxisAlignment.CENTER,
                     spacing=8,
                 ),
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 padding=36,
                 height=250,
             ),

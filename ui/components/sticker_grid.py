@@ -59,7 +59,7 @@ def build_sticker_grid(
                     height=64,
                     bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                     border_radius=8,
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment.CENTER,
                 )
             else:
                 field = ft.TextField(

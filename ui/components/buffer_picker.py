@@ -10,6 +10,6 @@ def build_buffer_picker(category: str, current_buffer_sticker: str | None, on_ch
         hint_text="Choose exact sticker",
         width=230,
         value=current_buffer_sticker,
-        options=[ft.DropdownOption(key=s, text=s) for s in stickers],
+        options=[ft.dropdown.Option(s) for s in stickers],
         on_select=lambda e: on_change(e.control.value),
     )

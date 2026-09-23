@@ -21,7 +21,7 @@ class SettingsPage(ft.Column):
         self._current_dialog: ft.AlertDialog | None = None
 
         self.file_picker = ft.FilePicker(on_result=self._import_file_selected)
-        self.page.services.append(self.file_picker)
+        self.page.overlay.append(self.file_picker)
 
         self.dark_mode_switch = ft.Switch(
             label="Dark mode",
