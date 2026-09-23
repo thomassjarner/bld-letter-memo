@@ -193,7 +193,8 @@ class LetterSchemesPage(ft.Column):
         )
 
         return ft.ExpansionTile(
-            initially_expanded=self._advanced_expanded,
+            expanded=self._advanced_expanded,
+            on_change=lambda e: setattr(self, "_advanced_expanded", bool(e.control.expanded)),
             title=ft.Text("Advanced settings"),
             subtitle=ft.Text("Cycle breaks, twist/flip handling, and memo/execution order", size=12),
             controls=[
@@ -232,7 +233,8 @@ class LetterSchemesPage(ft.Column):
         mode_label = "Standard" if cat.tracing_mode == "standard" else "Custom"
         rows = self._build_cycle_break_rows(scheme, category)
         return ft.ExpansionTile(
-            initially_expanded=self._category_advanced_expanded.get(category, False),
+            expanded=self._category_advanced_expanded.get(category, False),
+            on_change=lambda e, c=category: self._category_advanced_expanded.__setitem__(c, bool(e.control.expanded)),
             title=ft.Text(f"{title} tracing — {mode_label}"),
             controls=[
                 ft.Container(
