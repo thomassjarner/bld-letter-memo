@@ -24,19 +24,19 @@ class LetterPairsPage(ft.Column):
             width=210,
             value="__all__",
             label="Letter scheme",
-            options=[ft.dropdown.Option("__all__", "All letter schemes")],
-            on_change=self._on_search_change,
+            options=[ft.DropdownOption(key="__all__", text="All letter schemes")],
+            on_select=self._on_search_change,
         )
         self.status_filter = ft.Dropdown(
             width=175,
             value="all",
             options=[
-                ft.dropdown.Option("all", "All pairs"),
-                ft.dropdown.Option("active", "Active"),
-                ft.dropdown.Option("inactive", "Inactive"),
-                ft.dropdown.Option("missing", "Missing words"),
+                ft.DropdownOption(key="all", text="All pairs"),
+                ft.DropdownOption(key="active", text="Active"),
+                ft.DropdownOption(key="inactive", text="Inactive"),
+                ft.DropdownOption(key="missing", text="Missing words"),
             ],
-            on_change=self._on_search_change,
+            on_select=self._on_search_change,
         )
         self.progress_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
         self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
@@ -81,8 +81,8 @@ class LetterPairsPage(ft.Column):
         if selected_scheme != "__all__" and selected_scheme not in self.state.data.schemes:
             selected_scheme = "__all__"
             self.scheme_filter.value = "__all__"
-        self.scheme_filter.options = [ft.dropdown.Option("__all__", "All letter schemes")] + [
-            ft.dropdown.Option(name, name) for name in scheme_names
+        self.scheme_filter.options = [ft.DropdownOption(key="__all__", text="All letter schemes")] + [
+            ft.DropdownOption(key=name, text=name) for name in scheme_names
         ]
 
         if selected_scheme == "__all__":

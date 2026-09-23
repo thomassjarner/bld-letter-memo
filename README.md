@@ -40,6 +40,9 @@ unchanged. Specifically:
   `page.close(d)` (in Settings' import-confirmation dialog and Practice's
   reset-session dialog)
 - `ft.app(target=main)` → `ft.run(main)`
+- Flet 0.86 `Dropdown` selection events use `on_select` (not the old `on_change`) and options use `ft.DropdownOption`.
+- The legacy `Tabs(tabs=[...])` constructor was migrated to the 0.86 `Tabs` + `TabBar` API.
+- `FilePicker` is registered as a page service rather than a visual overlay control.
 
 **This migration has not been run end-to-end** (same sandbox limitation as
 the original build — no network access to install Flet here). Everything
