@@ -1,3 +1,16 @@
+# BLD Letter Memo Web 2.11
+
+Changes:
+- Letter Pairs A/B/C pages now use two side-by-side columns, so a full letter group fits much better on shorter laptop screens without scrolling.
+- Each compact pair row still shows Pair, Word, Status and Active in.
+- Fixed the Flet dialog API for timer session reset.
+- Fixed the same dialog API issue for Import Backup confirmation.
+- Uses page.show_dialog(...) / page.pop_dialog() instead of removed page.open(...) / page.close(...).
+
+Regression status:
+- 4/4 gold-standard scramble tests pass.
+
+
 # BLD Letter Memo Web 2.10
 
 Changes:

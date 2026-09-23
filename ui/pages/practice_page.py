@@ -653,13 +653,13 @@ class PracticePage(ft.Column):
         self._focus_keyboard_listener()
 
     def _confirm_reset(self, e=None):
-        def close(dialog):
-            self.page.close(dialog)
+        def close(dialog=None):
+            self.page.pop_dialog()
 
-        def reset(dialog):
+        def reset(dialog=None):
             self.state.reset_practice_session()
             self.last_solve_index = None
-            close(dialog)
+            close()
             self._refresh_stats_and_history()
             self._focus_keyboard_listener()
 
@@ -672,4 +672,4 @@ class PracticePage(ft.Column):
                 ft.TextButton("Reset", on_click=lambda e: reset(dialog)),
             ],
         )
-        self.page.open(dialog)
+        self.page.show_dialog(dialog)

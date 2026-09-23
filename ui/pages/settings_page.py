@@ -119,17 +119,19 @@ class SettingsPage(ft.Column):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         self._current_dialog = dialog
-        self.page.open(dialog)
+        self.page.show_dialog(dialog)
 
-    def _close_dialog(self, e):
+    def _close_dialog(self, e=None):
         if self._current_dialog is not None:
-            self.page.close(self._current_dialog)
+            self.page.pop_dialog()
+            self._current_dialog = None
         self._pending_import = None
 
     def _confirm_import(self, e):
         pending = self._pending_import
         if self._current_dialog is not None:
-            self.page.close(self._current_dialog)
+            self.page.pop_dialog()
+            self._current_dialog = None
         if pending is None:
             self.page.update()
             return

@@ -83,16 +83,22 @@ class LetterPairsPage(ft.Column):
             ],
             spacing=8,
         )
-        self.table_header = ft.Container(
+        compact_header = lambda: ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD), width=70),
+                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD), width=54),
                     ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD), expand=True),
-                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD), width=90),
-                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=220),
-                ]
+                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD), width=72),
+                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=105),
+                ],
+                spacing=6,
             ),
-            padding=ft.Padding.symmetric(horizontal=8),
+            padding=ft.Padding.symmetric(horizontal=6),
+            expand=True,
+        )
+        self.table_header = ft.Row(
+            [compact_header(), ft.VerticalDivider(width=8), compact_header()],
+            spacing=0,
         )
         self.group_controls = ft.Row(
             [self.prev_group, self.group_label, self.next_group],
@@ -185,9 +191,28 @@ class LetterPairsPage(ft.Column):
             self.next_group.disabled = group_index == len(groups) - 1
 
         self.count_text.value = f"{len(rows)} matching · {len(page_rows)} on this page"
-        self.rows_view.controls = [
-            self._build_row(pair, word, is_active, sources) for pair, word, is_active, sources in page_rows
+
+        # Use the screen horizontally: each letter page is rendered in two
+        # compact columns.  This keeps a full A/B/C... group visible even on
+        # shorter laptop screens without relying on browser scrolling.
+        cells = [
+            self._build_compact_row(pair, word, is_active, sources)
+            for pair, word, is_active, sources in page_rows
         ]
+        split_at = (len(cells) + 1) // 2
+        left = cells[:split_at]
+        right = cells[split_at:]
+        visual_rows = []
+        for i in range(split_at):
+            right_cell = right[i] if i < len(right) else ft.Container(expand=True)
+            visual_rows.append(
+                ft.Row(
+                    [left[i], ft.VerticalDivider(width=8), right_cell],
+                    spacing=0,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                )
+            )
+        self.rows_view.controls = visual_rows
         if update and self.page is not None:
             self.update()
 
@@ -219,7 +244,7 @@ class LetterPairsPage(ft.Column):
 
         return pair_match or word_match
 
-    def _build_row(self, pair: str, word: str, is_active: bool, sources: list[str]) -> ft.Control:
+    def _build_compact_row(self, pair: str, word: str, is_active: bool, sources: list[str]) -> ft.Control:
         field = ft.TextField(
             value=word,
             hint_text=None,
@@ -237,7 +262,7 @@ class LetterPairsPage(ft.Column):
             pair_label = ft.Container(
                 ft.TextField(
                     value=display_pair,
-                    width=68,
+                    width=52,
                     dense=True,
                     autofocus=True,
                     max_length=8,
@@ -246,13 +271,13 @@ class LetterPairsPage(ft.Column):
                     on_blur=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
                     on_submit=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
                 ),
-                width=70,
+                width=54,
             )
         else:
             pair_label = ft.GestureDetector(
                 content=ft.Container(
                     ft.Text(display_pair, weight=ft.FontWeight.BOLD, tooltip=f"Underlying pair: {pair}"),
-                    width=70,
+                    width=54,
                 ),
                 on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
             )
@@ -265,19 +290,21 @@ class LetterPairsPage(ft.Column):
         )
 
         return ft.Container(
+            expand=True,
             content=ft.Row(
                 [
                     pair_label,
                     ft.Container(field, expand=True),
-                    ft.Container(status_chip, width=90),
+                    ft.Container(status_chip, width=72),
                     ft.Container(
                         ft.Text(", ".join(sources), size=11, color=ft.Colors.ON_SURFACE_VARIANT, no_wrap=False),
-                        width=220,
+                        width=105,
                     ),
                 ],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=6,
             ),
-            padding=ft.Padding.symmetric(horizontal=8, vertical=0),
+            padding=ft.Padding.symmetric(horizontal=6, vertical=0),
             bgcolor=None if is_active else ft.Colors.SURFACE_CONTAINER_LOW,
             opacity=1.0 if is_active else 0.75,
         )
