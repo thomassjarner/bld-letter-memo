@@ -27,9 +27,9 @@ def main(page: ft.Page):
     state = AppState(repository)
     page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
 
-    schemes_page = LetterSchemesPage(state=state)
-    pairs_page = LetterPairsPage(state=state)
-    scramble_page = ScrambleMemoPage(state=state)
+    schemes_page = LetterSchemesPage(data=state)
+    pairs_page = LetterPairsPage(data=state)
+    scramble_page = ScrambleMemoPage(data=state)
     nav_rail = None
     practice_page = None
     pages = None
@@ -69,12 +69,14 @@ def main(page: ft.Page):
         if scramble_page.page is not None:
             scramble_page.update()
 
-    practice_page = PracticePage(state=state, open_memo_callback=open_scramble_from_practice)
+    practice_page = PracticePage(data=state)
+    practice_page.open_memo_callback = open_scramble_from_practice
     def apply_dark_mode(enabled: bool):
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
         page.update()
 
-    settings_page = SettingsPage(state=state, theme_callback=apply_dark_mode)
+    settings_page = SettingsPage(data=state)
+    settings_page.theme_callback = apply_dark_mode
 
     pages = [schemes_page, pairs_page, scramble_page, practice_page, settings_page]
     content_area = ft.Container(content=pages[0], expand=True, padding=16)

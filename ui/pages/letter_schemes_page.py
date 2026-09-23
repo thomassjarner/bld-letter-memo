@@ -1,4 +1,3 @@
-from dataclasses import field
 import flet as ft
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
@@ -21,7 +20,12 @@ OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 
 @ft.control
 class LetterSchemesPage(ft.Column):
-    state: AppState | None = field(default=None, metadata={"skip": True})
+    @property
+    def state(self):
+        # BaseControl.data is a Flet skip_field(), so Python-only AppState
+        # never enters the browser serialization protocol.
+        return self.data
+
 
     def init(self):
         self.expand = True

@@ -1,4 +1,3 @@
-from dataclasses import field
 import flet as ft
 
 from core.pairs import get_active_pairs
@@ -7,7 +6,12 @@ from ui.state import AppState
 
 @ft.control
 class LetterPairsPage(ft.Column):
-    state: AppState | None = field(default=None, metadata={"skip": True})
+    @property
+    def state(self):
+        # BaseControl.data is a Flet skip_field(), so Python-only AppState
+        # never enters the browser serialization protocol.
+        return self.data
+
 
     def init(self):
         self.expand = True

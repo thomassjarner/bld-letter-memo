@@ -1,4 +1,3 @@
-from dataclasses import field
 import json
 from datetime import date
 
@@ -10,8 +9,14 @@ from ui.state import AppState
 
 @ft.control
 class SettingsPage(ft.Column):
-    state: AppState | None = field(default=None, metadata={"skip": True})
-    theme_callback: object | None = field(default=None, metadata={"skip": True})
+    @property
+    def state(self):
+        # BaseControl.data is a Flet skip_field(), so Python-only AppState
+        # never enters the browser serialization protocol.
+        return self.data
+
+    theme_callback = None
+
 
     def init(self):
         self.expand = True

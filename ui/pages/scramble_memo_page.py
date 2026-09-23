@@ -1,4 +1,3 @@
-from dataclasses import field
 import flet as ft
 
 from core.tracer import ScrambleTracer, ScrambleError
@@ -6,7 +5,12 @@ from core.tracer import ScrambleTracer, ScrambleError
 
 @ft.control
 class ScrambleMemoPage(ft.Column):
-    state: object | None = field(default=None, metadata={"skip": True})
+    @property
+    def state(self):
+        # BaseControl.data is a Flet skip_field(), so Python-only AppState
+        # never enters the browser serialization protocol.
+        return self.data
+
 
     def init(self):
         self.expand = True

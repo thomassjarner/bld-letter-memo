@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import field
 
 import asyncio
 import time
@@ -58,6 +57,14 @@ def _wca_average(solves, count: int):
 
 @ft.control
 class PracticePage(ft.Column):
+    @property
+    def state(self):
+        # BaseControl.data is a Flet skip_field(), so Python-only AppState
+        # never enters the browser serialization protocol.
+        return self.data
+
+    open_memo_callback = None
+
     """Practice hub plus Blind Timer.
 
     Uses ft.KeyboardListener's real on_key_down/on_key_up events (added
@@ -75,8 +82,6 @@ class PracticePage(ft.Column):
     HOLD_ARM_SECONDS = 0.35
     SPACE_KEYS = (" ", "Space")
 
-    state: object | None = field(default=None, metadata={"skip": True})
-    open_memo_callback: object | None = field(default=None, metadata={"skip": True})
 
     def init(self):
         self.expand = True
