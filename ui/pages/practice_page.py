@@ -351,19 +351,37 @@ class PracticePage(ft.Column):
         elapsed = max(0.0, now - self.started_at)
         self.running = False
         centiseconds = max(0, int(round(elapsed * 100)))
+        solved_scramble = self.current_scramble
         self.timer_text.value = _format_centiseconds(centiseconds)
         self.timer_text.color = None
         self.status_text.value = "Stopped — mark Success, +2, or DNF"
-        self.last_solve_index = self.state.add_practice_solve(centiseconds, self.current_scramble, dnf=False, plus2=False)
+        self.last_solve_index = self.state.add_practice_solve(
+            centiseconds, solved_scramble, dnf=False, plus2=False
+        )
         self.success_button.disabled = False
         self.plus2_button.disabled = False
         self.dnf_button.disabled = False
         self.memo_button.disabled = False
-        self.previous_scramble_button.disabled = self.scramble_index <= 0
         self.new_scramble_button.disabled = False
+
+        # Prepare the next scramble immediately, while leaving the just-finished
+        # time and result controls on screen. The result buttons still refer to
+        # last_solve_index, i.e. the solve that just ended.
+        self._advance_to_fresh_scramble_preserving_result()
+
         self._refresh_stats_and_history(update=False)
         self._safe_update()
         self._focus_keyboard_listener()
+
+    def _advance_to_fresh_scramble_preserving_result(self):
+        if self.scramble_index < len(self.scramble_stack) - 1:
+            self.scramble_index += 1
+        else:
+            self.scramble_stack.append(self.generator.generate())
+            self.scramble_index += 1
+        self.current_scramble = self.scramble_stack[self.scramble_index]
+        self.scramble_text.value = self.current_scramble
+        self.previous_scramble_button.disabled = self.scramble_index <= 0
 
     def _safe_update(self):
         if self.page is not None:
@@ -386,7 +404,7 @@ class PracticePage(ft.Column):
             idx, solve = matching[-1]
             self.last_solve_index = idx
             if solve.dnf:
-                self.timer_text.value = "DNF"
+                self.timer_text.value = f"DNF ({_format_centiseconds(solve.centiseconds)})"
                 self.status_text.value = "Previous scramble — saved result: DNF"
             else:
                 effective = _effective_centiseconds(solve)
@@ -430,14 +448,27 @@ class PracticePage(ft.Column):
     def _mark_last(self, result: str):
         if self.last_solve_index is None:
             return
+        solves = self.state.data.practice_solves
+        if not (0 <= self.last_solve_index < len(solves)):
+            return
+
+        solve = solves[self.last_solve_index]
+        raw_time = _format_centiseconds(solve.centiseconds)
+
         if result == "dnf":
             self.state.set_practice_solve_result(self.last_solve_index, dnf=True, plus2=False)
+            self.timer_text.value = f"DNF ({raw_time})"
             self.status_text.value = "DNF"
         elif result == "plus2":
             self.state.set_practice_solve_result(self.last_solve_index, dnf=False, plus2=True)
+            # Show the penalized time immediately. Internally the solve keeps
+            # its measured time plus a +2 flag, so stats still use 37.26 for
+            # a measured 35.26 without losing the original measurement.
+            self.timer_text.value = _format_centiseconds(solve.centiseconds + 200) + "+"
             self.status_text.value = "+2"
         else:
             self.state.set_practice_solve_result(self.last_solve_index, dnf=False, plus2=False)
+            self.timer_text.value = raw_time
             self.status_text.value = "Success"
         self._refresh_stats_and_history(update=False)
         self._safe_update()
@@ -481,7 +512,7 @@ class PracticePage(ft.Column):
             solve = solves[idx]
             effective = _effective_centiseconds(solve)
             if solve.dnf:
-                result = "DNF"
+                result = f"DNF ({_format_centiseconds(solve.centiseconds)})"
                 result_color = ft.Colors.ERROR
             else:
                 result = _format_centiseconds(effective) + ("+" if getattr(solve, "plus2", False) else "")
@@ -543,7 +574,7 @@ class PracticePage(ft.Column):
 
     def _copy_time_and_scramble(self, solve):
         if solve.dnf:
-            result = "DNF"
+            result = f"DNF ({_format_centiseconds(solve.centiseconds)})"
         else:
             result = _format_centiseconds(_effective_centiseconds(solve))
             if getattr(solve, "plus2", False):

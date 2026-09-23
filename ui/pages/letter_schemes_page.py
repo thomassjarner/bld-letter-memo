@@ -65,7 +65,11 @@ class LetterSchemesPage(ft.Column):
                 expand=True,
             ),
         )
-        return ft.Row([sidebar, self.body_area], expand=True)
+        return ft.Row(
+            [sidebar, self.body_area],
+            expand=True,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+        )
 
     # ---- refresh ------------------------------------------------------------
 
