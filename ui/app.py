@@ -1,6 +1,6 @@
 import flet as ft
 
-from data.json_repository import JsonAppDataRepository
+from data.shared_preferences_repository import SharedPreferencesAppDataRepository
 from ui.pages.letter_pairs_page import LetterPairsPage
 from ui.pages.letter_schemes_page import LetterSchemesPage
 from ui.pages.practice_page import PracticePage
@@ -17,13 +17,13 @@ DESTINATIONS = [
 ]
 
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.title = "BLD Letter Memo"
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
     page.dark_theme = ft.Theme(color_scheme_seed=ft.Colors.TEAL_400)
     page.padding = 0
 
-    repository = JsonAppDataRepository()
+    repository = await SharedPreferencesAppDataRepository.create(page)
     state = AppState(repository)
     page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
 

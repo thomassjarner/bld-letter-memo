@@ -95,11 +95,12 @@ class ScrambleMemoPage(ft.Column):
     def _memo_text(self, pairs, orientation):
         shown = []
         for pair in pairs:
+            display_pair = self.state.get_pair_display(pair) if len(pair) == 2 and "?" not in pair else pair
             if self.show_words and len(pair) == 2 and "?" not in pair:
-                # Missing word deliberately falls back to the letters.
-                shown.append(self.state.get_word(pair) or pair)
+                # Missing word deliberately falls back to the visible pair label.
+                shown.append(self.state.get_word(pair) or display_pair)
             else:
-                shown.append(pair)
+                shown.append(display_pair)
         shown.extend(orientation)
         return " ".join(shown) if shown else "(solved)"
 

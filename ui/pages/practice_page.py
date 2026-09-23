@@ -124,6 +124,13 @@ class PracticePage(ft.Column):
         self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12)
         self._copy_notice_token = 0
         self.history = ft.Column(spacing=6)
+        self.session_dropdown = ft.Dropdown(
+            label="Session",
+            width=150,
+            value=self.state.data.active_practice_session,
+            options=[ft.DropdownOption(name, name) for name in self.state.practice_session_names],
+            on_select=self._switch_session,
+        )
 
         self.previous_scramble_button = ft.OutlinedButton(
             "Previous", icon=ft.Icons.ARROW_BACK, on_click=self._previous_scramble, disabled=True
@@ -217,7 +224,8 @@ class PracticePage(ft.Column):
                 ft.Row([
                     ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._show_menu),
                     ft.Text("Practice — Blind Timer", size=20, weight=ft.FontWeight.BOLD),
-                ]),
+                    self.session_dropdown,
+                ], wrap=True),
                 ft.Container(self.scramble_text, padding=12, border=ft.Border.all(1, ft.Colors.OUTLINE), border_radius=8),
                 ft.Row(
                     [self.previous_scramble_button, self.new_scramble_button],
@@ -265,9 +273,35 @@ class PracticePage(ft.Column):
             self._focus_keyboard_listener()
 
     def refresh(self, update: bool = True):
+        self.session_dropdown.value = self.state.data.active_practice_session
         self._refresh_stats_and_history(update=False)
         if update and self.page is not None:
             self.update()
+
+    def _switch_session(self, e):
+        if self.running:
+            # Do not move a running solve between sessions.
+            e.control.value = self.state.data.active_practice_session
+            self._safe_update()
+            return
+        name = e.control.value
+        self.state.switch_practice_session(name)
+        self.last_solve_index = None
+        self.current_scramble = self.generator.generate()
+        self.scramble_stack = [self.current_scramble]
+        self.scramble_index = 0
+        self.scramble_text.value = self.current_scramble
+        self.previous_scramble_button.disabled = True
+        self.timer_text.value = "0.00"
+        self.timer_text.color = None
+        self.status_text.value = ""
+        self.memo_button.disabled = True
+        self.success_button.disabled = True
+        self.plus2_button.disabled = True
+        self.dnf_button.disabled = True
+        self._refresh_stats_and_history(update=False)
+        self._safe_update()
+        self._focus_keyboard_listener()
 
     # ---- keyboard/timer --------------------------------------------------
 

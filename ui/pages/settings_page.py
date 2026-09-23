@@ -43,7 +43,7 @@ class SettingsPage(ft.Column):
             ),
             ft.Divider(),
             ft.Text("Backup & data", size=16, weight=ft.FontWeight.BOLD),
-            ft.Text("Autosave is on. Your data is stored locally for this app/browser."),
+            ft.Text("Autosave is on. Schemes, advanced settings, pair words/labels, timer sessions, and preferences are stored locally in this browser and survive app updates."),
             ft.Row(
                 [
                     ft.ElevatedButton("Export Backup", icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
@@ -51,7 +51,7 @@ class SettingsPage(ft.Column):
                 ]
             ),
             ft.Text(
-                "Importing a backup replaces the current schemes and letter-pair words.",
+                "Importing a backup replaces the current schemes, letter-pair data, timer sessions, and settings.",
                 size=12,
                 color=ft.Colors.ON_SURFACE_VARIANT,
             ),
@@ -110,7 +110,7 @@ class SettingsPage(ft.Column):
             modal=True,
             title=ft.Text("Import backup?"),
             content=ft.Text(
-                "This will replace your current schemes and letter-pair words with the selected backup."
+                "This will replace your current schemes, letter-pair data, timer sessions, and settings with the selected backup."
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=self._close_dialog),

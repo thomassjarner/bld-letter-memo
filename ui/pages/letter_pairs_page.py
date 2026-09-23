@@ -12,13 +12,12 @@ class LetterPairsPage(ft.Column):
         # never enters the browser serialization protocol.
         return self.data
 
-
     def init(self):
         self.expand = True
-        self.spacing = 12
-        self.scroll = ft.ScrollMode.AUTO
+        self.spacing = 0
+
         self.search_field = ft.TextField(
-            hint_text="Search letter pairs...",
+            hint_text="Search letter pairs (AC, A-, -S)...",
             width=260,
             prefix_icon=ft.Icons.SEARCH,
             on_change=self._on_search_change,
@@ -54,7 +53,15 @@ class LetterPairsPage(ft.Column):
         self.rows_view = ft.Column(spacing=2)
         self._word_fields: list[ft.TextField] = []
 
-        self.controls = [
+        # One explicit ListView owns scrolling for the entire Letter Pairs page.
+        # This is more reliable in Flet static-web than nesting an expanding list
+        # inside a custom Column which itself tries to scroll.
+        self.page_scroll = ft.ListView(
+            expand=True,
+            spacing=12,
+            padding=ft.Padding.all(4),
+        )
+        self.page_scroll.controls = [
             ft.Row(
                 [
                     self.search_field,
@@ -67,6 +74,11 @@ class LetterPairsPage(ft.Column):
             ),
             ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
             self.duplicate_warning,
+            ft.Text(
+                "Tip: double-click a pair label to change how it is displayed (for example AB → ØB).",
+                size=11,
+                color=ft.Colors.ON_SURFACE_VARIANT,
+            ),
             ft.Container(
                 content=ft.Row(
                     [
@@ -81,6 +93,7 @@ class LetterPairsPage(ft.Column):
             ft.Divider(height=1),
             self.rows_view,
         ]
+        self.controls = [self.page_scroll]
         self.refresh(update=False)
 
     def refresh(self, update: bool = True):
@@ -96,7 +109,11 @@ class LetterPairsPage(ft.Column):
 
         if selected_scheme == "__all__":
             active_pairs = get_active_pairs(self.state.data.schemes)
-            all_pairs = set(active_pairs) | set(self.state.data.global_words.keys())
+            all_pairs = (
+                set(active_pairs)
+                | set(self.state.data.global_words.keys())
+                | set(self.state.data.pair_aliases.keys())
+            )
         else:
             active_pairs = get_active_pairs({selected_scheme: self.state.data.schemes[selected_scheme]})
             # "Show only from this scheme" is intentionally strict: unrelated
@@ -139,26 +156,34 @@ class LetterPairsPage(ft.Column):
         self.rows_view.controls = [
             self._build_row(pair, word, is_active, sources) for pair, word, is_active, sources in rows
         ]
-        if update:
+        if update and self.page is not None:
             self.update()
+
+    def _pair_search_match(self, value: str, query: str) -> bool:
+        """Match exact/canonical/alias pair text including A-, -B wildcards."""
+        value = (value or "").upper()
+        q = (query or "").upper()
+        if not q:
+            return True
+        if q.endswith("-") and len(q) > 1:
+            return value.startswith(q[:-1])
+        if q.startswith("-") and len(q) > 1:
+            return value.endswith(q[1:])
+        if len(q) == 1:
+            return value.startswith(q)
+        return value == q
 
     def _matches_search(self, pair: str, word: str, query: str) -> bool:
         pair_match = False
         word_match = False
 
         if self.search_pairs.value:
-            q = query.upper()
-            if len(q) == 1 and q.isalpha():
-                pair_match = pair.startswith(q)
-            elif len(q) == 2 and q[0].isalpha() and q[1] == "-":
-                pair_match = pair.startswith(q[0])
-            elif len(q) == 2 and q[0] == "-" and q[1].isalpha():
-                pair_match = pair.endswith(q[1])
-            else:
-                pair_match = pair == q
+            display = self.state.get_pair_display(pair)
+            # Search both the canonical pair (AB) and its visible alias (ØB).
+            pair_match = self._pair_search_match(pair, query) or self._pair_search_match(display, query)
 
         if self.search_words.value:
-            word_match = query.lower() in word.lower()
+            word_match = query.casefold() in word.casefold()
 
         return pair_match or word_match
 
@@ -174,6 +199,15 @@ class LetterPairsPage(ft.Column):
         )
         self._word_fields.append(field)
 
+        display_pair = self.state.get_pair_display(pair)
+        pair_label = ft.GestureDetector(
+            content=ft.Container(
+                ft.Text(display_pair, weight=ft.FontWeight.BOLD, tooltip=f"Underlying pair: {pair}"),
+                width=70,
+            ),
+            on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
+        )
+
         status_chip = ft.Container(
             content=ft.Text("Active" if is_active else "Inactive", size=12, color=ft.Colors.WHITE),
             bgcolor=ft.Colors.GREEN_600 if is_active else ft.Colors.GREY_500,
@@ -184,7 +218,7 @@ class LetterPairsPage(ft.Column):
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(ft.Text(pair, weight=ft.FontWeight.BOLD), width=70),
+                    pair_label,
                     ft.Container(field, expand=True),
                     ft.Container(status_chip, width=90),
                     ft.Container(
@@ -195,9 +229,49 @@ class LetterPairsPage(ft.Column):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             padding=ft.Padding.symmetric(horizontal=8, vertical=2),
-            bgcolor=None if is_active else ft.Colors.GREY_100,
+            bgcolor=None if is_active else ft.Colors.SURFACE_CONTAINER_LOW,
             opacity=1.0 if is_active else 0.75,
         )
+
+    def _edit_pair_alias(self, pair: str):
+        current = self.state.get_pair_display(pair)
+        field = ft.TextField(
+            label=f"Display label for {pair}",
+            value="" if current == pair else current,
+            hint_text=pair,
+            autofocus=True,
+            max_length=8,
+        )
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Edit displayed letter pair"),
+            content=ft.Column(
+                [
+                    ft.Text(
+                        f"This only changes how {pair} is displayed. The pair remains {pair} internally, so searches for either form still work.",
+                        size=12,
+                    ),
+                    field,
+                    ft.Text("Leave it blank to restore the original pair.", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ],
+                tight=True,
+            ),
+            actions=[],
+        )
+
+        def cancel(e):
+            self.page.close(dialog)
+
+        def save(e):
+            self.state.set_pair_alias(pair, field.value or "")
+            self.page.close(dialog)
+            self.refresh()
+
+        dialog.actions = [
+            ft.TextButton("Cancel", on_click=cancel),
+            ft.ElevatedButton("Save", on_click=save),
+        ]
+        self.page.show_dialog(dialog)
 
     def _word_changed(self, pair: str, value: str):
         self.state.set_word(pair, value)
@@ -226,7 +300,8 @@ class LetterPairsPage(ft.Column):
         if duplicates:
             examples = []
             for items in sorted(duplicates, key=lambda x: x[0][1].casefold())[:4]:
-                examples.append(f"{items[0][1]}: {', '.join(pair for pair, _ in items)}")
+                shown_pairs = ", ".join(self.state.get_pair_display(pair) for pair, _ in items)
+                examples.append(f"{items[0][1]}: {shown_pairs}")
             more = " …" if len(duplicates) > 4 else ""
             self.duplicate_warning.value = "⚠ Duplicate mnemonic words — " + "; ".join(examples) + more
         else:

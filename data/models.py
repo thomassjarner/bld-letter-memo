@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 6
+CURRENT_VERSION = 8
 
 
 @dataclass
@@ -116,27 +116,81 @@ class AppData:
     active_scheme: Optional[str] = None
     schemes: Dict[str, LetterScheme] = field(default_factory=dict)
     global_words: Dict[str, str] = field(default_factory=dict)
-    practice_solves: List[PracticeSolve] = field(default_factory=list)
+    # Optional display aliases for canonical pair IDs. Example: AB -> ØB.
+    # Logic/search can still address the canonical AB pair.
+    pair_aliases: Dict[str, str] = field(default_factory=dict)
+    practice_sessions: Dict[str, List[PracticeSolve]] = field(
+        default_factory=lambda: {"Session 1": [], "Session 2": [], "Session 3": []}
+    )
+    active_practice_session: str = "Session 1"
     dark_mode: bool = False
 
+    def ensure_default_sessions(self) -> None:
+        for name in ("Session 1", "Session 2", "Session 3"):
+            self.practice_sessions.setdefault(name, [])
+        if self.active_practice_session not in self.practice_sessions:
+            self.active_practice_session = "Session 1"
+
+    @property
+    def practice_solves(self) -> List[PracticeSolve]:
+        self.ensure_default_sessions()
+        return self.practice_sessions[self.active_practice_session]
+
+    @practice_solves.setter
+    def practice_solves(self, solves: List[PracticeSolve]) -> None:
+        self.ensure_default_sessions()
+        self.practice_sessions[self.active_practice_session] = list(solves)
+
     def to_dict(self) -> dict:
+        self.ensure_default_sessions()
         return {
             "version": CURRENT_VERSION,
             "active_scheme": self.active_scheme,
             "schemes": {name: s.to_dict() for name, s in self.schemes.items()},
             "global_words": dict(self.global_words),
-            "practice_solves": [solve.to_dict() for solve in self.practice_solves],
+            "pair_aliases": dict(self.pair_aliases),
+            "practice_sessions": {
+                name: [solve.to_dict() for solve in solves]
+                for name, solves in self.practice_sessions.items()
+            },
+            "active_practice_session": self.active_practice_session,
             "dark_mode": bool(self.dark_mode),
         }
 
     @staticmethod
     def from_dict(d: dict) -> "AppData":
         schemes = {name: LetterScheme.from_dict(name, sd) for name, sd in d.get("schemes", {}).items()}
-        return AppData(
+
+        raw_sessions = d.get("practice_sessions")
+        sessions: Dict[str, List[PracticeSolve]] = {}
+        if isinstance(raw_sessions, dict):
+            for name, values in raw_sessions.items():
+                if not isinstance(name, str) or not isinstance(values, list):
+                    continue
+                sessions[name] = [
+                    PracticeSolve.from_dict(x) for x in values if isinstance(x, dict)
+                ]
+        else:
+            # Migration from pre-session builds.
+            sessions["Session 1"] = [
+                PracticeSolve.from_dict(x)
+                for x in d.get("practice_solves", [])
+                if isinstance(x, dict)
+            ]
+
+        data = AppData(
             version=CURRENT_VERSION,
             active_scheme=d.get("active_scheme"),
             schemes=schemes,
             global_words=dict(d.get("global_words", {})),
-            practice_solves=[PracticeSolve.from_dict(x) for x in d.get("practice_solves", []) if isinstance(x, dict)],
+            pair_aliases={
+                str(k): str(v)
+                for k, v in dict(d.get("pair_aliases", {})).items()
+                if str(k) and str(v)
+            },
+            practice_sessions=sessions,
+            active_practice_session=str(d.get("active_practice_session", "Session 1")),
             dark_mode=bool(d.get("dark_mode", False)),
         )
+        data.ensure_default_sessions()
+        return data

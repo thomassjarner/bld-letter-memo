@@ -230,7 +230,34 @@ class AppState:
     def get_word(self, pair: str) -> str:
         return self.data.global_words.get(pair, "")
 
+
+    def set_pair_alias(self, pair: str, alias: str) -> None:
+        pair = (pair or "").strip().upper()
+        alias = (alias or "").strip().upper()
+        if not pair:
+            return
+        if alias and alias != pair:
+            self.data.pair_aliases[pair] = alias
+        else:
+            self.data.pair_aliases.pop(pair, None)
+        self._save(notify=False)
+
+    def get_pair_display(self, pair: str) -> str:
+        return self.data.pair_aliases.get(pair, pair)
+
     # ---- practice timer ---------------------------------------------------
+
+    @property
+    def practice_session_names(self) -> List[str]:
+        self.data.ensure_default_sessions()
+        return ["Session 1", "Session 2", "Session 3"]
+
+    def switch_practice_session(self, name: str) -> None:
+        self.data.ensure_default_sessions()
+        if name not in self.data.practice_sessions:
+            return
+        self.data.active_practice_session = name
+        self._save(notify=False)
 
     def add_practice_solve(self, centiseconds: int, scramble: str, dnf: bool = False, plus2: bool = False) -> int:
         from data.models import PracticeSolve

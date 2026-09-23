@@ -40,8 +40,11 @@ class LetterSchemesPage(ft.Column):
         # page. Replacing the whole Column on every setting change reset its
         # scroll position to the top, which made Advanced settings painful to
         # edit. Updating its controls in place preserves the viewport.
-        self.body_scroll = ft.ListView(expand=True, spacing=12, padding=0)
-        self.body_area = ft.Container(expand=True, padding=16, content=self.body_scroll)
+        self.body_scroll = ft.ListView(
+            expand=True,
+            spacing=12,
+            padding=ft.Padding.all(16),
+        )
         self.settings_message = ft.Text("", size=12, color=ft.Colors.ERROR)
         self._advanced_expanded = False
         self._category_advanced_expanded = {"corners": False, "edges": False}
@@ -63,10 +66,14 @@ class LetterSchemesPage(ft.Column):
                     self.scheme_list_view,
                 ],
                 expand=True,
+                alignment=ft.MainAxisAlignment.START,
             ),
         )
+        # Put the ListView directly in the bounded Row. This avoids the
+        # static-web layout bug where an expanding ListView nested inside an
+        # expanding Container never receives a usable scroll viewport.
         return ft.Row(
-            [sidebar, self.body_area],
+            [sidebar, self.body_scroll],
             expand=True,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
