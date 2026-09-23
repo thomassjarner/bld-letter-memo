@@ -1,3 +1,4 @@
+from dataclasses import field
 import flet as ft
 
 from core.tracer import ScrambleTracer, ScrambleError
@@ -5,7 +6,7 @@ from core.tracer import ScrambleTracer, ScrambleError
 
 @ft.control
 class ScrambleMemoPage(ft.Column):
-    state: object | None = None
+    state: object | None = field(default=None, metadata={"skip": True})
 
     def init(self):
         self.expand = True

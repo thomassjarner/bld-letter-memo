@@ -1,3 +1,4 @@
+from dataclasses import field
 import flet as ft
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
@@ -20,7 +21,7 @@ OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 
 @ft.control
 class LetterSchemesPage(ft.Column):
-    state: AppState | None = None
+    state: AppState | None = field(default=None, metadata={"skip": True})
 
     def init(self):
         self.expand = True

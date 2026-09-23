@@ -1,3 +1,4 @@
+from dataclasses import field
 import flet as ft
 
 from core.pairs import get_active_pairs
@@ -6,7 +7,7 @@ from ui.state import AppState
 
 @ft.control
 class LetterPairsPage(ft.Column):
-    state: AppState | None = None
+    state: AppState | None = field(default=None, metadata={"skip": True})
 
     def init(self):
         self.expand = True

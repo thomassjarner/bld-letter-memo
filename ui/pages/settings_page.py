@@ -1,3 +1,4 @@
+from dataclasses import field
 import json
 from datetime import date
 
@@ -9,8 +10,8 @@ from ui.state import AppState
 
 @ft.control
 class SettingsPage(ft.Column):
-    state: AppState | None = None
-    theme_callback: object | None = None
+    state: AppState | None = field(default=None, metadata={"skip": True})
+    theme_callback: object | None = field(default=None, metadata={"skip": True})
 
     def init(self):
         self.expand = True

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import field
+
 import asyncio
 import time
 
@@ -73,8 +75,8 @@ class PracticePage(ft.Column):
     HOLD_ARM_SECONDS = 0.35
     SPACE_KEYS = (" ", "Space")
 
-    state: object | None = None
-    open_memo_callback: object | None = None
+    state: object | None = field(default=None, metadata={"skip": True})
+    open_memo_callback: object | None = field(default=None, metadata={"skip": True})
 
     def init(self):
         self.expand = True
