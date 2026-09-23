@@ -43,15 +43,27 @@ unchanged. Specifically:
 
 **This migration has not been run end-to-end** (same sandbox limitation as
 the original build — no network access to install Flet here). Everything
-was verified with `python -m py_compile` (no syntax errors) and a careful
-read against Flet's documented 0.86 breaking changes, but runtime
-verification needs to happen on your machine. The highest-uncertainty area
-is the Practice timer's keyboard handling (`ui/pages/practice_page.py`) — it
-uses a background-thread/key-repeat-polling workaround built specifically
-around Flet 0.24's lack of key-up events. If newer Flet exposes real key-up
-events now, this code will likely still *work* (it's additive, not broken by
-the API changes above) but could eventually be simplified. Flag anything
-that misbehaves in the timer specifically.
+was verified with `python -m py_compile` (no syntax errors) and against
+Flet's documented breaking changes, but runtime verification needs to
+happen on your machine.
+
+The Practice timer's keyboard handling (`ui/pages/practice_page.py`) was
+**redesigned, not just patched**: the original background-thread/key-repeat
+workaround (built around Flet 0.24 only exposing key-*down* events) crashes
+outright under `flet run --web` / `flet publish`, because that runtime is
+Pyodide (Python compiled to WebAssembly) and cannot create real OS threads
+(`threading.Thread(...).start()` raises `can't start new thread`). Current
+Flet has a proper `ft.KeyboardListener` control with real `on_key_down` /
+`on_key_up` events, so the timer now uses those directly instead of
+inferring release from a key-repeat stream, and all timed/delayed behavior
+(arm delay, live elapsed-seconds display, copy-notice fade) runs as
+`asyncio` tasks via `page.run_task(...)` instead of background threads —
+`asyncio` works fine in Pyodide, real threads don't. **The one thing I
+could not verify:** the exact string Flet's `KeyDownEvent.key` uses for the
+spacebar. The code checks for both `"Space"` and `" "` to cover the likely
+possibilities, but if holding Space does nothing at all, that's almost
+certainly the culprit — tell me what (if anything) prints/happens and I can
+narrow it down immediately.
 
 ## Running it
 
@@ -275,4 +287,17 @@ saved solve data or the timer UI.
 - Not yet verified at runtime (this sandbox can't install Flet) — see the
   "Migrated for Flet 0.86" section above for what to test first, especially
   the Practice timer's keyboard handling.
+
+## Fix: threading crash under Pyodide ("can't start new thread")
+
+The first real-world test of the web build hit `RuntimeError: can't start
+new thread` — Pyodide (the WebAssembly Python runtime `flet run`/`flet
+publish` use) cannot create OS threads at all. Root-caused to three
+`threading.Thread(...)` calls in the Practice timer. Fixed by redesigning
+the timer's keyboard handling around `ft.KeyboardListener`'s real
+`on_key_down`/`on_key_up` events (not available when this app was first
+built against Flet 0.24) and `page.run_task`/`asyncio` for all delayed/timed
+behavior. Also fixed, found only by testing: `ft.Dropdown`'s `on_change` →
+`on_select`, and `ft.padding`/`ft.border`/`ft.alignment` module functions →
+`ft.Padding`/`ft.Border`/`ft.Alignment` classmethods.
 

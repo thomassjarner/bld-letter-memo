@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import threading
+import asyncio
 import time
 
 import flet as ft
@@ -57,16 +57,20 @@ def _wca_average(solves, count: int):
 class PracticePage(ft.Column):
     """Practice hub plus Blind Timer.
 
-    Flet 0.24.1 only exposes key-down notifications. On macOS, holding Space
-    generates repeated key-down events. The timer uses those repeat events to
-    know that Space is still held, turns green once armed, then treats the end
-    of the repeat stream as the release. A tiny hidden TextField keeps keyboard
-    focus so holding Space does not trigger the system's repeated alert beep.
+    Uses ft.KeyboardListener's real on_key_down/on_key_up events (added
+    after this app was first built for Flet 0.24, which only exposed a
+    global key-down stream). Hold Space to arm (turns green after a short
+    delay), release once armed to start; any key stops a running timer.
+
+    All timed/delayed behavior (arm delay, live elapsed-seconds display,
+    copy-notice fade) runs as asyncio tasks via page.run_task rather than
+    background threads: raw OS threads (threading.Thread) cannot be
+    created inside Flet's Pyodide/web runtime ("can't start new thread"),
+    only real desktop mode. asyncio tasks work in both.
     """
 
     HOLD_ARM_SECONDS = 0.35
-    RELEASE_SILENCE_SECONDS = 0.12
-    TAP_CANCEL_SECONDS = 1.60
+    SPACE_KEYS = (" ", "Space")
 
     def __init__(self, page: ft.Page, state, open_memo_callback=None):
         super().__init__(expand=True, scroll=ft.ScrollMode.AUTO)
@@ -77,7 +81,6 @@ class PracticePage(ft.Column):
 
         self.mode = "menu"
         self.active = False
-        self._alive = True
 
         self.current_scramble = self.generator.generate()
         self.scramble_stack = [self.current_scramble]
@@ -86,26 +89,10 @@ class PracticePage(ft.Column):
         self.running = False
         self.holding_space = False
         self.armed = False
-        self.space_event_count = 0
-        self.space_hold_started = 0.0
-        self.last_space_event = 0.0
         self.started_at = 0.0
         self.last_display_second = -1
         self.last_solve_index = None
-
-        # Keeping focus in a text control prevents the repeated macOS alert
-        # sound that otherwise happens when Space is held on an unfocused UI.
-        self.keyboard_sink = ft.TextField(
-            value="",
-            width=1,
-            height=1,
-            text_size=1,
-            border=ft.InputBorder.NONE,
-            color=ft.Colors.TRANSPARENT,
-            bgcolor=ft.Colors.TRANSPARENT,
-            autofocus=True,
-            on_change=self._on_sink_change,
-        )
+        self.keyboard_listener: ft.KeyboardListener | None = None
 
         self.scramble_text = ft.Text(self.current_scramble, size=18, selectable=True)
         self.timer_text = ft.Text("0.00", size=64, weight=ft.FontWeight.BOLD)
@@ -134,10 +121,8 @@ class PracticePage(ft.Column):
             "Take to Scramble Memo", icon=ft.Icons.SHUFFLE, on_click=self._take_last_to_memo, disabled=True
         )
 
-        self.page_ref.on_keyboard_event = self._on_keyboard
         self._show_menu(update=False)
         self._refresh_stats_and_history(update=False)
-        threading.Thread(target=self._watch_loop, daemon=True).start()
 
     # ---- navigation inside Practice -------------------------------------
 
@@ -204,49 +189,57 @@ class PracticePage(ft.Column):
 
     def _show_timer(self, e=None, update=True):
         self.mode = "timer"
-        self.controls = [
-            ft.Row([
-                ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._show_menu),
-                ft.Text("Practice — Blind Timer", size=20, weight=ft.FontWeight.BOLD),
-            ]),
-            ft.Container(self.scramble_text, padding=12, border=ft.Border.all(1, ft.Colors.OUTLINE), border_radius=8),
-            ft.Row(
-                [self.previous_scramble_button, self.new_scramble_button],
-                alignment=ft.MainAxisAlignment.CENTER,
-            ),
-            ft.Container(
-                ft.Column(
-                    [self.timer_text, self.status_text, self.keyboard_sink],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        body = ft.Column(
+            [
+                ft.Row([
+                    ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._show_menu),
+                    ft.Text("Practice — Blind Timer", size=20, weight=ft.FontWeight.BOLD),
+                ]),
+                ft.Container(self.scramble_text, padding=12, border=ft.Border.all(1, ft.Colors.OUTLINE), border_radius=8),
+                ft.Row(
+                    [self.previous_scramble_button, self.new_scramble_button],
                     alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=8,
                 ),
-                alignment=ft.Alignment.CENTER,
-                padding=36,
-                height=250,
-            ),
-            ft.Row([self.success_button, self.plus2_button, self.dnf_button, self.memo_button], wrap=True),
-            ft.Divider(),
-            self.stats_text,
-            ft.Row([
-                ft.Text("Session solves", size=18, weight=ft.FontWeight.BOLD),
-                ft.TextButton("Reset session", icon=ft.Icons.DELETE_SWEEP, on_click=self._confirm_reset),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            self.copy_notice,
-            self.history,
-        ]
+                ft.Container(
+                    ft.Column(
+                        [self.timer_text, self.status_text],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        spacing=8,
+                    ),
+                    alignment=ft.Alignment.CENTER,
+                    padding=36,
+                    height=250,
+                ),
+                ft.Row([self.success_button, self.plus2_button, self.dnf_button, self.memo_button], wrap=True),
+                ft.Divider(),
+                self.stats_text,
+                ft.Row([
+                    ft.Text("Session solves", size=18, weight=ft.FontWeight.BOLD),
+                    ft.TextButton("Reset session", icon=ft.Icons.DELETE_SWEEP, on_click=self._confirm_reset),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                self.copy_notice,
+                self.history,
+            ],
+        )
+        self.keyboard_listener = ft.KeyboardListener(
+            content=body,
+            autofocus=True,
+            on_key_down=self._on_key_down,
+            on_key_up=self._on_key_up,
+        )
+        self.controls = [self.keyboard_listener]
         self._refresh_stats_and_history(update=False)
         if update:
             self._safe_update()
-            self._focus_keyboard_sink()
-            self._focus_keyboard_sink_delayed()
+            self._focus_keyboard_listener()
 
     def set_active(self, active: bool):
         self.active = bool(active)
         if not self.active:
             self._reset_hold_state()
         elif self.mode == "timer":
-            self._focus_keyboard_sink()
+            self._focus_keyboard_listener()
 
     def refresh(self, update: bool = True):
         self._refresh_stats_and_history(update=False)
@@ -255,121 +248,80 @@ class PracticePage(ft.Column):
 
     # ---- keyboard/timer --------------------------------------------------
 
-    def _focus_keyboard_sink(self):
+    def _focus_keyboard_listener(self):
         try:
-            if self.keyboard_sink.page is not None:
-                self.keyboard_sink.focus()
+            if self.keyboard_listener is not None and self.keyboard_listener.page is not None:
+                self.keyboard_listener.focus()
         except Exception:
             pass
-
-    def _focus_keyboard_sink_delayed(self):
-        # Flet may mount the timer controls a fraction after the view update.
-        # Focusing again shortly afterward avoids the first Space press being
-        # used only to acquire keyboard focus on macOS.
-        def worker():
-            time.sleep(0.08)
-            self._focus_keyboard_sink()
-        threading.Thread(target=worker, daemon=True).start()
 
     def _reset_hold_state(self):
         self.holding_space = False
         self.armed = False
-        self.space_event_count = 0
         if not self.running:
             self.timer_text.color = None
 
-    def _on_keyboard(self, e):
+    def _on_key_down(self, e: ft.KeyDownEvent):
         if not self.active or self.mode != "timer":
             return
 
         now = time.monotonic()
 
-        # While running, any keyboard key stops the timer. Before the timer
-        # starts, Space itself is handled by the focused keyboard sink below.
-        # That makes the very first held Space press usable on macOS/Flet
-        # 0.24.x instead of being consumed merely to acquire focus.
+        # While running, any key stops the timer.
         if self.running:
             self._stop_timer(now)
-
-    def _on_sink_change(self, e):
-        if not self.active or self.mode != "timer":
-            e.control.value = ""
             return
 
-        text = e.control.value or ""
-        e.control.value = ""
+        if e.key in self.SPACE_KEYS and not self.holding_space:
+            self.holding_space = True
+            self.armed = False
+            self.status_text.value = ""
+            self.timer_text.value = "0.00"
+            self.timer_text.color = None
+            self._safe_update()
+            self.page_ref.run_task(self._arm_after_delay)
+
+    def _on_key_up(self, e: ft.KeyUpEvent):
+        if not self.active or self.mode != "timer":
+            return
+        if e.key not in self.SPACE_KEYS or not self.holding_space:
+            return
 
         now = time.monotonic()
-        if self.running:
-            # Printable keys may be consumed by the focused TextField before
-            # Page.on_keyboard_event sees them, so stop here as well.
-            if text:
-                self._stop_timer(now)
-            return
+        if self.armed:
+            self.holding_space = False
+            self.armed = False
+            self._start_timer(now)
+        else:
+            # Released before the arm delay elapsed -- a quick tap, not a
+            # hold. Cancel rather than starting the timer.
+            self._reset_hold_state()
+            self.status_text.value = ""
+            self._safe_update()
 
-        # The sink accepts Space as ordinary text. This prevents the macOS
-        # alert beep and, unlike Page.on_keyboard_event, captures the first
-        # press immediately. Repeated spaces while held let the watch loop
-        # distinguish a hold from a quick tap; release is inferred from the
-        # repeat stream going silent.
-        for ch in text:
-            if ch == " ":
-                if not self.holding_space:
-                    self.holding_space = True
-                    self.armed = False
-                    self.space_event_count = 1
-                    self.space_hold_started = now
-                    self.last_space_event = now
-                    self.status_text.value = ""
-                    self.timer_text.value = "0.00"
-                    self.timer_text.color = None
-                    self._safe_update()
-                else:
-                    self.space_event_count += 1
-                    self.last_space_event = now
+    async def _arm_after_delay(self):
+        await asyncio.sleep(self.HOLD_ARM_SECONDS)
+        if self.holding_space and not self.armed and self.active and self.mode == "timer" and not self.running:
+            self.armed = True
+            self.timer_text.color = ft.Colors.GREEN
+            self._safe_update()
 
-    def _watch_loop(self):
-        while self._alive:
+    async def _tick_loop(self):
+        while self.running:
+            await asyncio.sleep(0.2)
+            if not self.running:
+                break
             now = time.monotonic()
-            try:
-                if self.active and self.mode == "timer" and self.holding_space:
-                    held = now - self.space_hold_started
-                    silence = now - self.last_space_event
-                    repeated = self.space_event_count >= 2
-
-                    if repeated and held >= self.HOLD_ARM_SECONDS and not self.armed:
-                        self.armed = True
-                        self.timer_text.color = ft.Colors.GREEN
-                        self.status_text.value = ""
-                        self._safe_update()
-
-                    if self.armed and silence >= self.RELEASE_SILENCE_SECONDS:
-                        self.holding_space = False
-                        self.armed = False
-                        self._start_timer(now)
-                    elif not repeated and held >= self.TAP_CANCEL_SECONDS:
-                        # A quick tap produces no repeat stream; cancel rather
-                        # than accidentally starting the timer.
-                        self._reset_hold_state()
-                        self.status_text.value = ""
-                        self._safe_update()
-
-                if self.running:
-                    elapsed = max(0.0, now - self.started_at)
-                    whole = int(elapsed)
-                    if whole != self.last_display_second:
-                        self.last_display_second = whole
-                        if whole >= 60:
-                            m, s = divmod(whole, 60)
-                            self.timer_text.value = f"{m}:{s:02d}"
-                        else:
-                            self.timer_text.value = str(whole)
-                        self._safe_update()
-            except Exception:
-                # Measurement remains monotonic even if a UI update happens
-                # while the user navigates.
-                pass
-            time.sleep(0.02)
+            elapsed = max(0.0, now - self.started_at)
+            whole = int(elapsed)
+            if whole != self.last_display_second:
+                self.last_display_second = whole
+                if whole >= 60:
+                    m, s = divmod(whole, 60)
+                    self.timer_text.value = f"{m}:{s:02d}"
+                else:
+                    self.timer_text.value = str(whole)
+                self._safe_update()
 
     def _start_timer(self, now: float):
         self.running = True
@@ -384,6 +336,7 @@ class PracticePage(ft.Column):
         self.dnf_button.disabled = True
         self.memo_button.disabled = True
         self._safe_update()
+        self.page_ref.run_task(self._tick_loop)
 
     def _stop_timer(self, now: float):
         elapsed = max(0.0, now - self.started_at)
@@ -401,7 +354,7 @@ class PracticePage(ft.Column):
         self.new_scramble_button.disabled = False
         self._refresh_stats_and_history(update=False)
         self._safe_update()
-        self._focus_keyboard_sink()
+        self._focus_keyboard_listener()
 
     def _safe_update(self):
         if self.page is not None:
@@ -455,7 +408,7 @@ class PracticePage(ft.Column):
             self.scramble_index += 1
         self._show_scramble_at_index()
         self._safe_update()
-        self._focus_keyboard_sink()
+        self._focus_keyboard_listener()
 
     def _previous_scramble(self, e=None):
         if self.running or self.scramble_index <= 0:
@@ -463,7 +416,7 @@ class PracticePage(ft.Column):
         self.scramble_index -= 1
         self._show_scramble_at_index()
         self._safe_update()
-        self._focus_keyboard_sink()
+        self._focus_keyboard_listener()
 
     def _mark_last(self, result: str):
         if self.last_solve_index is None:
@@ -479,7 +432,7 @@ class PracticePage(ft.Column):
             self.status_text.value = "Success"
         self._refresh_stats_and_history(update=False)
         self._safe_update()
-        self._focus_keyboard_sink()
+        self._focus_keyboard_listener()
 
     def _take_last_to_memo(self, e=None):
         if self.last_solve_index is None or not self.open_memo_callback:
@@ -553,7 +506,7 @@ class PracticePage(ft.Column):
         try:
             self.page_ref.set_clipboard(text)
             self._show_copy_notice(message)
-            self._focus_keyboard_sink_delayed()
+            self._focus_keyboard_listener()
         except Exception:
             pass
 
@@ -563,22 +516,21 @@ class PracticePage(ft.Column):
         self.copy_notice.value = message
         self.copy_notice.opacity = 1
         self._safe_update()
+        self.page_ref.run_task(self._fade_copy_notice, token)
 
-        def fade():
-            time.sleep(3.0)
-            if token != self._copy_notice_token:
-                return
-            try:
-                self.copy_notice.opacity = 0
+    async def _fade_copy_notice(self, token: int):
+        await asyncio.sleep(3.0)
+        if token != self._copy_notice_token:
+            return
+        try:
+            self.copy_notice.opacity = 0
+            self._safe_update()
+            await asyncio.sleep(0.35)
+            if token == self._copy_notice_token:
+                self.copy_notice.value = ""
                 self._safe_update()
-                time.sleep(0.35)
-                if token == self._copy_notice_token:
-                    self.copy_notice.value = ""
-                    self._safe_update()
-            except Exception:
-                pass
-
-        threading.Thread(target=fade, daemon=True).start()
+        except Exception:
+            pass
 
     def _copy_time_and_scramble(self, solve):
         if solve.dnf:
@@ -593,7 +545,7 @@ class PracticePage(ft.Column):
         self.state.delete_practice_solve(index)
         self.last_solve_index = None
         self._refresh_stats_and_history()
-        self._focus_keyboard_sink()
+        self._focus_keyboard_listener()
 
     def _confirm_reset(self, e=None):
         def close(dialog):
@@ -604,7 +556,7 @@ class PracticePage(ft.Column):
             self.last_solve_index = None
             close(dialog)
             self._refresh_stats_and_history()
-            self._focus_keyboard_sink()
+            self._focus_keyboard_listener()
 
         dialog = ft.AlertDialog(
             modal=True,
