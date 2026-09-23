@@ -18,12 +18,12 @@ class LetterPairsPage(ft.Column):
 
         self.search_field = ft.TextField(
             hint_text="Search letter pairs (AC, A-, -S)...",
-            width=260,
+            expand=True,
             prefix_icon=ft.Icons.SEARCH,
             on_change=self._on_search_change,
         )
         self.search_pairs = ft.Checkbox(
-            label="Show letter pairs", value=True, on_change=self._on_search_mode_change
+            label="Search letter pairs", value=True, on_change=self._on_search_mode_change
         )
         self.search_words = ft.Checkbox(
             label="Search within words", value=False, on_change=self._on_search_mode_change
@@ -50,13 +50,14 @@ class LetterPairsPage(ft.Column):
         self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
         self.progress_bar = ft.ProgressBar(width=220, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.rows_view = ft.ListView(
-            expand=True,
-            spacing=2,
-            padding=ft.Padding.only(right=4),
-            scroll=ft.ScrollMode.ALWAYS,
-            build_controls_on_demand=True,
-        )
+        # Letter pairs are paged by their canonical first letter (A pairs, B pairs, ...),
+        # so this page never needs a scrollable pair list.
+        self.rows_view = ft.Column(spacing=0)
+        self.current_group: str | None = "A"
+        self.available_groups: list[str] = []
+        self.group_label = ft.Text("A pairs", weight=ft.FontWeight.BOLD)
+        self.prev_group = ft.IconButton(ft.Icons.CHEVRON_LEFT, tooltip="Previous letter", on_click=self._previous_group)
+        self.next_group = ft.IconButton(ft.Icons.CHEVRON_RIGHT, tooltip="Next letter", on_click=self._next_group)
         self._word_fields: list[ft.TextField] = []
         self._editing_alias_pair: str | None = None
 
@@ -67,11 +68,11 @@ class LetterPairsPage(ft.Column):
                         self.search_field,
                         self.search_pairs,
                         self.search_words,
-                        self.scheme_filter,
-                        self.status_filter,
                     ],
-                    wrap=True,
+                    wrap=False,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
+                ft.Row([self.scheme_filter, self.status_filter], wrap=True),
                 ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
                 self.duplicate_warning,
                 ft.Text(
@@ -93,10 +94,14 @@ class LetterPairsPage(ft.Column):
             ),
             padding=ft.Padding.symmetric(horizontal=8),
         )
-        # Only the rows list scrolls. The filters and headings remain fixed.
-        # This gives ListView a bounded viewport inside the expanding page.
+        self.group_controls = ft.Row(
+            [self.prev_group, self.group_label, self.next_group],
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
         self.controls = [
             self.filters_area,
+            self.group_controls,
             self.table_header,
             ft.Divider(height=1),
             self.rows_view,
@@ -159,9 +164,29 @@ class LetterPairsPage(ft.Column):
 
             rows.append((pair, word, is_active, active_pairs.get(pair, [])))
 
-        self.count_text.value = f"{len(rows)} shown"
+        # Group the filtered result by the pair's canonical first letter.
+        # An alias such as ØB for canonical AB therefore remains on the A page,
+        # while searches for either AB or ØB still find it.
+        groups = sorted({pair[0].upper() for pair, *_ in rows if pair})
+        self.available_groups = groups
+        if not groups:
+            self.current_group = None
+            page_rows = []
+            self.group_label.value = "No matching pairs"
+            self.prev_group.disabled = True
+            self.next_group.disabled = True
+        else:
+            if self.current_group not in groups:
+                self.current_group = groups[0]
+            group_index = groups.index(self.current_group)
+            page_rows = [row for row in rows if row[0].upper().startswith(self.current_group)]
+            self.group_label.value = f"{self.current_group} pairs"
+            self.prev_group.disabled = group_index == 0
+            self.next_group.disabled = group_index == len(groups) - 1
+
+        self.count_text.value = f"{len(rows)} matching · {len(page_rows)} on this page"
         self.rows_view.controls = [
-            self._build_row(pair, word, is_active, sources) for pair, word, is_active, sources in rows
+            self._build_row(pair, word, is_active, sources) for pair, word, is_active, sources in page_rows
         ]
         if update and self.page is not None:
             self.update()
@@ -199,6 +224,7 @@ class LetterPairsPage(ft.Column):
             value=word,
             hint_text=None,
             dense=True,
+            height=34,
             border=ft.InputBorder.UNDERLINE,
             expand=True,
             on_submit=self._focus_next,
@@ -251,7 +277,7 @@ class LetterPairsPage(ft.Column):
                 ],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
+            padding=ft.Padding.symmetric(horizontal=8, vertical=0),
             bgcolor=None if is_active else ft.Colors.SURFACE_CONTAINER_LOW,
             opacity=1.0 if is_active else 0.75,
         )
@@ -311,6 +337,23 @@ class LetterPairsPage(ft.Column):
             self._word_fields[idx + 1].focus()
             self.update()
 
+
+    def _previous_group(self, e):
+        if not self.available_groups or self.current_group not in self.available_groups:
+            return
+        idx = self.available_groups.index(self.current_group)
+        if idx > 0:
+            self.current_group = self.available_groups[idx - 1]
+            self.refresh()
+
+    def _next_group(self, e):
+        if not self.available_groups or self.current_group not in self.available_groups:
+            return
+        idx = self.available_groups.index(self.current_group)
+        if idx + 1 < len(self.available_groups):
+            self.current_group = self.available_groups[idx + 1]
+            self.refresh()
+
     def _on_search_mode_change(self, e):
         # Keep at least one search mode enabled.
         if not self.search_pairs.value and not self.search_words.value:
@@ -318,7 +361,9 @@ class LetterPairsPage(ft.Column):
         self.search_field.hint_text = (
             "Search pair or word..." if self.search_words.value else "Search letter pairs (AC, A-, -S)..."
         )
+        self.current_group = None
         self.refresh()
 
     def _on_search_change(self, e):
+        self.current_group = None
         self.refresh()

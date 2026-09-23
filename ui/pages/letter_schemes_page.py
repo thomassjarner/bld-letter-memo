@@ -49,6 +49,7 @@ class LetterSchemesPage(ft.Column):
         self.settings_message = ft.Text("", size=12, color=ft.Colors.ERROR)
         self._advanced_expanded = False
         self._category_advanced_expanded = {"corners": False, "edges": False}
+        self.preference_section = "general"
         self._sticker_fields = {}
         self._sticker_order = []
         self._focused_sticker = None
@@ -149,8 +150,6 @@ class LetterSchemesPage(ft.Column):
             self._sticker_fields = {}
             self._sticker_order = []
             self.body_scroll.controls = common + [
-                self._build_orientation_settings(scheme),
-                ft.Divider(),
                 self._build_preferences(scheme),
                 self.settings_message,
             ]
@@ -204,49 +203,70 @@ class LetterSchemesPage(ft.Column):
         ], wrap=True)
 
     def _build_preferences(self, scheme):
-        memo_field = ft.TextField(
-            label="Memo",
-            hint_text="CE",
-            value=scheme.memo_order,
-            width=90,
-            max_length=2,
-            capitalization=ft.TextCapitalization.CHARACTERS,
-            on_submit=lambda e: self._save_order("memo", e.control),
-            on_blur=lambda e: self._save_order("memo", e.control),
+        nav = ft.Row(
+            [
+                ft.OutlinedButton(
+                    "General",
+                    icon=ft.Icons.TUNE,
+                    on_click=lambda e: self._set_preference_section("general"),
+                    disabled=self.preference_section == "general",
+                ),
+                ft.OutlinedButton(
+                    "Corners tracing",
+                    on_click=lambda e: self._set_preference_section("corners"),
+                    disabled=self.preference_section == "corners",
+                ),
+                ft.OutlinedButton(
+                    "Edges tracing",
+                    on_click=lambda e: self._set_preference_section("edges"),
+                    disabled=self.preference_section == "edges",
+                ),
+            ],
+            wrap=True,
         )
-        exec_field = ft.TextField(
-            label="Exec",
-            hint_text="EC",
-            value=scheme.execution_order,
-            width=90,
-            max_length=2,
-            capitalization=ft.TextCapitalization.CHARACTERS,
-            on_submit=lambda e: self._save_order("execution", e.control),
-            on_blur=lambda e: self._save_order("execution", e.control),
-        )
+
+        if self.preference_section == "general":
+            memo_field = ft.TextField(
+                label="Memo", hint_text="CE", value=scheme.memo_order, width=90, max_length=2,
+                capitalization=ft.TextCapitalization.CHARACTERS,
+                on_submit=lambda e: self._save_order("memo", e.control),
+                on_blur=lambda e: self._save_order("memo", e.control),
+            )
+            exec_field = ft.TextField(
+                label="Exec", hint_text="EC", value=scheme.execution_order, width=90, max_length=2,
+                capitalization=ft.TextCapitalization.CHARACTERS,
+                on_submit=lambda e: self._save_order("execution", e.control),
+                on_blur=lambda e: self._save_order("execution", e.control),
+            )
+            content = ft.Column(
+                [
+                    self._build_orientation_settings(scheme),
+                    ft.Row([
+                        ft.Text("Order", weight=ft.FontWeight.BOLD),
+                        memo_field, ft.Text("/"), exec_field,
+                        ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ], wrap=True),
+                ],
+                spacing=14,
+            )
+        else:
+            content = self._build_category_preferences(scheme, self.preference_section)
 
         return ft.Column(
             [
                 ft.Text("Preferences", size=18, weight=ft.FontWeight.BOLD),
                 ft.Text(
-                    "Tracing preferences are scheme-specific and are used automatically by Scramble Memo and future practice tools.",
-                    size=11,
-                    color=ft.Colors.ON_SURFACE_VARIANT,
+                    "Scheme-specific settings used automatically by Scramble Memo and future practice tools.",
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
-                ft.Row([
-                    ft.Text("Order", weight=ft.FontWeight.BOLD),
-                    memo_field,
-                    ft.Text("/"),
-                    exec_field,
-                    ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                ], wrap=True),
-                self._build_category_advanced(scheme, "corners"),
-                self._build_category_advanced(scheme, "edges"),
+                nav,
+                ft.Divider(),
+                content,
             ],
             spacing=10,
         )
 
-    def _build_category_advanced(self, scheme, category: str):
+    def _build_category_preferences(self, scheme, category: str):
         cat = scheme.corners if category == "corners" else scheme.edges
         title = "Corners" if category == "corners" else "Edges"
         noun = "twists" if category == "corners" else "flips"
@@ -260,35 +280,34 @@ class LetterSchemesPage(ft.Column):
             ],
             on_select=lambda e, c=category: self._orientation_mode_changed(c, e.control.value),
         )
-
         mode_label = "Standard" if cat.tracing_mode == "standard" else "Custom"
         rows = self._build_cycle_break_rows(scheme, category)
-        return ft.ExpansionTile(
-            expanded=self._category_advanced_expanded.get(category, False),
-            on_change=lambda e, c=category: self._category_advanced_expanded.__setitem__(c, bool(e.control.expanded)),
-            title=ft.Text(f"{title} tracing — {mode_label}"),
-            controls=[
-                ft.Container(
-                    padding=ft.Padding.only(left=16, right=16, bottom=12),
-                    content=ft.Column([
-                        ft.Row([
-                            mode,
-                            ft.OutlinedButton(
-                                "Reset to Standard",
-                                icon=ft.Icons.RESTART_ALT,
-                                on_click=lambda e, c=category: self._reset_tracing(c),
-                            ),
-                        ], wrap=True),
-                        ft.Text(
-                            "For each physical piece, choose the sticker you prefer to shoot to, then rank the pieces. "
-                            "When a cycle break is needed, the first still-unsolved piece in this list is chosen.",
-                            size=11,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
-                        ft.Column(rows, spacing=4),
-                    ], spacing=8),
-                )
+        split = (len(rows) + 1) // 2
+        row_grid = ft.Row(
+            [
+                ft.Column(rows[:split], spacing=3, expand=True),
+                ft.Column(rows[split:], spacing=3, expand=True),
             ],
+            spacing=18,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+        return ft.Column(
+            [
+                ft.Row([
+                    ft.Text(f"{title} tracing — {mode_label}", size=16, weight=ft.FontWeight.BOLD),
+                    mode,
+                    ft.OutlinedButton(
+                        "Reset to Standard", icon=ft.Icons.RESTART_ALT,
+                        on_click=lambda e, c=category: self._reset_tracing(c),
+                    ),
+                ], wrap=True),
+                ft.Text(
+                    "Choose the preferred sticker for each physical piece and rank which pieces you prefer for cycle breaks.",
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+                row_grid,
+            ],
+            spacing=8,
         )
 
     def _effective_priority(self, scheme, category: str):
@@ -344,6 +363,14 @@ class LetterSchemesPage(ft.Column):
                 ], spacing=4)
             )
         return rows
+
+    def _set_preference_section(self, section: str):
+        if section not in {"general", "corners", "edges"}:
+            return
+        self.preference_section = section
+        self.selected_category = "preferences"
+        self._refresh_body()
+        self.update()
 
     # ---- event handlers -----------------------------------------------------
 
@@ -505,7 +532,7 @@ class LetterSchemesPage(ft.Column):
         if scheme is None:
             return
         self.selected_category = "preferences"
-        self._category_advanced_expanded[category] = True
+        self.preference_section = category
         self.state.set_orientation_memo_mode(scheme, category, value)
         self.refresh()
 
@@ -514,7 +541,7 @@ class LetterSchemesPage(ft.Column):
         if scheme is None:
             return
         self.selected_category = "preferences"
-        self._category_advanced_expanded[category] = True
+        self.preference_section = category
         self.state.set_cycle_break_sticker(scheme, category, piece, sticker)
         self.refresh()
 
@@ -528,7 +555,7 @@ class LetterSchemesPage(ft.Column):
             return
         priority[index], priority[other] = priority[other], priority[index]
         self.selected_category = "preferences"
-        self._category_advanced_expanded[category] = True
+        self.preference_section = category
         self.state.set_cycle_break_priority(scheme, category, priority)
         self.refresh()
 
@@ -537,6 +564,6 @@ class LetterSchemesPage(ft.Column):
         if scheme is None:
             return
         self.selected_category = "preferences"
-        self._category_advanced_expanded[category] = True
+        self.preference_section = category
         self.state.reset_tracing_preferences(scheme, category)
         self.refresh()

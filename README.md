@@ -1,3 +1,19 @@
+# BLD Letter Memo Web 2.10
+
+Changes:
+- Letter Pairs no longer depends on scrolling: results are paged by canonical first letter (A pairs, B pairs, ...).
+- Search/filtering happens before page grouping.
+- Aliases stay grouped by their underlying canonical pair (for example ØB/AB stays on the A page).
+- Search controls are arranged horizontally: search field on the left, both search checkboxes to its right.
+- Renamed “Show letter pairs” to “Search letter pairs”.
+- Letter Scheme Preferences is split into compact General / Corners tracing / Edges tracing sections.
+- Corner/edge cycle-break preferences are shown in two compact columns to avoid vertical overflow.
+- Buffers remain under the Edges and Corners tabs.
+
+Regression status:
+- 4/4 gold-standard scramble tests pass.
+
+
 # BLD Letter Memo Web 2.9
 
 Changes in this build:
