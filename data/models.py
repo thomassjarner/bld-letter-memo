@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 11
+CURRENT_VERSION = 12
 
 
 @dataclass
@@ -143,6 +143,8 @@ class AppData:
     # Letter-pair quality ratings are stored on one common 1..5 scale. The
     # selected UI mode only changes how that value is presented.
     pair_ratings: Dict[str, float] = field(default_factory=dict)
+    pair_rating_versions: Dict[str, int] = field(default_factory=dict)
+    rating_scale_version: int = 1
     letter_pair_rating_mode: str = "numeric"  # numeric / colors / qualitative
     rating_color_levels: int = 3
     rating_color_hexes: List[str] = field(default_factory=lambda: ["#D32F2F", "#F9A825", "#2E7D32"])
@@ -178,6 +180,8 @@ class AppData:
             "global_words": dict(self.global_words),
             "pair_aliases": dict(self.pair_aliases),
             "pair_ratings": {k: float(v) for k, v in self.pair_ratings.items()},
+            "pair_rating_versions": {k: int(v) for k, v in self.pair_rating_versions.items()},
+            "rating_scale_version": int(self.rating_scale_version),
             "letter_pair_rating_mode": self.letter_pair_rating_mode,
             "rating_color_levels": int(self.rating_color_levels),
             "rating_color_hexes": list(self.rating_color_hexes),
@@ -243,6 +247,20 @@ class AppData:
                 raw_hexes = ["#D32F2F", "#E66F1E", "#F9A825", "#91A52B", "#2E7D32"]
                 raw_grades = [1.0, 2.0, 3.0, 4.0, 5.0]
 
+        scale_version = max(1, int(d.get("rating_scale_version", 1) or 1))
+        raw_rating_versions = {}
+        source_versions = d.get("pair_rating_versions", {})
+        if isinstance(source_versions, dict):
+            for k, v in source_versions.items():
+                if str(k) not in raw_ratings:
+                    continue
+                try:
+                    raw_rating_versions[str(k)] = max(1, int(v))
+                except (TypeError, ValueError):
+                    pass
+        for pair in raw_ratings:
+            raw_rating_versions.setdefault(pair, scale_version)
+
         data = AppData(
             version=CURRENT_VERSION,
             active_scheme=d.get("active_scheme"),
@@ -254,6 +272,8 @@ class AppData:
                 if str(k) and str(v)
             },
             pair_ratings=raw_ratings,
+            pair_rating_versions=raw_rating_versions,
+            rating_scale_version=scale_version,
             letter_pair_rating_mode=str(d.get("letter_pair_rating_mode", "numeric") or "numeric") if str(d.get("letter_pair_rating_mode", "numeric") or "numeric") in {"numeric", "colors", "qualitative"} else "numeric",
             rating_color_levels=level_count,
             rating_color_hexes=raw_hexes,

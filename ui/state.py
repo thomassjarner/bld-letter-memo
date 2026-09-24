@@ -243,13 +243,16 @@ class AppState:
     # ---- global words ------------------------------------------------------
 
     def set_word(self, pair: str, word: str) -> None:
+        pair = (pair or "").strip().upper()
         word = word.strip()
+        old_word = self.data.global_words.get(pair, "")
+        if old_word != word and pair in self.data.pair_ratings:
+            self.data.pair_ratings.pop(pair, None)
+            self.data.pair_rating_versions.pop(pair, None)
         if word:
             self.data.global_words[pair] = word
         else:
             self.data.global_words.pop(pair, None)
-        # Editing a mnemonic does not change pair activation, so avoid a
-        # full page refresh that would steal focus from the word field.
         self._save(notify=False)
 
     def get_word(self, pair: str) -> str:
@@ -289,10 +292,13 @@ class AppState:
     def set_rating_color_levels(self, levels: int) -> None:
         if levels not in {3, 4, 5}:
             return
+        if levels == self.data.rating_color_levels:
+            return
         colors, grades = self._default_rating_palette(levels)
         self.data.rating_color_levels = levels
         self.data.rating_color_hexes = colors
         self.data.rating_color_grades = grades
+        self.data.rating_scale_version += 1
         self._save()
 
     def set_rating_color(self, index: int, color_hex: str) -> bool:
@@ -315,8 +321,10 @@ class AppState:
         if not 1.0 <= value <= 5.0:
             return False
         if 0 <= index < len(self.data.rating_color_grades):
-            self.data.rating_color_grades[index] = value
-            self._save(notify=False)
+            if float(self.data.rating_color_grades[index]) != value:
+                self.data.rating_color_grades[index] = value
+                self.data.rating_scale_version += 1
+                self._save(notify=False)
             return True
         return False
 
@@ -326,6 +334,7 @@ class AppState:
             return
         if rating in {None, "", "none", "__none__"}:
             self.data.pair_ratings.pop(pair, None)
+            self.data.pair_rating_versions.pop(pair, None)
             self._save(notify=False)
             return
         try:
@@ -334,10 +343,20 @@ class AppState:
             return
         value = max(1.0, min(5.0, value))
         self.data.pair_ratings[pair] = value
+        self.data.pair_rating_versions[pair] = int(self.data.rating_scale_version)
         self._save(notify=False)
 
     def get_pair_rating(self, pair: str):
         return self.data.pair_ratings.get(pair)
+
+    def pair_rating_needs_update(self, pair: str) -> bool:
+        if pair not in self.data.pair_ratings:
+            return False
+        return int(self.data.pair_rating_versions.get(pair, self.data.rating_scale_version)) != int(self.data.rating_scale_version)
+
+    @property
+    def has_outdated_pair_ratings(self) -> bool:
+        return any(self.pair_rating_needs_update(pair) for pair in self.data.pair_ratings)
 
     # ---- practice timer ---------------------------------------------------
 

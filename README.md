@@ -1,3 +1,21 @@
+# BLD Letter Memo Web 2.16
+
+Changes:
+- Ratings are always visible in Letter Pairs. Missing words stay ungraded.
+- Color grading now includes an explicit reset/ungraded control.
+- Replacing a mnemonic resets that pair's old grade instead of inheriting it.
+- Changing the color grading scale preserves old numeric grades exactly.
+- Scale changes create an "Update grades" status filter so older grades can be reviewed.
+- Added a separate "Sort by grade" control with high/low, exact-grade, and ungraded options.
+- Renamed averages to "Overall average" and "Filter average"; both remain visible.
+- Added a "Stats" tab with strongest/weakest pairs and strongest/weakest letters.
+- Letter stats average all rated mnemonics whose displayed pair contains that letter.
+- Rating-scale metadata is included in autosave and backup/import.
+
+Regression status:
+- 11/11 tests pass, including all scramble/orientation/3-style tests and rating persistence tests.
+
+
 # BLD Letter Memo Web 2.15
 
 New in this build:

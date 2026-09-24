@@ -1,20 +1,26 @@
 import flet as ft
 
 from core.pairs import get_active_pairs
-from ui.state import AppState
 
 
 @ft.control
 class LetterPairsPage(ft.Column):
     @property
     def state(self):
-        # BaseControl.data is a Flet skip_field(), so Python-only AppState
-        # never enters the browser serialization protocol.
         return self.data
 
     def init(self):
         self.expand = True
         self.spacing = 0
+        self.selected_view = "dictionary"
+
+        self.tabbar = ft.Tabs(
+            length=2,
+            selected_index=0,
+            on_change=self._on_tab_change,
+            content=ft.TabBar(tabs=[ft.Tab(label="Dictionary"), ft.Tab(label="Stats")]),
+        )
+        self.content_area = ft.Column(expand=True, spacing=0)
 
         self.search_field = ft.TextField(
             hint_text="Search letter pairs (AC, A-, -S)...",
@@ -36,24 +42,18 @@ class LetterPairsPage(ft.Column):
             on_select=self._on_search_change,
         )
         self.status_filter = ft.Dropdown(
-            width=175,
-            value="all",
-            options=[
-                ft.DropdownOption("all", "All pairs"),
-                ft.DropdownOption("active", "Active"),
-                ft.DropdownOption("inactive", "Inactive"),
-                ft.DropdownOption("missing", "Missing words"),
-            ],
-            on_select=self._on_search_change,
+            width=175, value="all", label="Status", options=[], on_select=self._on_search_change
+        )
+        self.grade_sort = ft.Dropdown(
+            width=190, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
         )
         self.progress_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
         self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
         self.progress_bar = ft.ProgressBar(width=220, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.average_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
-        self.global_average_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        # Letter pairs are paged by their canonical first letter (A pairs, B pairs, ...),
-        # so this page never needs a scrollable pair list.
+        self.filter_average_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
+        self.overall_average_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+
         self.rows_view = ft.Column(spacing=0)
         self.current_group: str | None = "A"
         self.available_groups: list[str] = []
@@ -65,33 +65,38 @@ class LetterPairsPage(ft.Column):
 
         self.filters_area = ft.Column(
             [
-                ft.Row(
-                    [
-                        self.search_field,
-                        self.search_pairs,
-                        self.search_words,
-                    ],
-                    wrap=False,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                ft.Row([self.scheme_filter, self.status_filter], wrap=True),
+                ft.Row([self.search_field, self.search_pairs, self.search_words],
+                       wrap=False, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Row([self.scheme_filter, self.status_filter, self.grade_sort], wrap=True),
                 ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
-                ft.Row([self.average_text, self.global_average_text], wrap=True, spacing=18),
+                ft.Row([self.filter_average_text, self.overall_average_text], wrap=True, spacing=18),
                 self.duplicate_warning,
                 ft.Text(
                     "Tip: double-click a pair label to edit how it is displayed (for example AB → ØB).",
-                    size=11,
-                    color=ft.Colors.ON_SURFACE_VARIANT,
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
             ],
             spacing=8,
         )
-        compact_header = lambda: ft.Container(
+        self.table_header = ft.Row(
+            [self._compact_header(), ft.VerticalDivider(width=8), self._compact_header()],
+            spacing=0,
+        )
+        self.group_controls = ft.Row(
+            [self.prev_group, self.group_label, self.next_group],
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        self.controls = [self.tabbar, self.content_area]
+        self.refresh(update=False)
+
+    def _compact_header(self):
+        return ft.Container(
             content=ft.Row(
                 [
                     ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD), width=54),
                     ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD), expand=True),
-                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD), width=92),
+                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD), width=128),
                     ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD), width=72),
                     ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=90),
                 ],
@@ -100,50 +105,142 @@ class LetterPairsPage(ft.Column):
             padding=ft.Padding.symmetric(horizontal=6),
             expand=True,
         )
-        self.table_header = ft.Row(
-            [compact_header(), ft.VerticalDivider(width=8), compact_header()],
-            spacing=0,
-        )
-        self.group_controls = ft.Row(
-            [self.prev_group, self.group_label, self.next_group],
-            alignment=ft.MainAxisAlignment.CENTER,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-        self.controls = [
-            self.filters_area,
-            self.group_controls,
-            self.table_header,
-            ft.Divider(height=1),
-            self.rows_view,
-        ]
-        self.refresh(update=False)
+
+    def _on_tab_change(self, e):
+        self.selected_view = "stats" if int(e.control.selected_index or 0) == 1 else "dictionary"
+        self.refresh()
 
     def refresh(self, update: bool = True):
-        # Keep the scheme selector synchronized with saved schemes.
-        scheme_names = self.state.scheme_names
+        self._sync_filters()
+        if self.selected_view == "stats":
+            self.content_area.controls = [self._build_stats_view()]
+        else:
+            self._refresh_dictionary()
+            self.content_area.controls = [
+                self.filters_area, self.group_controls, self.table_header,
+                ft.Divider(height=1), self.rows_view,
+            ]
+        if update and self.page is not None:
+            self.update()
+
+    def _sync_filters(self):
         selected_scheme = self.scheme_filter.value or "__all__"
         if selected_scheme != "__all__" and selected_scheme not in self.state.data.schemes:
-            selected_scheme = "__all__"
             self.scheme_filter.value = "__all__"
         self.scheme_filter.options = [ft.DropdownOption("__all__", "All letter schemes")] + [
-            ft.DropdownOption(name, name) for name in scheme_names
+            ft.DropdownOption(name, name) for name in self.state.scheme_names
         ]
 
+        status_options = [
+            ft.DropdownOption("all", "All pairs"),
+            ft.DropdownOption("active", "Active"),
+            ft.DropdownOption("inactive", "Inactive"),
+            ft.DropdownOption("missing", "Missing words"),
+        ]
+        if self.state.has_outdated_pair_ratings:
+            status_options.append(ft.DropdownOption("update_grades", "Update grades"))
+        self.status_filter.options = status_options
+        if self.status_filter.value == "update_grades" and not self.state.has_outdated_pair_ratings:
+            self.status_filter.value = "all"
+
+        mode = self.state.data.letter_pair_rating_mode
+        grade_options = [
+            ft.DropdownOption("default", "Default"),
+            ft.DropdownOption("highest", "Highest first"),
+            ft.DropdownOption("lowest", "Lowest first"),
+            ft.DropdownOption("ungraded", "Ungraded"),
+        ]
+        if mode == "qualitative":
+            grade_options += [
+                ft.DropdownOption("grade:5", "Good"),
+                ft.DropdownOption("grade:3", "Mid"),
+                ft.DropdownOption("grade:1", "Bad"),
+            ]
+        elif mode == "colors":
+            for idx, grade in enumerate(self.state.data.rating_color_grades, start=1):
+                grade_options.append(
+                    ft.DropdownOption(f"grade:{float(grade)}", f"Color {idx} · {float(grade):g}")
+                )
+        else:
+            grade_options += [
+                ft.DropdownOption(f"grade:{i}", f"Grade {i}") for i in range(5, 0, -1)
+            ]
+        self.grade_sort.options = grade_options
+        valid_values = {"default", "highest", "lowest", "ungraded"}
+        if mode == "qualitative":
+            valid_values.update({"grade:5", "grade:3", "grade:1"})
+        elif mode == "colors":
+            valid_values.update(f"grade:{float(g)}" for g in self.state.data.rating_color_grades)
+        else:
+            valid_values.update(f"grade:{i}" for i in range(1, 6))
+        if self.grade_sort.value not in valid_values:
+            self.grade_sort.value = "default"
+
+    def _base_rows(self):
+        selected_scheme = self.scheme_filter.value or "__all__"
         if selected_scheme == "__all__":
             active_pairs = get_active_pairs(self.state.data.schemes)
             all_pairs = (
                 set(active_pairs)
-                | set(self.state.data.global_words.keys())
-                | set(self.state.data.pair_aliases.keys())
+                | set(self.state.data.global_words)
+                | set(self.state.data.pair_aliases)
+                | set(self.state.data.pair_ratings)
             )
         else:
-            active_pairs = get_active_pairs({selected_scheme: self.state.data.schemes[selected_scheme]})
-            # "Show only from this scheme" is intentionally strict: unrelated
-            # stored/inactive dictionary entries are not included.
+            active_pairs = get_active_pairs(
+                {selected_scheme: self.state.data.schemes[selected_scheme]}
+            )
             all_pairs = set(active_pairs)
 
         query = (self.search_field.value or "").strip()
-        status = self.status_filter.value
+        status = self.status_filter.value or "all"
+        rows = []
+        for pair in sorted(all_pairs):
+            is_active = pair in active_pairs
+            word = self.state.get_word(pair)
+            if status == "active" and not is_active:
+                continue
+            if status == "inactive" and is_active:
+                continue
+            if status == "missing" and (not is_active or bool(word.strip())):
+                continue
+            if status == "update_grades" and not self.state.pair_rating_needs_update(pair):
+                continue
+            if query and not self._matches_search(pair, word, query):
+                continue
+            rows.append((pair, word, is_active, active_pairs.get(pair, [])))
+
+        grade_mode = self.grade_sort.value or "default"
+        if grade_mode == "ungraded":
+            rows = [
+                row for row in rows
+                if row[1].strip() and self.state.get_pair_rating(row[0]) is None
+            ]
+        elif grade_mode.startswith("grade:"):
+            try:
+                target = float(grade_mode.split(":", 1)[1])
+            except ValueError:
+                target = None
+            if target is not None:
+                rows = [
+                    row for row in rows
+                    if self.state.get_pair_rating(row[0]) is not None
+                    and abs(float(self.state.get_pair_rating(row[0])) - target) < 0.011
+                ]
+        elif grade_mode in {"highest", "lowest"}:
+            reverse = grade_mode == "highest"
+            rated = [r for r in rows if self.state.get_pair_rating(r[0]) is not None]
+            unrated = [r for r in rows if self.state.get_pair_rating(r[0]) is None]
+            rated.sort(
+                key=lambda r: float(self.state.get_pair_rating(r[0])),
+                reverse=reverse,
+            )
+            rows = rated + unrated
+        return rows, active_pairs
+
+    def _refresh_dictionary(self):
+        rows, active_pairs = self._base_rows()
+        query = (self.search_field.value or "").strip()
 
         active_total = len(active_pairs)
         completed = sum(1 for pair in active_pairs if self.state.get_word(pair).strip())
@@ -154,36 +251,20 @@ class LetterPairsPage(ft.Column):
             f"{remaining} remaining ({percent}%)"
         )
         self.progress_bar.value = completed / active_total if active_total else 0
-
         self._update_duplicate_warning()
 
-        # Search/filter the entire dictionary first. Only after that do we
-        # split matches into A/B/C... display pages, so searches are global.
-        rows = []
-        self._word_fields = []
-        for pair in sorted(all_pairs):
-            is_active = pair in active_pairs
-            word = self.state.get_word(pair)
-
-            if status == "active" and not is_active:
-                continue
-            if status == "inactive" and is_active:
-                continue
-            if status == "missing" and (not is_active or bool(word.strip())):
-                continue
-            if query and not self._matches_search(pair, word, query):
-                continue
-
-            rows.append((pair, word, is_active, active_pairs.get(pair, [])))
-
-        # A non-empty search is global: show every matching pair together,
-        # regardless of which A/B/C page was selected before the search.
-        # With no search text we keep the normal canonical-first-letter pages.
+        grouped_disabled = (
+            bool(query)
+            or (self.grade_sort.value or "default") != "default"
+            or self.status_filter.value == "update_grades"
+        )
         groups = sorted({pair[0].upper() for pair, *_ in rows if pair})
         self.available_groups = groups
-        if query:
+        self._word_fields = []
+
+        if grouped_disabled:
             page_rows = rows
-            self.group_label.value = "Search results" if rows else "No matching pairs"
+            self.group_label.value = "Filtered results" if rows else "No matching pairs"
             self.prev_group.disabled = True
             self.next_group.disabled = True
             self.count_text.value = f"{len(rows)} matching across all letter groups"
@@ -204,39 +285,25 @@ class LetterPairsPage(ft.Column):
             self.next_group.disabled = group_index == len(groups) - 1
             self.count_text.value = f"{len(rows)} total · {len(page_rows)} on this page"
 
-        def _average_for_pairs(items):
-            values = []
-            for pair, word, *_ in items:
-                rating = self.state.get_pair_rating(pair)
-                if word.strip() and rating is not None:
-                    values.append(float(rating))
-            return (sum(values) / len(values), len(values)) if values else (None, 0)
-
-        current_avg, current_n = _average_for_pairs(page_rows)
-        global_items = []
-        for pair, word in self.state.data.global_words.items():
-            if word.strip():
-                global_items.append((pair, word, True, []))
-        global_avg, global_n = _average_for_pairs(global_items)
-        self.average_text.value = (
-            f"Average grade: {current_avg:.2f} ({current_n} rated)" if current_avg is not None
-            else "Average grade: —"
-        )
-        self.global_average_text.value = (
-            f"Global average: {global_avg:.2f} ({global_n} rated)" if global_avg is not None
-            else "Global average: —"
-        )
-
-        # Use the screen horizontally: each letter page is rendered in two
-        # compact columns.  This keeps a full A/B/C... group visible even on
-        # shorter laptop screens without relying on browser scrolling.
-        cells = [
-            self._build_compact_row(pair, word, is_active, sources)
-            for pair, word, is_active, sources in page_rows
+        filter_avg, filter_n = self._average_for_rows(page_rows)
+        overall_rows = [
+            (pair, word, True, [])
+            for pair, word in self.state.data.global_words.items()
+            if word.strip()
         ]
+        overall_avg, overall_n = self._average_for_rows(overall_rows)
+        self.filter_average_text.value = (
+            f"Filter average: {filter_avg:.2f} ({filter_n} rated)"
+            if filter_avg is not None else "Filter average: —"
+        )
+        self.overall_average_text.value = (
+            f"Overall average: {overall_avg:.2f} ({overall_n} rated)"
+            if overall_avg is not None else "Overall average: —"
+        )
+
+        cells = [self._build_compact_row(*row) for row in page_rows]
         split_at = (len(cells) + 1) // 2
-        left = cells[:split_at]
-        right = cells[split_at:]
+        left, right = cells[:split_at], cells[split_at:]
         visual_rows = []
         for i in range(split_at):
             right_cell = right[i] if i < len(right) else ft.Container(expand=True)
@@ -248,11 +315,16 @@ class LetterPairsPage(ft.Column):
                 )
             )
         self.rows_view.controls = visual_rows
-        if update and self.page is not None:
-            self.update()
+
+    def _average_for_rows(self, items):
+        values = []
+        for pair, word, *_ in items:
+            rating = self.state.get_pair_rating(pair)
+            if word.strip() and rating is not None:
+                values.append(float(rating))
+        return (sum(values) / len(values), len(values)) if values else (None, 0)
 
     def _pair_search_match(self, value: str, query: str) -> bool:
-        """Match exact/canonical/alias pair text including A-, -B wildcards."""
         value = (value or "").upper()
         q = (query or "").upper()
         if not q:
@@ -268,52 +340,92 @@ class LetterPairsPage(ft.Column):
     def _matches_search(self, pair: str, word: str, query: str) -> bool:
         pair_match = False
         word_match = False
-
         if self.search_pairs.value:
             display = self.state.get_pair_display(pair)
-            # Search both the canonical pair (AB) and its visible alias (ØB).
-            pair_match = self._pair_search_match(pair, query) or self._pair_search_match(display, query)
-
+            pair_match = (
+                self._pair_search_match(pair, query)
+                or self._pair_search_match(display, query)
+            )
         if self.search_words.value:
             word_match = query.casefold() in word.casefold()
-
         return pair_match or word_match
 
     def _rating_control(self, pair: str, word: str):
-        if not (word or "").strip():
-            return ft.Container(ft.Text("—", color=ft.Colors.ON_SURFACE_VARIANT), width=82)
+        has_word = bool((word or "").strip())
         mode = self.state.data.letter_pair_rating_mode
         rating = self.state.get_pair_rating(pair)
+
         if mode == "colors":
-            controls = []
             grades = list(self.state.data.rating_color_grades)
-            closest_grade = min(grades, key=lambda g: abs(float(rating) - float(g))) if rating is not None and grades else None
-            for idx, (color, grade) in enumerate(zip(self.state.data.rating_color_hexes, grades)):
-                selected = closest_grade is not None and float(grade) == float(closest_grade)
+            closest_grade = (
+                min(grades, key=lambda grade: abs(float(rating) - float(grade)))
+                if rating is not None and grades else None
+            )
+            controls = []
+            for color, grade in zip(self.state.data.rating_color_hexes, grades):
+                selected = (
+                    closest_grade is not None
+                    and abs(float(grade) - float(closest_grade)) < 0.001
+                )
                 controls.append(
                     ft.GestureDetector(
                         content=ft.Container(
-                            width=16, height=16, bgcolor=color, border_radius=8,
-                            border=ft.Border.all(2, ft.Colors.ON_SURFACE) if selected else None,
+                            width=17,
+                            height=17,
+                            bgcolor=color,
+                            border_radius=9,
+                            opacity=1.0 if has_word else 0.28,
+                            border=(
+                                ft.Border.all(2, ft.Colors.ON_SURFACE)
+                                if selected else None
+                            ),
                             tooltip=f"Grade {grade:g}",
                         ),
-                        on_tap=lambda e, p=pair, g=grade: self._rating_changed(p, g),
+                        on_tap=(
+                            (lambda e, p=pair, g=grade: self._rating_changed(p, g))
+                            if has_word else None
+                        ),
                     )
                 )
-            return ft.Row(controls, spacing=3, width=92)
+            controls.append(
+                ft.IconButton(
+                    ft.Icons.RESTART_ALT,
+                    icon_size=16,
+                    tooltip="Ungraded",
+                    disabled=not has_word,
+                    on_click=lambda e, p=pair: self._rating_changed(p, None),
+                )
+            )
+            return ft.Row(controls, spacing=2, width=128)
+
         if mode == "qualitative":
             value = "__none__"
             if rating is not None:
                 value = "bad" if rating < 2 else ("mid" if rating < 4 else "good")
             return ft.Dropdown(
-                width=92, dense=True, value=value,
-                options=[ft.DropdownOption("__none__", "—"), ft.DropdownOption("bad", "Bad"), ft.DropdownOption("mid", "Mid"), ft.DropdownOption("good", "Good")],
-                on_select=lambda e, p=pair: self._rating_changed(p, {"bad":1, "mid":3, "good":5}.get(e.control.value)),
+                width=112,
+                dense=True,
+                value=value,
+                disabled=not has_word,
+                options=[
+                    ft.DropdownOption("__none__", "—"),
+                    ft.DropdownOption("bad", "Bad"),
+                    ft.DropdownOption("mid", "Mid"),
+                    ft.DropdownOption("good", "Good"),
+                ],
+                on_select=lambda e, p=pair: self._rating_changed(
+                    p, {"bad": 1, "mid": 3, "good": 5}.get(e.control.value)
+                ),
             )
+
         value = "__none__" if rating is None else str(int(round(float(rating))))
         return ft.Dropdown(
-            width=82, dense=True, value=value,
-            options=[ft.DropdownOption("__none__", "—")] + [ft.DropdownOption(str(i), str(i)) for i in range(1, 6)],
+            width=92,
+            dense=True,
+            value=value,
+            disabled=not has_word,
+            options=[ft.DropdownOption("__none__", "—")]
+            + [ft.DropdownOption(str(i), str(i)) for i in range(1, 6)],
             on_select=lambda e, p=pair: self._rating_changed(p, e.control.value),
         )
 
@@ -321,10 +433,9 @@ class LetterPairsPage(ft.Column):
         self.state.set_pair_rating(pair, value)
         self.refresh()
 
-    def _build_compact_row(self, pair: str, word: str, is_active: bool, sources: list[str]) -> ft.Control:
+    def _build_compact_row(self, pair: str, word: str, is_active: bool, sources: list[str]):
         field = ft.TextField(
             value=word,
-            hint_text=None,
             dense=True,
             height=34,
             border=ft.InputBorder.UNDERLINE,
@@ -353,29 +464,39 @@ class LetterPairsPage(ft.Column):
         else:
             pair_label = ft.GestureDetector(
                 content=ft.Container(
-                    ft.Text(display_pair, weight=ft.FontWeight.BOLD, tooltip=f"Underlying pair: {pair}"),
+                    ft.Text(
+                        display_pair,
+                        weight=ft.FontWeight.BOLD,
+                        tooltip=f"Underlying pair: {pair}",
+                    ),
                     width=54,
                 ),
                 on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
             )
 
         status_chip = ft.Container(
-            content=ft.Text("Active" if is_active else "Inactive", size=12, color=ft.Colors.WHITE),
+            content=ft.Text(
+                "Active" if is_active else "Inactive", size=12, color=ft.Colors.WHITE
+            ),
             bgcolor=ft.Colors.GREEN_600 if is_active else ft.Colors.GREY_500,
             padding=ft.Padding.symmetric(horizontal=8, vertical=3),
             border_radius=12,
         )
-
         return ft.Container(
             expand=True,
             content=ft.Row(
                 [
                     pair_label,
                     ft.Container(field, expand=True),
-                    ft.Container(self._rating_control(pair, word), width=92),
+                    ft.Container(self._rating_control(pair, word), width=128),
                     ft.Container(status_chip, width=72),
                     ft.Container(
-                        ft.Text(", ".join(sources), size=11, color=ft.Colors.ON_SURFACE_VARIANT, no_wrap=False),
+                        ft.Text(
+                            ", ".join(sources),
+                            size=11,
+                            color=ft.Colors.ON_SURFACE_VARIANT,
+                            no_wrap=False,
+                        ),
                         width=90,
                     ),
                 ],
@@ -387,12 +508,83 @@ class LetterPairsPage(ft.Column):
             opacity=1.0 if is_active else 0.75,
         )
 
+    def _build_stats_view(self):
+        rated = []
+        for pair, word in self.state.data.global_words.items():
+            if not word.strip():
+                continue
+            rating = self.state.get_pair_rating(pair)
+            if rating is not None:
+                rated.append((pair, word, float(rating)))
+
+        strongest_pairs = sorted(rated, key=lambda x: (-x[2], x[0]))[:10]
+        weakest_pairs = sorted(rated, key=lambda x: (x[2], x[0]))[:10]
+
+        by_letter = {}
+        for pair, _, rating in rated:
+            display = self.state.get_pair_display(pair).upper()
+            for letter in set(ch for ch in display if ch.isalpha()):
+                by_letter.setdefault(letter, []).append(rating)
+        letter_stats = [
+            (letter, sum(vals) / len(vals), len(vals))
+            for letter, vals in by_letter.items() if vals
+        ]
+        strongest_letters = sorted(letter_stats, key=lambda x: (-x[1], x[0]))[:8]
+        weakest_letters = sorted(letter_stats, key=lambda x: (x[1], x[0]))[:8]
+
+        def pair_list(title, items):
+            rows = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
+            if not items:
+                rows.append(ft.Text("No rated words yet.", color=ft.Colors.ON_SURFACE_VARIANT))
+            for pair, word, rating in items:
+                rows.append(
+                    ft.Row([
+                        ft.Text(self.state.get_pair_display(pair), width=48, weight=ft.FontWeight.BOLD),
+                        ft.Text(word, expand=True),
+                        ft.Text(f"{rating:.2f}", width=48, text_align=ft.TextAlign.RIGHT),
+                    ])
+                )
+            return ft.Container(ft.Column(rows, spacing=5), expand=True, padding=10)
+
+        def letter_list(title, items):
+            rows = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
+            if not items:
+                rows.append(ft.Text("No rated words yet.", color=ft.Colors.ON_SURFACE_VARIANT))
+            for letter, avg, count in items:
+                rows.append(
+                    ft.Row([
+                        ft.Text(letter, width=42, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"{avg:.2f}", width=50),
+                        ft.Text(f"{count} rated pairs", color=ft.Colors.ON_SURFACE_VARIANT),
+                    ])
+                )
+            return ft.Container(ft.Column(rows, spacing=5), expand=True, padding=10)
+
+        return ft.Column(
+            [
+                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "Letter statistics average every rated mnemonic whose displayed pair contains that letter.",
+                    size=12, color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+                ft.Row([
+                    pair_list("Strongest pairs", strongest_pairs),
+                    pair_list("Weakest pairs", weakest_pairs),
+                ], vertical_alignment=ft.CrossAxisAlignment.START),
+                ft.Divider(),
+                ft.Row([
+                    letter_list("Strongest letters", strongest_letters),
+                    letter_list("Weakest letters", weakest_letters),
+                ], vertical_alignment=ft.CrossAxisAlignment.START),
+            ],
+            spacing=10,
+        )
+
     def _edit_pair_alias(self, pair: str):
         self._editing_alias_pair = pair
         self.refresh()
 
     def _save_pair_alias_inline(self, pair: str, value: str):
-        # on_submit can be followed by on_blur; guard against saving twice.
         if self._editing_alias_pair != pair:
             return
         self._editing_alias_pair = None
@@ -401,52 +593,51 @@ class LetterPairsPage(ft.Column):
 
     def _word_changed(self, pair: str, value: str):
         self.state.set_word(pair, value)
-        # Update progress/count without rebuilding the list and stealing focus.
-        active_pairs = get_active_pairs(self.state.data.schemes)
-        total = len(active_pairs)
-        completed = sum(1 for p in active_pairs if self.state.get_word(p).strip())
-        remaining = total - completed
-        percent = int(round((completed / total) * 100)) if total else 0
-        self.progress_text.value = (
-            f"Letter-pair dictionary: {completed} / {total} complete — {remaining} remaining ({percent}%)"
-        )
-        self.progress_bar.value = completed / total if total else 0
         self._update_duplicate_warning()
         self._refresh_average_labels_only()
-        self.average_text.update()
-        self.global_average_text.update()
         self.progress_text.update()
         self.progress_bar.update()
         self.duplicate_warning.update()
+        self.filter_average_text.update()
+        self.overall_average_text.update()
 
     def _refresh_average_labels_only(self):
-        # Recompute from the same filters without rebuilding controls.
-        selected_scheme = self.scheme_filter.value or "__all__"
-        if selected_scheme == "__all__":
-            active_pairs = get_active_pairs(self.state.data.schemes)
-            all_pairs = set(active_pairs) | set(self.state.data.global_words) | set(self.state.data.pair_aliases)
-        elif selected_scheme in self.state.data.schemes:
-            active_pairs = get_active_pairs({selected_scheme: self.state.data.schemes[selected_scheme]})
-            all_pairs = set(active_pairs)
-        else:
-            active_pairs = {}
-            all_pairs = set()
+        rows, active_pairs = self._base_rows()
         query = (self.search_field.value or "").strip()
-        status = self.status_filter.value
-        rows=[]
-        for pair in sorted(all_pairs):
-            is_active = pair in active_pairs
-            word = self.state.get_word(pair)
-            if status == "active" and not is_active: continue
-            if status == "inactive" and is_active: continue
-            if status == "missing" and (not is_active or bool(word.strip())): continue
-            if query and not self._matches_search(pair, word, query): continue
-            if not query and self.current_group and not pair.upper().startswith(self.current_group): continue
-            rows.append((pair, word))
-        vals=[float(self.state.get_pair_rating(pair)) for pair, word in rows if word.strip() and self.state.get_pair_rating(pair) is not None]
-        self.average_text.value = f"Average grade: {sum(vals)/len(vals):.2f} ({len(vals)} rated)" if vals else "Average grade: —"
-        gvals=[float(self.state.get_pair_rating(pair)) for pair, word in self.state.data.global_words.items() if word.strip() and self.state.get_pair_rating(pair) is not None]
-        self.global_average_text.value = f"Global average: {sum(gvals)/len(gvals):.2f} ({len(gvals)} rated)" if gvals else "Global average: —"
+        if (
+            query
+            or (self.grade_sort.value or "default") != "default"
+            or self.status_filter.value == "update_grades"
+        ):
+            page_rows = rows
+        elif self.current_group:
+            page_rows = [r for r in rows if r[0].upper().startswith(self.current_group)]
+        else:
+            page_rows = rows
+
+        active_total = len(active_pairs)
+        completed = sum(1 for pair in active_pairs if self.state.get_word(pair).strip())
+        remaining = active_total - completed
+        percent = int(round((completed / active_total) * 100)) if active_total else 0
+        self.progress_text.value = (
+            f"Letter-pair dictionary: {completed} / {active_total} complete — "
+            f"{remaining} remaining ({percent}%)"
+        )
+        self.progress_bar.value = completed / active_total if active_total else 0
+
+        avg, n = self._average_for_rows(page_rows)
+        overall_rows = [
+            (pair, word, True, [])
+            for pair, word in self.state.data.global_words.items()
+            if word.strip()
+        ]
+        oavg, on = self._average_for_rows(overall_rows)
+        self.filter_average_text.value = (
+            f"Filter average: {avg:.2f} ({n} rated)" if avg is not None else "Filter average: —"
+        )
+        self.overall_average_text.value = (
+            f"Overall average: {oavg:.2f} ({on} rated)" if oavg is not None else "Overall average: —"
+        )
 
     def _update_duplicate_warning(self):
         by_word = {}
@@ -458,10 +649,14 @@ class LetterPairsPage(ft.Column):
         if duplicates:
             examples = []
             for items in sorted(duplicates, key=lambda x: x[0][1].casefold())[:4]:
-                shown_pairs = ", ".join(self.state.get_pair_display(pair) for pair, _ in items)
+                shown_pairs = ", ".join(
+                    self.state.get_pair_display(pair) for pair, _ in items
+                )
                 examples.append(f"{items[0][1]}: {shown_pairs}")
             more = " …" if len(duplicates) > 4 else ""
-            self.duplicate_warning.value = "⚠ Duplicate mnemonic words — " + "; ".join(examples) + more
+            self.duplicate_warning.value = (
+                "⚠ Duplicate mnemonic words — " + "; ".join(examples) + more
+            )
         else:
             self.duplicate_warning.value = ""
 
@@ -473,7 +668,6 @@ class LetterPairsPage(ft.Column):
         if idx + 1 < len(self._word_fields):
             self._word_fields[idx + 1].focus()
             self.update()
-
 
     def _previous_group(self, e):
         if not self.available_groups or self.current_group not in self.available_groups:
@@ -492,11 +686,12 @@ class LetterPairsPage(ft.Column):
             self.refresh()
 
     def _on_search_mode_change(self, e):
-        # Keep at least one search mode enabled.
         if not self.search_pairs.value and not self.search_words.value:
             e.control.value = True
         self.search_field.hint_text = (
-            "Search pair or word..." if self.search_words.value else "Search letter pairs (AC, A-, -S)..."
+            "Search pair or word..."
+            if self.search_words.value
+            else "Search letter pairs (AC, A-, -S)..."
         )
         self.current_group = None
         self.refresh()

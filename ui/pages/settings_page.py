@@ -64,7 +64,7 @@ class SettingsPage(ft.Column):
             ft.Text("Letter pairs settings", size=16, weight=ft.FontWeight.BOLD),
             self.rating_mode_dropdown,
             ft.Text(
-                "Ratings are always stored on a common 1–5 scale, so changing the display system does not lose your grades.",
+                "Ratings are stored on a common 1–5 scale. Changing the color scale never rewrites old grades; those pairs can be reviewed with the Update grades filter.",
                 size=12, color=ft.Colors.ON_SURFACE_VARIANT,
             ),
             ft.Row([self.rating_levels_dropdown], wrap=True),
