@@ -178,6 +178,19 @@ class AppState:
         scheme.highlight_orientation_targets = bool(enabled)
         self._save()
 
+    def set_three_style_enabled(self, scheme: LetterScheme, enabled: bool) -> None:
+        scheme.three_style_enabled = bool(enabled)
+        self._save()
+
+    def set_edge_parity_partner(self, scheme: LetterScheme, piece: str) -> bool:
+        pieces = CATEGORY_PIECES["edges"]
+        buffer_piece = scheme.edges.buffer_piece
+        if piece not in pieces or piece == buffer_piece:
+            return False
+        scheme.edge_parity_partner = piece
+        self._save()
+        return True
+
     def set_orientation_memo_mode(self, scheme: LetterScheme, category: str, mode: str) -> None:
         if mode not in {"visual", "trace"}:
             return

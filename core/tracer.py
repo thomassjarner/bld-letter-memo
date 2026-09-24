@@ -151,6 +151,7 @@ class TraceResult:
     # True for targets added specifically to memo a twist/flip in trace mode.
     corner_orientation_target_flags: List[bool]=field(default_factory=list)
     edge_orientation_target_flags: List[bool]=field(default_factory=list)
+    three_style_parity_applied: bool=False
 
     @property
     def corner_memo(self): return " ".join(self.corner_pairs + self.corner_orientation)
@@ -310,11 +311,52 @@ def _trace_category(state, cat, order, pieces, standard_priority, standard_stick
             add_target(second, None, True)
     return targets, orientation, cycle_ids, orientation_target_flags
 
+
+def _memo_swap_edge_identities(state, buffer_piece: str, partner_piece: str):
+    """Virtual edge memo-swap used for 3-style parity handling.
+
+    The scrambled physical state is left untouched. Only the home identities of
+    the buffer edge and configured parity-partner edge are exchanged before the
+    edge trace. For DF <-> UR this also maps FD <-> RU. This deliberately flips
+    edge permutation parity while preserving the normal tracing machinery.
+    """
+    if buffer_piece not in EDGE_PIECES or partner_piece not in EDGE_PIECES:
+        raise ScrambleError("Invalid 3-style edge parity partner")
+    if buffer_piece == partner_piece:
+        raise ScrambleError("3-style edge parity partner must differ from the edge buffer")
+
+    a0, a1 = buffer_piece, buffer_piece[::-1]
+    b0, b1 = partner_piece, partner_piece[::-1]
+    rename = {a0: b0, a1: b1, b0: a0, b1: a1}
+    return {key: rename.get(home, home) for key, home in state.items()}
+
 class ScrambleTracer:
     def trace(self, scramble: str, scheme: LetterScheme) -> TraceResult:
         state=simulate(scramble, scheme.memo_up, scheme.memo_front)
-        ct,co,ccycles,cflags=_trace_category(state,scheme.corners,CORNER_STICKER_ORDER,CORNER_PIECES,STANDARD_CORNER_PRIORITY,STANDARD_CORNER_STICKER)
-        et,eo,ecycles,eflags=_trace_category(state,scheme.edges,EDGE_STICKER_ORDER,EDGE_PIECES,STANDARD_EDGE_PRIORITY,STANDARD_EDGE_STICKER)
+
+        # Corners are always traced first. In 3-style mode their parity decides
+        # whether the configured edge memo-swap must be applied.
+        ct,co,ccycles,cflags=_trace_category(
+            state,scheme.corners,CORNER_STICKER_ORDER,CORNER_PIECES,
+            STANDARD_CORNER_PRIORITY,STANDARD_CORNER_STICKER,
+        )
+
+        edge_state = state
+        three_style_parity_applied = False
+        if scheme.three_style_enabled and len(ct) % 2 == 1:
+            buffer_sticker = scheme.edges.buffer_sticker or scheme.edges.buffer_piece
+            buffer_piece = find_piece_for_sticker(buffer_sticker, EDGE_PIECES) if buffer_sticker else None
+            partner = scheme.edge_parity_partner or "UR"
+            if not buffer_piece:
+                raise ScrambleError("Select an edge buffer before using 3-style parity handling")
+            edge_state = _memo_swap_edge_identities(state, buffer_piece, partner)
+            three_style_parity_applied = True
+
+        et,eo,ecycles,eflags=_trace_category(
+            edge_state,scheme.edges,EDGE_STICKER_ORDER,EDGE_PIECES,
+            STANDARD_EDGE_PRIORITY,STANDARD_EDGE_STICKER,
+        )
+
         def letters(targets,cat):
             result=[]
             for s in targets:
@@ -324,18 +366,25 @@ class ScrambleTracer:
             return result
         cl=letters(ct,scheme.corners); el=letters(et,scheme.edges)
 
-        # A legal 3x3 permutation has matching corner/edge permutation parity.
-        # Visual twist/flip annotations are orientation-only and deliberately
-        # do not participate in this check. If this fails, the trace is wrong;
-        # never "repair" the memo by adding/removing a target.
-        if len(ct) % 2 != len(et) % 2:
-            raise ScrambleError(
-                "Internal trace check failed: corner and edge target counts "
-                "have different parity. The memo was not shown because the "
-                "tracing result is invalid."
-            )
+        if three_style_parity_applied:
+            # This mismatch is intentional in 3-style parity mode: corners stay
+            # odd, while the virtual edge memo-swap makes the edge trace even.
+            if len(et) % 2 != 0:
+                raise ScrambleError(
+                    "Internal 3-style trace check failed: parity-adjusted edge "
+                    "memo should contain an even number of targets."
+                )
+        else:
+            # Ordinary mode, and 3-style solves whose corner trace is even, use
+            # the normal legal-cube parity invariant.
+            if len(ct) % 2 != len(et) % 2:
+                raise ScrambleError(
+                    "Internal trace check failed: corner and edge target counts "
+                    "have different parity. The memo was not shown because the "
+                    "tracing result is invalid."
+                )
 
         return TraceResult(
             ct, et, cl, el, _pair(cl), _pair(el), co, eo,
-            ccycles, ecycles, cflags, eflags,
+            ccycles, ecycles, cflags, eflags, three_style_parity_applied,
         )

@@ -246,6 +246,7 @@ class LetterSchemesPage(ft.Column):
                         memo_field, ft.Text("/"), exec_field,
                         ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                     ], wrap=True),
+                    self._build_three_style_settings(scheme),
                     ft.Switch(
                         label="Show cycles with colors",
                         value=scheme.show_cycle_colors,
@@ -279,6 +280,36 @@ class LetterSchemesPage(ft.Column):
             ],
             spacing=10,
         )
+
+    def _build_three_style_settings(self, scheme):
+        buffer_piece = scheme.edges.buffer_piece
+        pieces = [p for p in CATEGORY_PIECES["edges"] if p != buffer_piece]
+        preferred = scheme.edge_parity_partner or "UR"
+        if preferred not in pieces:
+            preferred = "UR" if "UR" in pieces else (pieces[0] if pieces else "")
+
+        controls = [
+            ft.Switch(
+                label="3-style",
+                value=scheme.three_style_enabled,
+                on_change=lambda e: self._three_style_enabled_changed(e.control.value),
+            )
+        ]
+        if scheme.three_style_enabled:
+            controls.extend([
+                ft.Dropdown(
+                    label="Edge parity partner",
+                    width=190,
+                    value=preferred,
+                    options=[ft.DropdownOption(p, p) for p in pieces],
+                    on_select=lambda e: self._edge_parity_partner_changed(e.control.value),
+                ),
+                ft.Text(
+                    "Default: UR. When the corner trace is odd, the edge buffer and parity partner are memo-swapped before the edge trace.",
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+            ])
+        return ft.Row(controls, wrap=True, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
     def _build_category_preferences(self, scheme, category: str):
         cat = scheme.corners if category == "corners" else scheme.edges
@@ -552,6 +583,29 @@ class LetterSchemesPage(ft.Column):
         if scheme is None:
             return
         self.state.set_highlight_orientation_targets(scheme, enabled)
+
+    def _three_style_enabled_changed(self, enabled: bool):
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        self.state.set_three_style_enabled(scheme, enabled)
+        self.selected_category = "preferences"
+        self.preference_section = "general"
+        self._refresh_body()
+        self.update()
+
+    def _edge_parity_partner_changed(self, piece: str):
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        if not self.state.set_edge_parity_partner(scheme, piece):
+            self.settings_message.value = "Parity partner must be a different edge piece from the buffer."
+        else:
+            self.settings_message.value = ""
+        self.selected_category = "preferences"
+        self.preference_section = "general"
+        self._refresh_body()
+        self.update()
 
     def _orientation_mode_changed(self, category: str, value: str):
         scheme = self.state.active_scheme

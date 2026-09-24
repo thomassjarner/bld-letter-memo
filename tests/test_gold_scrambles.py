@@ -146,3 +146,39 @@ def test_all_memo_orientations_reframe_centers_and_preserve_parity():
     # If orientation were being ignored, every frame would produce the exact
     # same target sequence. It should materially affect memo interpretation.
     assert len(seen_target_sequences) > 1
+
+
+def test_three_style_odd_corner_trace_keeps_corners_and_evenizes_edges():
+    tracer = ScrambleTracer()
+    for case in GOLD_TESTS:
+        normal_scheme = make_gold_scheme()
+        normal = tracer.trace(case["scramble"], normal_scheme)
+        assert len(normal.corner_targets) % 2 == 1
+
+        scheme = make_gold_scheme()
+        scheme.three_style_enabled = True
+        scheme.edge_parity_partner = "UR"
+        result = tracer.trace(case["scramble"], scheme)
+
+        assert result.corner_targets == normal.corner_targets
+        assert result.corner_orientation == normal.corner_orientation
+        assert result.three_style_parity_applied is True
+        assert len(result.edge_targets) % 2 == 0
+
+
+def test_three_style_even_corner_trace_leaves_edges_normal():
+    scramble = "U' L R U' B U2 F' B' D' U2 R F L D L' D2 U2 L U2 F B L2 Rw Uw'"
+    tracer = ScrambleTracer()
+
+    normal_scheme = make_gold_scheme()
+    normal = tracer.trace(scramble, normal_scheme)
+    assert len(normal.corner_targets) % 2 == 0
+
+    scheme = make_gold_scheme()
+    scheme.three_style_enabled = True
+    scheme.edge_parity_partner = "UR"
+    result = tracer.trace(scramble, scheme)
+
+    assert result.corner_targets == normal.corner_targets
+    assert result.edge_targets == normal.edge_targets
+    assert result.three_style_parity_applied is False

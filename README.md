@@ -1,3 +1,25 @@
+# BLD Letter Memo Web 2.14
+
+Changes:
+- Added optional 3-style mode under Letter Scheme -> Preferences -> General.
+- 3-style is OFF by default, so existing tracing behavior is unchanged.
+- When enabled, an Edge parity partner selector appears (default: UR).
+- Corners are always traced normally first.
+- If the corner target count is even, edge tracing is unchanged.
+- If the corner target count is odd, the edge buffer and configured parity partner are
+  memo-swapped before tracing edges, producing an even edge target count for 3-style.
+- The normal corner/edge matching-parity error is intentionally bypassed only when that
+  3-style parity memo-swap has been applied.
+- Diagnostic trace reports whether the 3-style parity memo-swap was used.
+- Existing scheme data migrates automatically; 3-style defaults to disabled.
+
+Regression status:
+- 4 original gold-standard scrambles still pass in normal mode.
+- all-orientation regression still passes.
+- new 3-style odd/even parity tests pass.
+- 7/7 tests pass.
+
+
 # BLD Letter Memo Web 2.13
 
 Changes in this build:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 9
+CURRENT_VERSION = 10
 
 
 @dataclass
@@ -58,6 +58,11 @@ class LetterScheme:
     # Scheme-specific memo display preferences.
     show_cycle_colors: bool = False
     highlight_orientation_targets: bool = False
+    # Optional 3-style parity handling. When enabled and the corner trace is
+    # odd, the edge buffer piece and this partner are memo-swapped before
+    # tracing edges. UR is the standard suggested partner.
+    three_style_enabled: bool = False
+    edge_parity_partner: str = "UR"
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +74,8 @@ class LetterScheme:
             "execution_order": self.execution_order,
             "show_cycle_colors": bool(self.show_cycle_colors),
             "highlight_orientation_targets": bool(self.highlight_orientation_targets),
+            "three_style_enabled": bool(self.three_style_enabled),
+            "edge_parity_partner": self.edge_parity_partner or "UR",
         }
 
     @staticmethod
@@ -83,6 +90,8 @@ class LetterScheme:
             execution_order=d.get("execution_order", ""),
             show_cycle_colors=bool(d.get("show_cycle_colors", False)),
             highlight_orientation_targets=bool(d.get("highlight_orientation_targets", False)),
+            three_style_enabled=bool(d.get("three_style_enabled", False)),
+            edge_parity_partner=str(d.get("edge_parity_partner", "UR") or "UR"),
         )
 
     def duplicate(self, new_name: str) -> "LetterScheme":

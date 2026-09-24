@@ -76,6 +76,8 @@ class ScrambleMemoPage(ft.Column):
             tuple(sorted(scheme.edges.cycle_break_stickers.items())),
             tuple(sorted(scheme.corners.stickers.items())),
             tuple(sorted(scheme.edges.stickers.items())),
+            scheme.three_style_enabled,
+            scheme.edge_parity_partner,
         )
 
     def refresh(self, update: bool = True):
@@ -112,7 +114,8 @@ class ScrambleMemoPage(ft.Column):
                 f"Corner cycles: {' '.join('—' if x is None else str(x + 1) for x in r.corner_cycle_ids) or '—'}\n"
                 f"Edge targets: {' '.join(r.edge_targets) or '—'}\n"
                 f"Edge letters: {' '.join(r.edge_letters) or '—'}\n"
-                f"Edge cycles: {' '.join('—' if x is None else str(x + 1) for x in r.edge_cycle_ids) or '—'}"
+                f"Edge cycles: {' '.join('—' if x is None else str(x + 1) for x in r.edge_cycle_ids) or '—'}\n"
+                f"3-style parity memo-swap: {'yes' if r.three_style_parity_applied else 'no'}"
             )
         except (ScrambleError, ValueError) as ex:
             self.error.value = str(ex)
