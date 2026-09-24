@@ -44,7 +44,7 @@ class ScrambleMemoPage(ft.Column):
         self.controls = [
             ft.Text("Scramble → Memo", size=20, weight=ft.FontWeight.BOLD),
             ft.Text(
-                "Scrambles are always read as White-top / Green-front, then re-oriented automatically to the active scheme before tracing."
+                "Scramble interpretation follows the active scheme: fixed White-top / Green-front by default, or the scheme's own orientation when that preference is enabled."
             ),
             self.scramble,
             ft.Row([
@@ -78,6 +78,7 @@ class ScrambleMemoPage(ft.Column):
             tuple(sorted(scheme.edges.stickers.items())),
             scheme.three_style_enabled,
             scheme.edge_parity_partner,
+            scheme.scramble_from_own_orientation,
         )
 
     def refresh(self, update: bool = True):

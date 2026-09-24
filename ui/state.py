@@ -158,6 +158,10 @@ class AppState:
         self._save()
         return True
 
+    def set_scramble_from_own_orientation(self, scheme: LetterScheme, enabled: bool) -> None:
+        scheme.scramble_from_own_orientation = bool(enabled)
+        self._save()
+
     def set_order(self, scheme: LetterScheme, kind: str, value: str) -> bool:
         """Save CE/EC, or blank to use the standard placeholder/default."""
         value = (value or "").strip().upper()
@@ -265,6 +269,75 @@ class AppState:
 
     def get_pair_display(self, pair: str) -> str:
         return self.data.pair_aliases.get(pair, pair)
+
+    # ---- letter-pair rating settings --------------------------------------
+
+    @staticmethod
+    def _default_rating_palette(levels: int):
+        if levels == 4:
+            return ["#D32F2F", "#E66F1E", "#A8A72C", "#2E7D32"], [1.0, 2.33, 3.67, 5.0]
+        if levels == 5:
+            return ["#D32F2F", "#E66F1E", "#F9A825", "#91A52B", "#2E7D32"], [1.0, 2.0, 3.0, 4.0, 5.0]
+        return ["#D32F2F", "#F9A825", "#2E7D32"], [1.0, 3.0, 5.0]
+
+    def set_letter_pair_rating_mode(self, mode: str) -> None:
+        if mode not in {"numeric", "colors", "qualitative"}:
+            return
+        self.data.letter_pair_rating_mode = mode
+        self._save()
+
+    def set_rating_color_levels(self, levels: int) -> None:
+        if levels not in {3, 4, 5}:
+            return
+        colors, grades = self._default_rating_palette(levels)
+        self.data.rating_color_levels = levels
+        self.data.rating_color_hexes = colors
+        self.data.rating_color_grades = grades
+        self._save()
+
+    def set_rating_color(self, index: int, color_hex: str) -> bool:
+        value = (color_hex or "").strip().upper()
+        if not value.startswith("#"):
+            value = "#" + value
+        if len(value) != 7 or any(c not in "0123456789ABCDEF#" for c in value):
+            return False
+        if 0 <= index < len(self.data.rating_color_hexes):
+            self.data.rating_color_hexes[index] = value
+            self._save(notify=False)
+            return True
+        return False
+
+    def set_rating_color_grade(self, index: int, grade) -> bool:
+        try:
+            value = float(grade)
+        except (TypeError, ValueError):
+            return False
+        if not 1.0 <= value <= 5.0:
+            return False
+        if 0 <= index < len(self.data.rating_color_grades):
+            self.data.rating_color_grades[index] = value
+            self._save(notify=False)
+            return True
+        return False
+
+    def set_pair_rating(self, pair: str, rating) -> None:
+        pair = (pair or "").strip().upper()
+        if not pair:
+            return
+        if rating in {None, "", "none", "__none__"}:
+            self.data.pair_ratings.pop(pair, None)
+            self._save(notify=False)
+            return
+        try:
+            value = float(rating)
+        except (TypeError, ValueError):
+            return
+        value = max(1.0, min(5.0, value))
+        self.data.pair_ratings[pair] = value
+        self._save(notify=False)
+
+    def get_pair_rating(self, pair: str):
+        return self.data.pair_ratings.get(pair)
 
     # ---- practice timer ---------------------------------------------------
 

@@ -241,6 +241,15 @@ class LetterSchemesPage(ft.Column):
             content = ft.Column(
                 [
                     self._build_orientation_settings(scheme),
+                    ft.Switch(
+                        label="Scramble from own orientation",
+                        value=scheme.scramble_from_own_orientation,
+                        on_change=lambda e: self._scramble_from_own_orientation_changed(e.control.value),
+                    ),
+                    ft.Text(
+                        "Off: scramble notation is read as White-top / Green-front. On: scramble notation is read from this scheme's own orientation.",
+                        size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                    ),
                     ft.Row([
                         ft.Text("Order", weight=ft.FontWeight.BOLD),
                         memo_field, ft.Text("/"), exec_field,
@@ -583,6 +592,12 @@ class LetterSchemesPage(ft.Column):
         if scheme is None:
             return
         self.state.set_highlight_orientation_targets(scheme, enabled)
+
+    def _scramble_from_own_orientation_changed(self, enabled: bool):
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        self.state.set_scramble_from_own_orientation(scheme, enabled)
 
     def _three_style_enabled_changed(self, enabled: bool):
         scheme = self.state.active_scheme

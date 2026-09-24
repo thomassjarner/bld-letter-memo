@@ -32,6 +32,25 @@ class SettingsPage(ft.Column):
             on_change=self._dark_mode_changed,
         )
 
+        self.rating_mode_dropdown = ft.Dropdown(
+            label="Rating system",
+            width=220,
+            value=self.state.data.letter_pair_rating_mode,
+            options=[
+                ft.DropdownOption("numeric", "Numerical (1–5)"),
+                ft.DropdownOption("colors", "Colors"),
+                ft.DropdownOption("qualitative", "Bad / Mid / Good"),
+            ],
+            on_select=self._rating_mode_changed,
+        )
+        self.rating_levels_dropdown = ft.Dropdown(
+            label="Color levels", width=150, value=str(self.state.data.rating_color_levels),
+            options=[ft.DropdownOption(str(x), str(x)) for x in (3, 4, 5)],
+            on_select=self._rating_levels_changed,
+        )
+        self.rating_palette_area = ft.Column(spacing=6)
+        self._rebuild_rating_palette()
+
         self.controls = [
             ft.Text("Settings", size=20, weight=ft.FontWeight.BOLD),
             ft.Text("General", size=16, weight=ft.FontWeight.BOLD),
@@ -41,6 +60,15 @@ class SettingsPage(ft.Column):
                 size=12,
                 color=ft.Colors.ON_SURFACE_VARIANT,
             ),
+            ft.Divider(),
+            ft.Text("Letter pairs settings", size=16, weight=ft.FontWeight.BOLD),
+            self.rating_mode_dropdown,
+            ft.Text(
+                "Ratings are always stored on a common 1–5 scale, so changing the display system does not lose your grades.",
+                size=12, color=ft.Colors.ON_SURFACE_VARIANT,
+            ),
+            ft.Row([self.rating_levels_dropdown], wrap=True),
+            self.rating_palette_area,
             ft.Divider(),
             ft.Text("Backup & data", size=16, weight=ft.FontWeight.BOLD),
             ft.Text("Autosave is on. Schemes, advanced settings, pair words/labels, timer sessions, and preferences are stored locally in this browser and survive app updates."),
@@ -63,6 +91,58 @@ class SettingsPage(ft.Column):
         self.state.set_dark_mode(enabled)
         if self.theme_callback:
             self.theme_callback(enabled)
+
+    def _rating_mode_changed(self, e):
+        self.state.set_letter_pair_rating_mode(e.control.value)
+        self.update()
+
+    def _rating_levels_changed(self, e):
+        try:
+            levels = int(e.control.value)
+        except (TypeError, ValueError):
+            return
+        self.state.set_rating_color_levels(levels)
+        self._rebuild_rating_palette()
+        self.rating_palette_area.update()
+
+    def _rebuild_rating_palette(self):
+        rows = []
+        colors = list(self.state.data.rating_color_hexes)
+        grades = list(self.state.data.rating_color_grades)
+        for i, (color, grade) in enumerate(zip(colors, grades)):
+            color_field = ft.TextField(
+                label=f"Level {i+1} color", value=color, width=150, dense=True,
+                on_blur=lambda e, idx=i: self._save_rating_color(idx, e.control),
+                on_submit=lambda e, idx=i: self._save_rating_color(idx, e.control),
+            )
+            grade_field = ft.TextField(
+                label="Grade", value=(f"{grade:.2f}".rstrip("0").rstrip(".")), width=90, dense=True,
+                on_blur=lambda e, idx=i: self._save_rating_grade(idx, e.control),
+                on_submit=lambda e, idx=i: self._save_rating_grade(idx, e.control),
+            )
+            rows.append(ft.Row([
+                ft.Container(width=22, height=22, bgcolor=color, border_radius=11),
+                color_field, grade_field,
+            ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER))
+        self.rating_palette_area.controls = rows
+
+    def _save_rating_color(self, index, control):
+        if not self.state.set_rating_color(index, control.value):
+            control.value = self.state.data.rating_color_hexes[index]
+            control.error_text = "Use a hex color like #F9A825"
+        else:
+            control.value = self.state.data.rating_color_hexes[index]
+            control.error_text = None
+        control.update()
+
+    def _save_rating_grade(self, index, control):
+        if not self.state.set_rating_color_grade(index, control.value):
+            control.value = str(self.state.data.rating_color_grades[index])
+            control.error_text = "Grade must be between 1 and 5"
+        else:
+            control.value = f"{self.state.data.rating_color_grades[index]:.2f}".rstrip("0").rstrip(".")
+            control.error_text = None
+        control.update()
 
     async def _export_backup(self, e):
         try:

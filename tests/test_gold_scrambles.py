@@ -182,3 +182,34 @@ def test_three_style_even_corner_trace_leaves_edges_normal():
     assert result.corner_targets == normal.corner_targets
     assert result.edge_targets == normal.edge_targets
     assert result.three_style_parity_applied is False
+
+
+def test_scramble_from_own_orientation_is_relative_to_scheme_frame():
+    """Own-orientation scramble notation should be relative to the user's frame.
+
+    Therefore two otherwise identical schemes with different memo orientations
+    produce the same target sequence when both scramble from their own frame.
+    """
+    scramble = GOLD_TESTS[1]["scramble"]
+    tracer = ScrambleTracer()
+    a = make_gold_scheme()
+    a.scramble_from_own_orientation = True
+    b = make_gold_scheme()
+    b.memo_up = "Y"
+    b.memo_front = "B"
+    b.scramble_from_own_orientation = True
+    ra = tracer.trace(scramble, a)
+    rb = tracer.trace(scramble, b)
+    assert ra.corner_targets == rb.corner_targets
+    assert ra.edge_targets == rb.edge_targets
+
+
+def test_rating_data_roundtrip_and_defaults():
+    from data.models import AppData
+    data = AppData()
+    data.pair_ratings["AB"] = 4.0
+    data.letter_pair_rating_mode = "colors"
+    restored = AppData.from_dict(data.to_dict())
+    assert restored.pair_ratings["AB"] == 4.0
+    assert restored.letter_pair_rating_mode == "colors"
+    assert restored.rating_color_levels == 3

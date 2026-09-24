@@ -124,14 +124,26 @@ def _orient(state, up_color, front_color):
     }
 
 
-def simulate(scramble, up="W", front="G"):
-    # Scramble notation is ALWAYS read in the fixed White-up/Green-front frame.
+def simulate(scramble, up="W", front="G", scramble_from_own_orientation=False):
+    """Simulate a scramble and return state in the scheme's memo frame.
+
+    Normal mode reads notation in the fixed White-up/Green-front frame, then
+    reframes the finished cube to the scheme orientation. Own-orientation mode
+    treats U/F/R/... in the scramble as relative to the user's solving frame,
+    so the relative solved state can be scrambled directly with no later reframe.
+    """
     state = _solved()
     tokens = scramble.strip().split()
     if not tokens:
         raise ScrambleError("Enter a scramble first")
     for token in tokens:
         state = _apply(state, token)
+    if scramble_from_own_orientation:
+        # In this mode the user's own solving frame is treated as the relative
+        # White-up/Green-front coordinate frame while moves are applied. Wide
+        # moves in the scramble can still rotate centers, so re-center back to
+        # that same relative frame before tracing.
+        return _orient(state, "W", "G")
     return _orient(state, up, front)
 
 @dataclass
@@ -332,7 +344,7 @@ def _memo_swap_edge_identities(state, buffer_piece: str, partner_piece: str):
 
 class ScrambleTracer:
     def trace(self, scramble: str, scheme: LetterScheme) -> TraceResult:
-        state=simulate(scramble, scheme.memo_up, scheme.memo_front)
+        state=simulate(scramble, scheme.memo_up, scheme.memo_front, scheme.scramble_from_own_orientation)
 
         # Corners are always traced first. In 3-style mode their parity decides
         # whether the configured edge memo-swap must be applied.

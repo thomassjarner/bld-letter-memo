@@ -1,3 +1,14 @@
+# BLD Letter Memo Web 2.15
+
+New in this build:
+- Optional **Scramble from own orientation** setting under Letter Scheme -> Preferences -> General.
+- Letter-pair quality ratings stored on a shared 1–5 scale.
+- Rating display modes: numerical 1–5 (default), color levels, or Bad/Mid/Good.
+- Color rating system supports 3, 4, or 5 levels, with editable hex colors and editable grade values.
+- Letter Pairs shows an average grade for the current page/search/filter and a global average for all rated words.
+- Missing words and unrated words are excluded from averages.
+- Rating and orientation preferences are included in autosave/export/import data.
+
 # BLD Letter Memo Web 2.14
 
 Changes:

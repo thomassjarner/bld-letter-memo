@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 10
+CURRENT_VERSION = 11
 
 
 @dataclass
@@ -63,6 +63,9 @@ class LetterScheme:
     # tracing edges. UR is the standard suggested partner.
     three_style_enabled: bool = False
     edge_parity_partner: str = "UR"
+    # If enabled, scramble notation is applied from the scheme's own U/F orientation
+    # instead of the fixed White-up / Green-front frame.
+    scramble_from_own_orientation: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -76,6 +79,7 @@ class LetterScheme:
             "highlight_orientation_targets": bool(self.highlight_orientation_targets),
             "three_style_enabled": bool(self.three_style_enabled),
             "edge_parity_partner": self.edge_parity_partner or "UR",
+            "scramble_from_own_orientation": bool(self.scramble_from_own_orientation),
         }
 
     @staticmethod
@@ -92,6 +96,7 @@ class LetterScheme:
             highlight_orientation_targets=bool(d.get("highlight_orientation_targets", False)),
             three_style_enabled=bool(d.get("three_style_enabled", False)),
             edge_parity_partner=str(d.get("edge_parity_partner", "UR") or "UR"),
+            scramble_from_own_orientation=bool(d.get("scramble_from_own_orientation", False)),
         )
 
     def duplicate(self, new_name: str) -> "LetterScheme":
@@ -135,6 +140,13 @@ class AppData:
     # Optional display aliases for canonical pair IDs. Example: AB -> ØB.
     # Logic/search can still address the canonical AB pair.
     pair_aliases: Dict[str, str] = field(default_factory=dict)
+    # Letter-pair quality ratings are stored on one common 1..5 scale. The
+    # selected UI mode only changes how that value is presented.
+    pair_ratings: Dict[str, float] = field(default_factory=dict)
+    letter_pair_rating_mode: str = "numeric"  # numeric / colors / qualitative
+    rating_color_levels: int = 3
+    rating_color_hexes: List[str] = field(default_factory=lambda: ["#D32F2F", "#F9A825", "#2E7D32"])
+    rating_color_grades: List[float] = field(default_factory=lambda: [1.0, 3.0, 5.0])
     practice_sessions: Dict[str, List[PracticeSolve]] = field(
         default_factory=lambda: {"Session 1": [], "Session 2": [], "Session 3": []}
     )
@@ -165,6 +177,11 @@ class AppData:
             "schemes": {name: s.to_dict() for name, s in self.schemes.items()},
             "global_words": dict(self.global_words),
             "pair_aliases": dict(self.pair_aliases),
+            "pair_ratings": {k: float(v) for k, v in self.pair_ratings.items()},
+            "letter_pair_rating_mode": self.letter_pair_rating_mode,
+            "rating_color_levels": int(self.rating_color_levels),
+            "rating_color_hexes": list(self.rating_color_hexes),
+            "rating_color_grades": [float(v) for v in self.rating_color_grades],
             "practice_sessions": {
                 name: [solve.to_dict() for solve in solves]
                 for name, solves in self.practice_sessions.items()
@@ -194,6 +211,38 @@ class AppData:
                 if isinstance(x, dict)
             ]
 
+        raw_ratings = {}
+        for k, v in dict(d.get("pair_ratings", {})).items():
+            try:
+                value = float(v)
+            except (TypeError, ValueError):
+                continue
+            if 1.0 <= value <= 5.0:
+                raw_ratings[str(k)] = value
+
+        level_count = int(d.get("rating_color_levels", 3) or 3)
+        if level_count not in {3, 4, 5}:
+            level_count = 3
+        default_hexes = ["#D32F2F", "#F9A825", "#2E7D32"]
+        default_grades = [1.0, 3.0, 5.0]
+        raw_hexes = [str(x) for x in d.get("rating_color_hexes", default_hexes)]
+        raw_grades = []
+        for x in d.get("rating_color_grades", default_grades):
+            try:
+                raw_grades.append(float(x))
+            except (TypeError, ValueError):
+                pass
+        if len(raw_hexes) != level_count or len(raw_grades) != level_count:
+            if level_count == 3:
+                raw_hexes = ["#D32F2F", "#F9A825", "#2E7D32"]
+                raw_grades = [1.0, 3.0, 5.0]
+            elif level_count == 4:
+                raw_hexes = ["#D32F2F", "#E66F1E", "#A8A72C", "#2E7D32"]
+                raw_grades = [1.0, 2.33, 3.67, 5.0]
+            else:
+                raw_hexes = ["#D32F2F", "#E66F1E", "#F9A825", "#91A52B", "#2E7D32"]
+                raw_grades = [1.0, 2.0, 3.0, 4.0, 5.0]
+
         data = AppData(
             version=CURRENT_VERSION,
             active_scheme=d.get("active_scheme"),
@@ -204,6 +253,11 @@ class AppData:
                 for k, v in dict(d.get("pair_aliases", {})).items()
                 if str(k) and str(v)
             },
+            pair_ratings=raw_ratings,
+            letter_pair_rating_mode=str(d.get("letter_pair_rating_mode", "numeric") or "numeric") if str(d.get("letter_pair_rating_mode", "numeric") or "numeric") in {"numeric", "colors", "qualitative"} else "numeric",
+            rating_color_levels=level_count,
+            rating_color_hexes=raw_hexes,
+            rating_color_grades=raw_grades,
             practice_sessions=sessions,
             active_practice_session=str(d.get("active_practice_session", "Session 1")),
             dark_mode=bool(d.get("dark_mode", False)),
