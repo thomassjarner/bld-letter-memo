@@ -143,36 +143,26 @@ class LetterPairsPage(ft.Column):
         if self.status_filter.value == "update_grades" and not self.state.has_outdated_pair_ratings:
             self.status_filter.value = "all"
 
-        mode = self.state.data.letter_pair_rating_mode
+        # Grade sorting is based on grades that actually exist in saved data,
+        # not on the currently-selected presentation system. This preserves old
+        # ratings when users switch between numerical/color/qualitative modes.
+        stored_grades = sorted(
+            {round(float(v), 6) for v in self.state.data.pair_ratings.values()},
+            reverse=True,
+        )
         grade_options = [
             ft.DropdownOption("default", "Default"),
             ft.DropdownOption("highest", "Highest first"),
             ft.DropdownOption("lowest", "Lowest first"),
             ft.DropdownOption("ungraded", "Ungraded"),
         ]
-        if mode == "qualitative":
-            grade_options += [
-                ft.DropdownOption("grade:5", "Good"),
-                ft.DropdownOption("grade:3", "Mid"),
-                ft.DropdownOption("grade:1", "Bad"),
-            ]
-        elif mode == "colors":
-            for idx, grade in enumerate(self.state.data.rating_color_grades, start=1):
-                grade_options.append(
-                    ft.DropdownOption(f"grade:{float(grade)}", f"Color {idx} · {float(grade):g}")
-                )
-        else:
-            grade_options += [
-                ft.DropdownOption(f"grade:{i}", f"Grade {i}") for i in range(5, 0, -1)
-            ]
+        grade_options += [
+            ft.DropdownOption(f"grade:{grade}", f"{grade:g}")
+            for grade in stored_grades
+        ]
         self.grade_sort.options = grade_options
         valid_values = {"default", "highest", "lowest", "ungraded"}
-        if mode == "qualitative":
-            valid_values.update({"grade:5", "grade:3", "grade:1"})
-        elif mode == "colors":
-            valid_values.update(f"grade:{float(g)}" for g in self.state.data.rating_color_grades)
-        else:
-            valid_values.update(f"grade:{i}" for i in range(1, 6))
+        valid_values.update(f"grade:{grade}" for grade in stored_grades)
         if self.grade_sort.value not in valid_values:
             self.grade_sort.value = "default"
 
@@ -526,9 +516,6 @@ class LetterPairsPage(ft.Column):
             if rating is not None:
                 rated.append((pair, word, float(rating)))
 
-        strongest_pairs = sorted(rated, key=lambda x: (-x[2], x[0]))[:10]
-        weakest_pairs = sorted(rated, key=lambda x: (x[2], x[0]))[:10]
-
         by_letter = {}
         for pair, _, rating in rated:
             display = self.state.get_pair_display(pair).upper()
@@ -540,20 +527,6 @@ class LetterPairsPage(ft.Column):
         ]
         strongest_letters = sorted(letter_stats, key=lambda x: (-x[1], x[0]))[:8]
         weakest_letters = sorted(letter_stats, key=lambda x: (x[1], x[0]))[:8]
-
-        def pair_list(title, items):
-            rows = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
-            if not items:
-                rows.append(ft.Text("No rated words yet.", color=ft.Colors.ON_SURFACE_VARIANT))
-            for pair, word, rating in items:
-                rows.append(
-                    ft.Row([
-                        ft.Text(self.state.get_pair_display(pair), width=48, weight=ft.FontWeight.BOLD),
-                        ft.Text(word, expand=True),
-                        ft.Text(f"{rating:.2f}", width=48, text_align=ft.TextAlign.RIGHT),
-                    ])
-                )
-            return ft.Container(ft.Column(rows, spacing=5), expand=True, padding=10)
 
         def letter_list(title, items):
             rows = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
@@ -576,11 +549,6 @@ class LetterPairsPage(ft.Column):
                     "Letter statistics average every rated mnemonic whose displayed pair contains that letter.",
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
-                ft.Row([
-                    pair_list("Strongest pairs", strongest_pairs),
-                    pair_list("Weakest pairs", weakest_pairs),
-                ], vertical_alignment=ft.CrossAxisAlignment.START),
-                ft.Divider(),
                 ft.Row([
                     letter_list("Strongest letters", strongest_letters),
                     letter_list("Weakest letters", weakest_letters),

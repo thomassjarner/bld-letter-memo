@@ -1,3 +1,15 @@
+# BLD Letter Memo Web 2.16.3
+
+Changes:
+- Stats now shows only Strongest letters and Weakest letters. Pair rankings are handled by grade sorting instead.
+- Sort by grade now lists only grade values that actually exist in saved rating data.
+- Grade choices are shown as plain numeric values such as 4, never labels like "Color 4 · 4".
+- Old grades remain selectable after changing rating systems or color scales, as long as those grades still exist in saved data.
+
+Regression status:
+- 11/11 tests pass.
+
+
 # BLD Letter Memo Web 2.16
 
 Changes:
