@@ -448,8 +448,9 @@ class LetterPairsPage(ft.Column):
             height=34,
             border=ft.InputBorder.UNDERLINE,
             expand=True,
-            on_submit=self._focus_next,
             on_change=lambda e, p=pair: self._word_changed(p, e.control.value),
+            on_blur=lambda e, p=pair: self._word_committed(p, e.control.value),
+            on_submit=lambda e, p=pair: self._word_submitted(p, e.control.value),
         )
         self._word_fields.append(field)
 
@@ -598,6 +599,40 @@ class LetterPairsPage(ft.Column):
         self._editing_alias_pair = None
         self.state.set_pair_alias(pair, (value or "").upper())
         self.refresh()
+
+
+    def _word_committed(self, pair: str, value: str):
+        # Save one final time and rebuild the row so the Rating control appears
+        # immediately when a mnemonic has been entered (or disappears again if
+        # the word was cleared).  We intentionally do not rebuild on every
+        # keystroke, which keeps browser typing responsive.
+        self.state.set_word(pair, value)
+        self.refresh()
+
+    def _word_submitted(self, pair: str, value: str):
+        # Enter commits the word, refreshes the row/rating UI, then advances to
+        # the next word field when possible.
+        self.state.set_word(pair, value)
+        self.refresh()
+        # The refresh rebuilds the field list, so move focus using the current
+        # pair's rebuilt position rather than the old TextField control.
+        try:
+            rows, _ = self._base_rows()
+            pair_order = [p for p, *_ in rows]
+            idx = pair_order.index(pair)
+            if idx + 1 < len(pair_order):
+                next_pair = pair_order[idx + 1]
+                # Only focus if the next pair is currently rendered on this page.
+                rendered = [f for f in self._word_fields]
+                # In normal A/B/C pages, rendered order matches current page rows.
+                if rendered:
+                    page_pairs = [p for p, *_ in rows if (
+                        (self.current_group is None) or p.upper().startswith(self.current_group)
+                    )]
+                    if next_pair in page_pairs:
+                        rendered[page_pairs.index(next_pair)].focus()
+        except Exception:
+            pass
 
     def _word_changed(self, pair: str, value: str):
         self.state.set_word(pair, value)
