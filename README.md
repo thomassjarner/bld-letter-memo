@@ -1,3 +1,12 @@
+# BLD Letter Memo Web 2.13
+
+Changes in this build:
+- Timer arms after a 0.10 second Space hold.
+- Search is truly global while text is entered: `-L` shows every matching *L pair together, independent of the selected letter page.
+- Twist/flip target highlighting is now blue and deliberately separated from the cycle-1 green.
+- Light and dark themes use separate higher-contrast memo palettes.
+- Browser persistence keeps the original storage key and now also maintains a shadow copy plus a rollback snapshot for recovery from accidental empty/stale writes.
+
 # BLD Letter Memo Web 2.12
 
 Changes in this build:

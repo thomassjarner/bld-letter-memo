@@ -93,7 +93,7 @@ class PracticePage(ft.Column):
     only real desktop mode. asyncio tasks work in both.
     """
 
-    HOLD_ARM_SECONDS = 0.35
+    HOLD_ARM_SECONDS = 0.10
     SPACE_KEYS = (" ", "Space")
 
 

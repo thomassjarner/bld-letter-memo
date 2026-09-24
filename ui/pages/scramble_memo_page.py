@@ -5,10 +5,13 @@ from core.tracer import ScrambleTracer, ScrambleError
 
 # Chosen for legibility in both themes. The dark palette is intentionally
 # lighter because it is used as foreground text on a dark surface.
-LIGHT_CYCLE_COLORS = ("#2E7D32", "#B7791F", "#C62828", "#7B1FA2")
-DARK_CYCLE_COLORS = ("#81C784", "#FFD166", "#FF8A80", "#CE93D8")
-LIGHT_ORIENTATION_COLOR = "#00796B"
-DARK_ORIENTATION_COLOR = "#80CBC4"
+# Separate palettes are used because the same foreground colors do not have
+# equal contrast on light and dark surfaces.  Orientation targets deliberately
+# use blue rather than teal so they cannot be confused with cycle 1 green.
+LIGHT_CYCLE_COLORS = ("#2E7D32", "#A85D00", "#C62828", "#6A1B9A")
+DARK_CYCLE_COLORS = ("#66BB6A", "#FFD54F", "#EF5350", "#BA68C8")
+LIGHT_ORIENTATION_COLOR = "#1565C0"
+DARK_ORIENTATION_COLOR = "#42A5F5"
 
 
 @ft.control

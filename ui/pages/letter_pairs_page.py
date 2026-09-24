@@ -172,17 +172,24 @@ class LetterPairsPage(ft.Column):
 
             rows.append((pair, word, is_active, active_pairs.get(pair, [])))
 
-        # Group the filtered result by the pair's canonical first letter.
-        # An alias such as ØB for canonical AB therefore remains on the A page,
-        # while searches for either AB or ØB still find it.
+        # A non-empty search is global: show every matching pair together,
+        # regardless of which A/B/C page was selected before the search.
+        # With no search text we keep the normal canonical-first-letter pages.
         groups = sorted({pair[0].upper() for pair, *_ in rows if pair})
         self.available_groups = groups
-        if not groups:
+        if query:
+            page_rows = rows
+            self.group_label.value = "Search results" if rows else "No matching pairs"
+            self.prev_group.disabled = True
+            self.next_group.disabled = True
+            self.count_text.value = f"{len(rows)} matching across all letter groups"
+        elif not groups:
             self.current_group = None
             page_rows = []
             self.group_label.value = "No matching pairs"
             self.prev_group.disabled = True
             self.next_group.disabled = True
+            self.count_text.value = "0 matching pairs"
         else:
             if self.current_group not in groups:
                 self.current_group = groups[0]
@@ -191,8 +198,7 @@ class LetterPairsPage(ft.Column):
             self.group_label.value = f"{self.current_group} pairs"
             self.prev_group.disabled = group_index == 0
             self.next_group.disabled = group_index == len(groups) - 1
-
-        self.count_text.value = f"{len(rows)} matching across all pages · {len(page_rows)} on this page"
+            self.count_text.value = f"{len(rows)} total · {len(page_rows)} on this page"
 
         # Use the screen horizontally: each letter page is rendered in two
         # compact columns.  This keeps a full A/B/C... group visible even on
