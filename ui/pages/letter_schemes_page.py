@@ -246,6 +246,20 @@ class LetterSchemesPage(ft.Column):
                         memo_field, ft.Text("/"), exec_field,
                         ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                     ], wrap=True),
+                    ft.Switch(
+                        label="Show cycles with colors",
+                        value=scheme.show_cycle_colors,
+                        on_change=lambda e: self._show_cycle_colors_changed(e.control.value),
+                    ),
+                    ft.Switch(
+                        label="Highlight twist/flip targets",
+                        value=scheme.highlight_orientation_targets,
+                        on_change=lambda e: self._highlight_orientation_targets_changed(e.control.value),
+                    ),
+                    ft.Text(
+                        "Cycle colors affect generated memo display only. Twist/flip highlighting applies when those are memoed as target letters.",
+                        size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                    ),
                 ],
                 spacing=14,
             )
@@ -526,6 +540,18 @@ class LetterSchemesPage(ft.Column):
             control.update()
         if self.settings_message.page is not None:
             self.settings_message.update()
+
+    def _show_cycle_colors_changed(self, enabled: bool):
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        self.state.set_show_cycle_colors(scheme, enabled)
+
+    def _highlight_orientation_targets_changed(self, enabled: bool):
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        self.state.set_highlight_orientation_targets(scheme, enabled)
 
     def _orientation_mode_changed(self, category: str, value: str):
         scheme = self.state.active_scheme

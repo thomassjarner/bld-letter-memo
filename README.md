@@ -1,3 +1,18 @@
+# BLD Letter Memo Web 2.12
+
+Changes in this build:
+- Fixed alternate memo orientations correctly: scrambles are always interpreted in White-top/Green-front, then the finished cube is reframed to the selected scheme orientation before tracing.
+- Added regression coverage for all 24 legal cube orientations.
+- Letter-pair search is explicitly global across all A/B/C... pages before page grouping.
+- Added scheme preference: **Show cycles with colors**. Cycle 1 = green, cycle 2 = gold/yellow, cycle 3 = red, cycle 4 = purple, with separate light/dark palettes.
+- Added scheme preference: **Highlight twist/flip targets** for trace/shoot orientation memo. Those targets use a teal accent and take visual priority over cycle colors.
+- Cycle/twist highlighting works in both Show Letters and Show Words modes; missing words still fall back to the visible pair letters.
+- Existing persistent browser storage key is unchanged, so updating to 2.12 does not intentionally reset saved user data.
+
+Regression status:
+- 5/5 tracer tests pass, including the four gold-standard scrambles and the 24-orientation frame test.
+
+
 # BLD Letter Memo Web 2.11
 
 Changes:

@@ -170,6 +170,14 @@ class AppState:
         self._save()
         return True
 
+    def set_show_cycle_colors(self, scheme: LetterScheme, enabled: bool) -> None:
+        scheme.show_cycle_colors = bool(enabled)
+        self._save()
+
+    def set_highlight_orientation_targets(self, scheme: LetterScheme, enabled: bool) -> None:
+        scheme.highlight_orientation_targets = bool(enabled)
+        self._save()
+
     def set_orientation_memo_mode(self, scheme: LetterScheme, category: str, mode: str) -> None:
         if mode not in {"visual", "trace"}:
             return

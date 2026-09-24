@@ -65,24 +65,73 @@ def _apply(state, token):
 def _whole(state, axis, q):
     return {(_rot(p,axis,q),_rot(n,axis,q)):h for (p,n),h in state.items()}
 
+def _canonical_transformed_sticker(sticker: str, face_map: Dict[str, str]) -> str:
+    """Rename an absolute sticker into the selected memo frame.
+
+    The scramble is always executed in the fixed White-up/Green-front frame.
+    After the physical cube is rotated to the scheme's preferred orientation,
+    both *positions* and *sticker identities* must be expressed in that new
+    frame.  Renaming only the positions would make a solved cube appear
+    scrambled under a non-standard orientation.
+    """
+    if len(sticker) == 1:
+        return face_map[sticker]
+    mapped = [face_map[c] for c in sticker]
+    normal = mapped[0]
+    piece_faces = set(mapped)
+    order = CORNER_STICKER_ORDER if len(sticker) == 3 else EDGE_STICKER_ORDER
+    for candidate in order:
+        if candidate[0] == normal and set(candidate) == piece_faces:
+            return candidate
+    raise ScrambleError(f"Could not transform sticker {sticker}")
+
+
 def _orient(state, up_color, front_color):
-    if up_color not in COLOR_FACE or front_color not in COLOR_FACE or up_color==front_color:
+    """Express a scrambled state in the scheme's memo orientation.
+
+    Scramble moves are always interpreted from White-up/Green-front.  We then
+    physically rotate the finished cube so the requested center colors are on
+    U/F, and finally rename every sticker relative to those centers.  This is
+    the key distinction that makes alternative orientations trace correctly.
+    """
+    if up_color not in COLOR_FACE or front_color not in COLOR_FACE or up_color == front_color:
         raise ScrambleError("Invalid memo orientation")
-    wanted_u=COLOR_FACE[up_color]; wanted_f=COLOR_FACE[front_color]
-    q=deque([state]); seen=set()
+    wanted_u = COLOR_FACE[up_color]
+    wanted_f = COLOR_FACE[front_color]
+    q = deque([state]); seen = set(); oriented = None
     while q:
-        s=q.popleft(); sig=tuple(_at(s,f) for f in "ULFRBD")
-        if sig in seen: continue
+        candidate = q.popleft()
+        sig = tuple(_at(candidate, f) for f in "ULFRBD")
+        if sig in seen:
+            continue
         seen.add(sig)
-        if _at(s,"U")==wanted_u and _at(s,"F")==wanted_f: return s
-        for ax in "xyz": q.append(_whole(s,ax,1))
-    raise ScrambleError("Up/front colors must be adjacent")
+        if _at(candidate, "U") == wanted_u and _at(candidate, "F") == wanted_f:
+            oriented = candidate
+            break
+        for ax in "xyz":
+            q.append(_whole(candidate, ax, 1))
+    if oriented is None:
+        raise ScrambleError("Up/front colors must be adjacent")
+
+    # After the physical re-orientation, map absolute color-face identities to
+    # relative U/L/F/R/B/D names using the centers now visible on each face.
+    face_map = {_at(oriented, relative_face): relative_face for relative_face in "ULFRBD"}
+    if set(face_map) != set("ULFRBD"):
+        raise ScrambleError("Invalid center orientation")
+    return {
+        key: _canonical_transformed_sticker(home_sticker, face_map)
+        for key, home_sticker in oriented.items()
+    }
+
 
 def simulate(scramble, up="W", front="G"):
-    state=_solved()
-    tokens=scramble.strip().split()
-    if not tokens: raise ScrambleError("Enter a scramble first")
-    for token in tokens: state=_apply(state, token)
+    # Scramble notation is ALWAYS read in the fixed White-up/Green-front frame.
+    state = _solved()
+    tokens = scramble.strip().split()
+    if not tokens:
+        raise ScrambleError("Enter a scramble first")
+    for token in tokens:
+        state = _apply(state, token)
     return _orient(state, up, front)
 
 @dataclass
@@ -95,6 +144,13 @@ class TraceResult:
     edge_pairs: List[str]
     corner_orientation: List[str]=field(default_factory=list)
     edge_orientation: List[str]=field(default_factory=list)
+    # One entry per ordinary target. None means the target is not part of a
+    # permutation cycle (currently used for trace/shoot twist/flip targets).
+    corner_cycle_ids: List[int | None]=field(default_factory=list)
+    edge_cycle_ids: List[int | None]=field(default_factory=list)
+    # True for targets added specifically to memo a twist/flip in trace mode.
+    corner_orientation_target_flags: List[bool]=field(default_factory=list)
+    edge_orientation_target_flags: List[bool]=field(default_factory=list)
 
     @property
     def corner_memo(self): return " ".join(self.corner_pairs + self.corner_orientation)
@@ -174,27 +230,39 @@ def _orientation_annotations(state, pieces, order, mode):
 
 def _trace_category(state, cat, order, pieces, standard_priority, standard_stickers):
     buffer=cat.buffer_sticker or cat.buffer_piece
-    if not buffer: return [], []
+    if not buffer: return [], [], [], []
     buffer_piece=find_piece_for_sticker(buffer,pieces)
-    if not buffer_piece: return [], []
+    if not buffer_piece: return [], [], [], []
     buffer_stickers=pieces[buffer_piece]
 
     # Only wrongly positioned pieces belong to permutation cycles. Correctly
     # positioned twists/flips are reserved for orientation memo.
     perm_unsolved={p for p in pieces if not _physical_correct(state,p,order)}
-    targets=[]; covered=set()
+    targets=[]; covered=set(); cycle_ids=[]; orientation_target_flags=[]
 
-    def add_target(sticker):
+    def add_target(sticker, cycle_id=None, orientation_target=False):
         targets.append(sticker)
+        cycle_ids.append(cycle_id)
+        orientation_target_flags.append(bool(orientation_target))
         p=find_piece_for_sticker(sticker,pieces)
         if p: covered.add(p)
 
+    # Cycle numbering is based on cycles that actually contain memo targets.
+    # The first visible cycle is always 0 (green in the UI), even if the
+    # physical buffer cycle is empty and the first memo begins with a break.
+    next_cycle_id = 0
+
     # Buffer cycle: stop as soon as any sticker of the physical buffer piece returns.
     cur=buffer
+    buffer_cycle_started=False
     for _ in range(40):
         t=_at(state,cur)
         if t in buffer_stickers: break
-        add_target(t); cur=t
+        if not buffer_cycle_started:
+            buffer_cycle_started=True
+            current_cycle_id=next_cycle_id
+            next_cycle_id += 1
+        add_target(t, current_cycle_id); cur=t
 
     priority=cat.cycle_break_priority if cat.cycle_break_priority else standard_priority
     preferred=dict(standard_stickers); preferred.update(cat.cycle_break_stickers)
@@ -206,18 +274,19 @@ def _trace_category(state, cat, order, pieces, standard_priority, standard_stick
         if not remaining: break
         piece=remaining[0]; start=preferred.get(piece,piece)
         if start not in pieces[piece]: start=piece
+        cycle_id = next_cycle_id
+        next_cycle_id += 1
         # A cycle break shoots to the configured sticker, so that sticker is
         # itself a memo target. The cycle closes when tracing reaches the SAME
         # PHYSICAL PIECE again -- it does not have to return to the exact same
-        # sticker/letter. Crucially, that closing hit IS a memo target: it is
-        # the final shot that closes the broken cycle.
-        add_target(start)
+        # sticker/letter. Crucially, that closing hit IS a memo target.
+        add_target(start, cycle_id)
         start_piece=piece
         cur=start
         for _ in range(40):
             t=_at(state,cur)
             t_piece=find_piece_for_sticker(t,pieces)
-            add_target(t)
+            add_target(t, cycle_id)
             if t_piece==start_piece:
                 break
             cur=t
@@ -225,17 +294,9 @@ def _trace_category(state, cat, order, pieces, standard_priority, standard_stick
 
     # Orientation-only pieces can either be memoed visually, or converted
     # into two ordinary targets (shoot into the piece, then shoot back).
-    # The preferred cycle-break sticker is also the preferred first sticker
-    # for this trace/shoot representation.
     orientation=_orientation_annotations(state,pieces,order,cat.orientation_memo)
     if cat.orientation_memo == "trace":
         for piece in _orientation_only_pieces(state,pieces,order):
-            # A twisted/flipped buffer is not memoed as its own orientation
-            # target in trace/shoot mode.  The buffer is already the tracing
-            # origin; if it is physically in place but misoriented, tracing
-            # simply starts a new cycle at the highest-priority eligible
-            # non-buffer piece.  The non-buffer orientation-only pieces below
-            # are handled as ordinary shoot/out-and-back targets.
             if piece == buffer_piece:
                 continue
             first=preferred.get(piece,piece)
@@ -243,17 +304,17 @@ def _trace_category(state, cat, order, pieces, standard_priority, standard_stick
                 first=piece
             second=_at(state,first)
             if second not in pieces[piece] or second == first:
-                # Defensive fallback: choose another sticker on the same piece.
                 second=next((x for x in pieces[piece] if x != first), first)
-            add_target(first)
-            add_target(second)
-    return targets, orientation
+            # These are orientation-memo targets, not another permutation cycle.
+            add_target(first, None, True)
+            add_target(second, None, True)
+    return targets, orientation, cycle_ids, orientation_target_flags
 
 class ScrambleTracer:
     def trace(self, scramble: str, scheme: LetterScheme) -> TraceResult:
         state=simulate(scramble, scheme.memo_up, scheme.memo_front)
-        ct,co=_trace_category(state,scheme.corners,CORNER_STICKER_ORDER,CORNER_PIECES,STANDARD_CORNER_PRIORITY,STANDARD_CORNER_STICKER)
-        et,eo=_trace_category(state,scheme.edges,EDGE_STICKER_ORDER,EDGE_PIECES,STANDARD_EDGE_PRIORITY,STANDARD_EDGE_STICKER)
+        ct,co,ccycles,cflags=_trace_category(state,scheme.corners,CORNER_STICKER_ORDER,CORNER_PIECES,STANDARD_CORNER_PRIORITY,STANDARD_CORNER_STICKER)
+        et,eo,ecycles,eflags=_trace_category(state,scheme.edges,EDGE_STICKER_ORDER,EDGE_PIECES,STANDARD_EDGE_PRIORITY,STANDARD_EDGE_STICKER)
         def letters(targets,cat):
             result=[]
             for s in targets:
@@ -274,4 +335,7 @@ class ScrambleTracer:
                 "tracing result is invalid."
             )
 
-        return TraceResult(ct,et,cl,el,_pair(cl),_pair(el),co,eo)
+        return TraceResult(
+            ct, et, cl, el, _pair(cl), _pair(el), co, eo,
+            ccycles, ecycles, cflags, eflags,
+        )

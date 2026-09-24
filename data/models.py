@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 8
+CURRENT_VERSION = 9
 
 
 @dataclass
@@ -55,6 +55,9 @@ class LetterScheme:
     # Standard: memo corners->edges (CE), execute edges->corners (EC).
     memo_order: str = ""
     execution_order: str = ""
+    # Scheme-specific memo display preferences.
+    show_cycle_colors: bool = False
+    highlight_orientation_targets: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -64,6 +67,8 @@ class LetterScheme:
             "memo_front": self.memo_front,
             "memo_order": self.memo_order,
             "execution_order": self.execution_order,
+            "show_cycle_colors": bool(self.show_cycle_colors),
+            "highlight_orientation_targets": bool(self.highlight_orientation_targets),
         }
 
     @staticmethod
@@ -76,6 +81,8 @@ class LetterScheme:
             memo_front=d.get("memo_front", "G"),
             memo_order=d.get("memo_order", ""),
             execution_order=d.get("execution_order", ""),
+            show_cycle_colors=bool(d.get("show_cycle_colors", False)),
+            highlight_orientation_targets=bool(d.get("highlight_orientation_targets", False)),
         )
 
     def duplicate(self, new_name: str) -> "LetterScheme":

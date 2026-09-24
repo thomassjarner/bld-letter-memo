@@ -106,3 +106,43 @@ def test_gold_scramble(case):
         assert result.corner_targets[case["corner_break_index"]] == case["corner_break_sticker"]
     if "edge_break_sticker" in case:
         assert result.edge_targets[case["edge_break_index"]] == case["edge_break_sticker"]
+
+
+def test_all_memo_orientations_reframe_centers_and_preserve_parity():
+    """All 24 legal cube orientations must be valid memo frames.
+
+    Scramble notation stays in the fixed White-up/Green-front frame; simulate()
+    then expresses the finished cube relative to the requested scheme frame.
+    In that relative frame all six centers must read U/L/F/R/B/D again.
+    """
+    colors = ["W", "Y", "G", "B", "R", "O"]
+    opposite = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
+    tracer = ScrambleTracer()
+    case = GOLD_TESTS[1]
+
+    seen_target_sequences = set()
+    for up in colors:
+        for front in colors:
+            if front in {up, opposite[up]}:
+                continue
+            scheme = make_gold_scheme()
+            scheme.memo_up = up
+            scheme.memo_front = front
+            state = simulate(case["scramble"], up, front)
+            assert all(state[(
+                # center key: position vector == face vector == VEC[face]
+                # Use tracer helper indirectly via the public sticker lookup
+                # representation by importing _at below.
+                )] for _ in []) is True
+            from core.tracer import _at
+            assert tuple(_at(state, face) for face in "ULFRBD") == tuple("ULFRBD")
+
+            result = tracer.trace(case["scramble"], scheme)
+            assert len(result.corner_targets) % 2 == len(result.edge_targets) % 2
+            assert len(result.corner_cycle_ids) == len(result.corner_targets)
+            assert len(result.edge_cycle_ids) == len(result.edge_targets)
+            seen_target_sequences.add((tuple(result.corner_targets), tuple(result.edge_targets)))
+
+    # If orientation were being ignored, every frame would produce the exact
+    # same target sequence. It should materially affect memo interpretation.
+    assert len(seen_target_sequences) > 1

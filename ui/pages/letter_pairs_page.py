@@ -153,6 +153,8 @@ class LetterPairsPage(ft.Column):
 
         self._update_duplicate_warning()
 
+        # Search/filter the entire dictionary first. Only after that do we
+        # split matches into A/B/C... display pages, so searches are global.
         rows = []
         self._word_fields = []
         for pair in sorted(all_pairs):
@@ -190,7 +192,7 @@ class LetterPairsPage(ft.Column):
             self.prev_group.disabled = group_index == 0
             self.next_group.disabled = group_index == len(groups) - 1
 
-        self.count_text.value = f"{len(rows)} matching · {len(page_rows)} on this page"
+        self.count_text.value = f"{len(rows)} matching across all pages · {len(page_rows)} on this page"
 
         # Use the screen horizontally: each letter page is rendered in two
         # compact columns.  This keeps a full A/B/C... group visible even on
