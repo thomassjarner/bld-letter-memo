@@ -355,6 +355,17 @@ class LetterPairsPage(ft.Column):
         mode = self.state.data.letter_pair_rating_mode
         rating = self.state.get_pair_rating(pair)
 
+        # A pair without a mnemonic cannot be graded yet. Render a simple
+        # placeholder instead of disabled interactive controls. In current
+        # Flet, GestureDetector must have at least one gesture handler, so a
+        # handler-less disabled detector causes the red runtime error seen on web.
+        if not has_word:
+            return ft.Container(
+                ft.Text("—", color=ft.Colors.ON_SURFACE_VARIANT),
+                width=128,
+                alignment=ft.Alignment.CENTER_LEFT,
+            )
+
         if mode == "colors":
             grades = list(self.state.data.rating_color_grades)
             closest_grade = (
@@ -374,17 +385,14 @@ class LetterPairsPage(ft.Column):
                             height=17,
                             bgcolor=color,
                             border_radius=9,
-                            opacity=1.0 if has_word else 0.28,
+                            opacity=1.0,
                             border=(
                                 ft.Border.all(2, ft.Colors.ON_SURFACE)
                                 if selected else None
                             ),
                             tooltip=f"Grade {grade:g}",
                         ),
-                        on_tap=(
-                            (lambda e, p=pair, g=grade: self._rating_changed(p, g))
-                            if has_word else None
-                        ),
+                        on_tap=lambda e, p=pair, g=grade: self._rating_changed(p, g),
                     )
                 )
             controls.append(
@@ -392,7 +400,7 @@ class LetterPairsPage(ft.Column):
                     ft.Icons.RESTART_ALT,
                     icon_size=16,
                     tooltip="Ungraded",
-                    disabled=not has_word,
+                    disabled=False,
                     on_click=lambda e, p=pair: self._rating_changed(p, None),
                 )
             )
