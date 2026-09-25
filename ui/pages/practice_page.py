@@ -116,6 +116,7 @@ class PracticePage(ft.Column):
         self.last_display_second = -1
         self.last_solve_index = None
         self.keyboard_listener: ft.KeyboardListener | None = None
+        self.timer_key_sink: ft.TextField | None = None
 
         self.scramble_text = ft.Text(self.current_scramble, size=18, selectable=True)
         self.timer_text = ft.Text("0.00", size=64, weight=ft.FontWeight.BOLD)
@@ -253,8 +254,24 @@ class PracticePage(ft.Column):
                 self.history,
             ],
         )
+        # Keep an invisible editable field focused while timing. Browsers treat
+        # Space inside an input as text input rather than page-scroll, while the
+        # surrounding KeyboardListener still receives key-down/key-up events.
+        self.timer_key_sink = ft.TextField(
+            value="",
+            width=1,
+            height=1,
+            opacity=0.01,
+            border=ft.InputBorder.NONE,
+            text_size=1,
+            on_change=self._clear_timer_key_sink,
+        )
+        listener_content = ft.Stack(
+            [body, ft.Container(self.timer_key_sink, left=0, top=0, width=1, height=1)],
+            expand=True,
+        )
         self.keyboard_listener = ft.KeyboardListener(
-            content=body,
+            content=listener_content,
             autofocus=True,
             on_key_down=self._on_key_down,
             on_key_up=self._on_key_up,
@@ -307,10 +324,20 @@ class PracticePage(ft.Column):
 
     def _focus_keyboard_listener(self):
         try:
-            if self.keyboard_listener is not None and self.keyboard_listener.page is not None:
+            if self.timer_key_sink is not None and self.timer_key_sink.page is not None:
+                self.timer_key_sink.focus()
+            elif self.keyboard_listener is not None and self.keyboard_listener.page is not None:
                 self.keyboard_listener.focus()
         except Exception:
             pass
+
+    def _clear_timer_key_sink(self, e):
+        # Keep the invisible input empty so it can continue consuming Space and
+        # other browser-default keystrokes without altering visible UI.
+        if e.control.value:
+            e.control.value = ""
+            if e.control.page is not None:
+                e.control.update()
 
     def _reset_hold_state(self):
         self.holding_space = False

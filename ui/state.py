@@ -240,6 +240,12 @@ class AppState:
         self.data.dark_mode = bool(enabled)
         self._save(notify=False)
 
+    def set_navigation_style(self, style: str) -> None:
+        if style not in {"top_tabs", "compact_sidebar", "popout"}:
+            return
+        self.data.navigation_style = style
+        self._save(notify=False)
+
     # ---- global words ------------------------------------------------------
 
     def set_word(self, pair: str, word: str) -> None:

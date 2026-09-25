@@ -1,3 +1,24 @@
+# BLD Letter Memo Web 2.18
+
+Changes:
+- Added Settings -> General -> Navigation style with three persistent choices:
+  - Top tabs (default)
+  - Compact sidebar
+  - Pop-out menu
+- Top tabs place the five main app sections in a compact header at the top-right.
+- Compact sidebar keeps a slim always-visible navigation bar on the left.
+- Pop-out menu keeps navigation tucked into a small left-side Menu button.
+- Blind Timer now focuses an invisible input while timing so Space is consumed by the timer instead of scrolling the browser page.
+- Letter Pair Stats is simplified to one ranked list of every letter currently used in the active letter scheme, highest average rating first.
+- Letters with no rated pairs remain visible at the bottom with an em dash.
+
+Persistence:
+- Navigation style is saved in browser storage and included in backup/import.
+- Existing data migrates with Top tabs as the default.
+
+Regression status:
+- 11/11 automated tests pass.
+
 # BLD Letter Memo Web 2.17
 
 UI cleanup release:

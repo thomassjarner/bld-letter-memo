@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 12
+CURRENT_VERSION = 13
 
 
 @dataclass
@@ -154,6 +154,7 @@ class AppData:
     )
     active_practice_session: str = "Session 1"
     dark_mode: bool = False
+    navigation_style: str = "top_tabs"  # top_tabs / compact_sidebar / popout
 
     def ensure_default_sessions(self) -> None:
         for name in ("Session 1", "Session 2", "Session 3"):
@@ -192,6 +193,7 @@ class AppData:
             },
             "active_practice_session": self.active_practice_session,
             "dark_mode": bool(self.dark_mode),
+            "navigation_style": self.navigation_style,
         }
 
     @staticmethod
@@ -281,6 +283,7 @@ class AppData:
             practice_sessions=sessions,
             active_practice_session=str(d.get("active_practice_session", "Session 1")),
             dark_mode=bool(d.get("dark_mode", False)),
+            navigation_style=(str(d.get("navigation_style", "top_tabs") or "top_tabs") if str(d.get("navigation_style", "top_tabs") or "top_tabs") in {"top_tabs", "compact_sidebar", "popout"} else "top_tabs"),
         )
         data.ensure_default_sessions()
         return data

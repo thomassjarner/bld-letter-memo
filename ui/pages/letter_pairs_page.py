@@ -508,53 +508,63 @@ class LetterPairsPage(ft.Column):
         )
 
     def _build_stats_view(self):
-        rated = []
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return ft.Column([
+                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text("Create or select a letter scheme to see letter ratings.", color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=10)
+
+        scheme_letters = sorted({
+            (letter or "").strip().upper()
+            for category in (scheme.corners, scheme.edges)
+            for letter in category.stickers.values()
+            if (letter or "").strip()
+        })
+
+        by_letter = {letter: [] for letter in scheme_letters}
         for pair, word in self.state.data.global_words.items():
             if not word.strip():
                 continue
             rating = self.state.get_pair_rating(pair)
-            if rating is not None:
-                rated.append((pair, word, float(rating)))
+            if rating is None:
+                continue
+            canonical = (pair or "").upper()
+            for letter in scheme_letters:
+                if letter in canonical:
+                    by_letter[letter].append(float(rating))
 
-        by_letter = {}
-        for pair, _, rating in rated:
-            display = self.state.get_pair_display(pair).upper()
-            for letter in set(ch for ch in display if ch.isalpha()):
-                by_letter.setdefault(letter, []).append(rating)
-        letter_stats = [
-            (letter, sum(vals) / len(vals), len(vals))
-            for letter, vals in by_letter.items() if vals
-        ]
-        strongest_letters = sorted(letter_stats, key=lambda x: (-x[1], x[0]))[:8]
-        weakest_letters = sorted(letter_stats, key=lambda x: (x[1], x[0]))[:8]
+        ranked = []
+        for letter in scheme_letters:
+            values = by_letter.get(letter, [])
+            avg = (sum(values) / len(values)) if values else None
+            ranked.append((letter, avg, len(values)))
+        ranked.sort(key=lambda item: (item[1] is None, -(item[1] or 0), item[0]))
 
-        def letter_list(title, items):
-            rows = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
-            if not items:
-                rows.append(ft.Text("No rated words yet.", color=ft.Colors.ON_SURFACE_VARIANT))
-            for letter, avg, count in items:
-                rows.append(
-                    ft.Row([
-                        ft.Text(letter, width=42, weight=ft.FontWeight.BOLD),
-                        ft.Text(f"{avg:.2f}", width=50),
-                        ft.Text(f"{count} rated pairs", color=ft.Colors.ON_SURFACE_VARIANT),
-                    ])
+        rows = []
+        for index, (letter, avg, count) in enumerate(ranked, start=1):
+            rows.append(
+                ft.Container(
+                    content=ft.Row([
+                        ft.Text(f"{index}.", width=34, color=ft.Colors.ON_SURFACE_VARIANT),
+                        ft.Text(letter, width=52, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"{avg:.2f}" if avg is not None else "—", width=58, weight=ft.FontWeight.BOLD if avg is not None else None),
+                        ft.Text(f"{count} rated pairs" if count else "No rated pairs", color=ft.Colors.ON_SURFACE_VARIANT),
+                    ], spacing=8),
+                    padding=ft.Padding.symmetric(horizontal=6, vertical=3),
                 )
-            return ft.Container(ft.Column(rows, spacing=5), expand=True, padding=10)
+            )
 
         return ft.Column(
             [
                 ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
                 ft.Text(
-                    "Letter statistics average every rated mnemonic whose displayed pair contains that letter.",
+                    f"Letters in {scheme.name}, ranked by average rating of rated pairs containing that letter.",
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
-                ft.Row([
-                    letter_list("Strongest letters", strongest_letters),
-                    letter_list("Weakest letters", weakest_letters),
-                ], vertical_alignment=ft.CrossAxisAlignment.START),
+                *(rows or [ft.Text("No letters have been assigned in this scheme yet.", color=ft.Colors.ON_SURFACE_VARIANT)]),
             ],
-            spacing=10,
+            spacing=4,
         )
 
     def _edit_pair_alias(self, pair: str):

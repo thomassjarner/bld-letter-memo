@@ -33,49 +33,29 @@ async def main(page: ft.Page):
     scramble_page = ScrambleMemoPage(data=state)
     practice_page = None
     pages = None
-    content_area = None
-    menu_button = None
     current_index = 0
+    popout_open = False
 
-    def refresh_menu_items(update: bool = True):
-        nonlocal menu_button
-        if menu_button is None:
-            return
-        menu_button.items = [
-            ft.PopupMenuItem(
-                content=label,
-                icon=icon,
-                checked=(idx == current_index),
-                on_click=lambda e, i=idx: navigate_to(i),
-                height=42,
-            )
-            for idx, (label, icon) in enumerate(DESTINATIONS)
-        ]
-        # Only call update after the control has been mounted on the page.
-        if update:
-            menu_button.update()
+    content_area = ft.Container(
+        expand=True,
+        padding=ft.Padding.only(left=14, top=62, right=14, bottom=14),
+        left=0,
+        right=0,
+        top=0,
+        bottom=0,
+    )
 
-    def navigate_to(index: int):
-        nonlocal practice_page, pages, content_area, current_index
-        if pages is None or content_area is None:
-            return
-        current_index = index
-        practice_page.set_active(index == 3)
-        target = pages[index]
-        if target is pairs_page:
-            pairs_page.refresh(update=False)
-        elif target is schemes_page:
-            schemes_page.refresh(update=False)
-        elif target is scramble_page:
-            scramble_page.refresh(update=False)
-        elif target is practice_page:
-            practice_page.refresh(update=False)
-        content_area.content = target
-        refresh_menu_items()
-        if content_area.page is not None:
-            content_area.update()
-        else:
-            page.update()
+    top_save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
+    side_save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
+    pop_save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
+
+    def on_save_status(status: str):
+        for control in (top_save_status, side_save_status, pop_save_status):
+            control.value = status
+            if control.page is not None:
+                control.update()
+
+    state.on_save_status(on_save_status)
 
     def open_scramble_from_practice(scramble: str):
         scramble_page.scramble.value = scramble
@@ -98,62 +78,176 @@ async def main(page: ft.Page):
     settings_page.theme_callback = apply_dark_mode
 
     pages = [schemes_page, pairs_page, scramble_page, practice_page, settings_page]
-    content_area = ft.Container(
-        content=pages[0],
-        expand=True,
-        padding=ft.Padding.only(left=12, top=10, right=12, bottom=66),
-    )
+    content_area.content = pages[0]
 
-    save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
-
-    def on_save_status(status: str):
-        save_status.value = status
-        if save_status.page is not None:
-            save_status.update()
-
-    state.on_save_status(on_save_status)
-
-    menu_button = ft.PopupMenuButton(
-        content=ft.Container(
+    def make_nav_button(index: int, compact: bool = False):
+        label, icon = DESTINATIONS[index]
+        selected = index == current_index
+        return ft.Container(
             content=ft.Row(
-                [ft.Icon(ft.Icons.MENU, size=18), ft.Text("Menu", weight=ft.FontWeight.BOLD, size=13)],
-                spacing=6,
+                [ft.Icon(icon, size=18), ft.Text(label, size=12, weight=ft.FontWeight.BOLD if selected else None)],
+                spacing=5,
+                tight=True,
+            ) if not compact else ft.Column(
+                [ft.Icon(icon, size=19), ft.Text(label.replace(" ", "\n"), size=10, text_align=ft.TextAlign.CENTER)],
+                spacing=3,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 tight=True,
             ),
-            padding=ft.Padding.symmetric(horizontal=12, vertical=8),
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=18,
-            bgcolor=ft.Colors.SURFACE_CONTAINER,
-        ),
-        menu_position=ft.PopupMenuPosition.OVER,
-        menu_padding=4,
-        tooltip="Open navigation menu",
+            padding=ft.Padding.symmetric(horizontal=9 if not compact else 6, vertical=7),
+            border_radius=8,
+            bgcolor=ft.Colors.SECONDARY_CONTAINER if selected else None,
+            ink=True,
+            on_click=lambda e, i=index: navigate_to(i),
+        )
+
+    top_nav = ft.Container(
+        left=0,
+        right=0,
+        top=0,
+        height=52,
+        padding=ft.Padding.symmetric(horizontal=14, vertical=7),
+        bgcolor=ft.Colors.SURFACE,
+        border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
     )
-    refresh_menu_items(update=False)
+    sidebar_nav = ft.Container(
+        left=0,
+        top=0,
+        bottom=0,
+        width=108,
+        padding=ft.Padding.symmetric(horizontal=6, vertical=8),
+        bgcolor=ft.Colors.SURFACE,
+        border=ft.Border(right=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
+    )
+    popout_panel = ft.Container(
+        left=12,
+        bottom=54,
+        width=190,
+        padding=7,
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+        border_radius=10,
+        visible=False,
+    )
+    popout_button = ft.Container(
+        left=12,
+        bottom=12,
+        padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+        border_radius=18,
+        ink=True,
+    )
+
+    def toggle_popout(e=None):
+        nonlocal popout_open
+        popout_open = not popout_open
+        popout_panel.visible = popout_open
+        if popout_panel.page is not None:
+            popout_panel.update()
+
+    popout_button.content = ft.Row(
+        [ft.Icon(ft.Icons.MENU, size=18), ft.Text("Menu", size=12, weight=ft.FontWeight.BOLD), pop_save_status],
+        spacing=6,
+        tight=True,
+    )
+    popout_button.on_click = toggle_popout
+
+    def rebuild_navigation(update: bool = True):
+        nonlocal popout_open
+        style = state.data.navigation_style
+
+        top_nav.visible = style == "top_tabs"
+        sidebar_nav.visible = style == "compact_sidebar"
+        popout_button.visible = style == "popout"
+        popout_panel.visible = style == "popout" and popout_open
+
+        top_nav.content = ft.Row(
+            [
+                ft.Row([
+                    ft.Text("BLD Letter Memo", size=15, weight=ft.FontWeight.BOLD),
+                    top_save_status,
+                ], spacing=8, tight=True),
+                ft.Row([make_nav_button(i) for i in range(len(DESTINATIONS))], spacing=2, tight=True),
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        sidebar_nav.content = ft.Column(
+            [
+                ft.Text("BLD", size=13, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                ft.Divider(height=8),
+                *[make_nav_button(i, compact=True) for i in range(len(DESTINATIONS))],
+                ft.Container(expand=True),
+                side_save_status,
+            ],
+            spacing=3,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        popout_panel.content = ft.Column(
+            [make_nav_button(i) for i in range(len(DESTINATIONS))],
+            spacing=2,
+            tight=True,
+        )
+
+        if style == "top_tabs":
+            content_area.left = 0
+            content_area.top = 52
+            content_area.padding = ft.Padding.only(left=14, top=10, right=14, bottom=14)
+        elif style == "compact_sidebar":
+            content_area.left = 108
+            content_area.top = 0
+            content_area.padding = ft.Padding.all(14)
+        else:
+            content_area.left = 0
+            content_area.top = 0
+            content_area.padding = ft.Padding.only(left=14, top=14, right=14, bottom=58)
+
+        if update:
+            page.update()
+
+    def apply_navigation_style(style: str):
+        nonlocal popout_open
+        popout_open = False
+        rebuild_navigation(update=True)
+
+    settings_page.navigation_callback = apply_navigation_style
+
+    def navigate_to(index: int):
+        nonlocal current_index, popout_open
+        current_index = index
+        practice_page.set_active(index == 3)
+        target = pages[index]
+        if target is pairs_page:
+            pairs_page.refresh(update=False)
+        elif target is schemes_page:
+            schemes_page.refresh(update=False)
+        elif target is scramble_page:
+            scramble_page.refresh(update=False)
+        elif target is practice_page:
+            practice_page.refresh(update=False)
+        content_area.content = target
+        popout_open = False
+        rebuild_navigation(update=False)
+        page.update()
 
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
 
     def on_page_keyboard(e):
-        if content_area is not None and content_area.content is schemes_page:
+        if content_area.content is schemes_page:
             schemes_page.handle_keyboard_event(e)
 
     page.on_keyboard_event = on_page_keyboard
 
-    floating_nav = ft.Container(
-        content=ft.Row([menu_button, save_status], spacing=8, tight=True),
-        left=12,
-        bottom=12,
-        padding=0,
+    root = ft.Stack(
+        controls=[content_area, top_nav, sidebar_nav, popout_panel, popout_button],
+        expand=True,
+        fit=ft.StackFit.EXPAND,
     )
-
-    page.add(
-        ft.Stack(
-            controls=[content_area, floating_nav],
-            expand=True,
-            fit=ft.StackFit.EXPAND,
-        )
-    )
-    # The menu is mounted now, so future navigation refreshes can safely update it.
+    page.add(root)
+    rebuild_navigation(update=True)
 
 
 def run():

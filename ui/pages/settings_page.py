@@ -16,6 +16,7 @@ class SettingsPage(ft.Column):
         return self.data
 
     theme_callback = None
+    navigation_callback = None
 
 
     def init(self):
@@ -30,6 +31,17 @@ class SettingsPage(ft.Column):
             label="Dark mode",
             value=bool(self.state.data.dark_mode),
             on_change=self._dark_mode_changed,
+        )
+        self.navigation_style_dropdown = ft.Dropdown(
+            label="Navigation style",
+            width=220,
+            value=self.state.data.navigation_style,
+            options=[
+                ft.DropdownOption("top_tabs", "Top tabs"),
+                ft.DropdownOption("compact_sidebar", "Compact sidebar"),
+                ft.DropdownOption("popout", "Pop-out menu"),
+            ],
+            on_select=self._navigation_style_changed,
         )
 
         self.rating_mode_dropdown = ft.Dropdown(
@@ -54,7 +66,7 @@ class SettingsPage(ft.Column):
         self.controls = [
             ft.Text("Settings", size=18, weight=ft.FontWeight.BOLD),
             ft.Text("General", size=15, weight=ft.FontWeight.BOLD),
-            ft.Row([self.dark_mode_switch], spacing=8),
+            ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=10, wrap=True),
             ft.Text(
                 "Dark mode uses a softer teal accent so controls stay visible without being overly bright.",
                 size=12,
@@ -90,6 +102,12 @@ class SettingsPage(ft.Column):
         self.state.set_dark_mode(enabled)
         if self.theme_callback:
             self.theme_callback(enabled)
+
+    def _navigation_style_changed(self, e):
+        style = e.control.value or "top_tabs"
+        self.state.set_navigation_style(style)
+        if self.navigation_callback:
+            self.navigation_callback(style)
 
     def _rating_mode_changed(self, e):
         self.state.set_letter_pair_rating_mode(e.control.value)
@@ -222,8 +240,11 @@ class SettingsPage(ft.Column):
             imported = AppData.from_dict(raw)
             self.state.replace_data(imported)
             self.dark_mode_switch.value = bool(imported.dark_mode)
+            self.navigation_style_dropdown.value = imported.navigation_style
             if self.theme_callback:
                 self.theme_callback(bool(imported.dark_mode))
+            if self.navigation_callback:
+                self.navigation_callback(imported.navigation_style)
             self.status_text.value = f"Imported backup: {name}"
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
             self.status_text.value = f"Could not import that backup: {exc}"
