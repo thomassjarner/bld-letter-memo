@@ -37,7 +37,7 @@ async def main(page: ft.Page):
     menu_button = None
     current_index = 0
 
-    def refresh_menu_items():
+    def refresh_menu_items(update: bool = True):
         nonlocal menu_button
         if menu_button is None:
             return
@@ -51,7 +51,8 @@ async def main(page: ft.Page):
             )
             for idx, (label, icon) in enumerate(DESTINATIONS)
         ]
-        if menu_button.page is not None:
+        # Only call update after the control has been mounted on the page.
+        if update:
             menu_button.update()
 
     def navigate_to(index: int):
@@ -128,7 +129,7 @@ async def main(page: ft.Page):
         menu_padding=4,
         tooltip="Open navigation menu",
     )
-    refresh_menu_items()
+    refresh_menu_items(update=False)
 
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
 
@@ -152,6 +153,7 @@ async def main(page: ft.Page):
             fit=ft.StackFit.EXPAND,
         )
     )
+    # The menu is mounted now, so future navigation refreshes can safely update it.
 
 
 def run():
