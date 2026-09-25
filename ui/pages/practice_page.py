@@ -165,15 +165,15 @@ class PracticePage(ft.Column):
         )
         return ft.Container(
             content=ft.Column([
-                ft.Icon(icon, size=34),
-                ft.Text(title, size=18, weight=ft.FontWeight.BOLD),
+                ft.Icon(icon, size=28),
+                ft.Text(title, size=17, weight=ft.FontWeight.BOLD),
                 ft.Text(subtitle, color=ft.Colors.ON_SURFACE_VARIANT),
                 button,
             ], spacing=8),
-            padding=16,
-            border=ft.Border.all(1, ft.Colors.OUTLINE),
+            padding=12,
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
             border_radius=10,
-            width=340,
+            width=300,
         )
 
     def _show_menu(self, e=None, update=True):
@@ -182,7 +182,7 @@ class PracticePage(ft.Column):
         self.mode = "menu"
         self._reset_hold_state()
         self.controls = [
-            ft.Text("Practice", size=22, weight=ft.FontWeight.BOLD),
+            ft.Text("Practice", size=20, weight=ft.FontWeight.BOLD),
             ft.Text("Choose a practice activity.", color=ft.Colors.ON_SURFACE_VARIANT),
             ft.Row([
                 self._practice_card(
@@ -223,7 +223,7 @@ class PracticePage(ft.Column):
             [
                 ft.Row([
                     ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._show_menu),
-                    ft.Text("Practice — Blind Timer", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Text("Practice — Blind Timer", size=18, weight=ft.FontWeight.BOLD),
                     self.session_dropdown,
                 ], wrap=True),
                 ft.Container(self.scramble_text, padding=12, border=ft.Border.all(1, ft.Colors.OUTLINE), border_radius=8),

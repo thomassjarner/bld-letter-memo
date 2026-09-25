@@ -35,21 +35,21 @@ class LetterPairsPage(ft.Column):
             label="Search within words", value=False, on_change=self._on_search_mode_change
         )
         self.scheme_filter = ft.Dropdown(
-            width=210,
+            width=185, dense=True,
             value="__all__",
             label="Letter scheme",
             options=[ft.DropdownOption("__all__", "All letter schemes")],
             on_select=self._on_search_change,
         )
         self.status_filter = ft.Dropdown(
-            width=175, value="all", label="Status", options=[], on_select=self._on_search_change
+            width=145, dense=True, value="all", label="Status", options=[], on_select=self._on_search_change
         )
         self.grade_sort = ft.Dropdown(
-            width=190, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
+            width=165, dense=True, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
         )
         self.progress_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
         self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
-        self.progress_bar = ft.ProgressBar(width=220, value=0)
+        self.progress_bar = ft.ProgressBar(width=180, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.filter_average_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
         self.overall_average_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
@@ -76,7 +76,7 @@ class LetterPairsPage(ft.Column):
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
             ],
-            spacing=8,
+            spacing=5,
         )
         self.table_header = ft.Row(
             [self._compact_header(), ft.VerticalDivider(width=8), self._compact_header()],
@@ -94,15 +94,15 @@ class LetterPairsPage(ft.Column):
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD), width=54),
-                    ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD), expand=True),
-                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD), width=128),
-                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD), width=72),
-                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD), width=90),
+                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD, size=12), width=48),
+                    ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD, size=12), expand=True),
+                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD, size=12), width=118),
+                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12), width=62),
+                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD, size=12), width=82),
                 ],
-                spacing=6,
+                spacing=4,
             ),
-            padding=ft.Padding.symmetric(horizontal=6),
+            padding=ft.Padding.symmetric(horizontal=4),
             expand=True,
         )
 
@@ -352,7 +352,7 @@ class LetterPairsPage(ft.Column):
         if not has_word:
             return ft.Container(
                 ft.Text("—", color=ft.Colors.ON_SURFACE_VARIANT),
-                width=128,
+                width=118,
                 alignment=ft.Alignment.CENTER_LEFT,
             )
 
@@ -394,14 +394,14 @@ class LetterPairsPage(ft.Column):
                     on_click=lambda e, p=pair: self._rating_changed(p, None),
                 )
             )
-            return ft.Row(controls, spacing=2, width=128)
+            return ft.Row(controls, spacing=1, width=118)
 
         if mode == "qualitative":
             value = "__none__"
             if rating is not None:
                 value = "bad" if rating < 2 else ("mid" if rating < 4 else "good")
             return ft.Dropdown(
-                width=112,
+                width=104,
                 dense=True,
                 value=value,
                 disabled=not has_word,
@@ -418,7 +418,7 @@ class LetterPairsPage(ft.Column):
 
         value = "__none__" if rating is None else str(int(round(float(rating))))
         return ft.Dropdown(
-            width=92,
+            width=84,
             dense=True,
             value=value,
             disabled=not has_word,
@@ -435,7 +435,7 @@ class LetterPairsPage(ft.Column):
         field = ft.TextField(
             value=word,
             dense=True,
-            height=34,
+            height=30,
             border=ft.InputBorder.UNDERLINE,
             expand=True,
             on_change=lambda e, p=pair: self._word_changed(p, e.control.value),
@@ -449,7 +449,7 @@ class LetterPairsPage(ft.Column):
             pair_label = ft.Container(
                 ft.TextField(
                     value=display_pair,
-                    width=52,
+                    width=46,
                     dense=True,
                     autofocus=True,
                     max_length=8,
@@ -458,7 +458,7 @@ class LetterPairsPage(ft.Column):
                     on_blur=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
                     on_submit=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
                 ),
-                width=54,
+                width=48,
             )
         else:
             pair_label = ft.GestureDetector(
@@ -468,17 +468,17 @@ class LetterPairsPage(ft.Column):
                         weight=ft.FontWeight.BOLD,
                         tooltip=f"Underlying pair: {pair}",
                     ),
-                    width=54,
+                    width=48,
                 ),
                 on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
             )
 
         status_chip = ft.Container(
             content=ft.Text(
-                "Active" if is_active else "Inactive", size=12, color=ft.Colors.WHITE
+                "Active" if is_active else "Inactive", size=10, color=ft.Colors.WHITE
             ),
             bgcolor=ft.Colors.GREEN_600 if is_active else ft.Colors.GREY_500,
-            padding=ft.Padding.symmetric(horizontal=8, vertical=3),
+            padding=ft.Padding.symmetric(horizontal=6, vertical=2),
             border_radius=12,
         )
         return ft.Container(

@@ -1,3 +1,19 @@
+# BLD Letter Memo Web 2.17
+
+UI cleanup release:
+- Replaced the permanent left navigation rail with a compact floating **Menu** button in the bottom-left.
+- The Menu opens the five main sections and marks the current section.
+- Save status now sits unobtrusively beside the Menu button.
+- Main content gets nearly the full browser width.
+- Letter Scheme list and scheme editor use tighter spacing, narrower controls, and smaller action icons.
+- Letter Pair filters, headers, rows, status chips, and rating controls are more compact.
+- Practice cards and headings are tightened up.
+- Settings uses denser controls and puts related controls on the same row where possible.
+- Bottom content padding keeps the floating Menu from covering page content.
+
+Regression status: 11/11 existing tests pass.
+
+
 # BLD Letter Memo Web 2.16.3
 
 Changes:

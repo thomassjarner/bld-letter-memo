@@ -20,7 +20,7 @@ class SettingsPage(ft.Column):
 
     def init(self):
         self.expand = True
-        self.spacing = 12
+        self.spacing = 8
         self.status_text = ft.Text("")
         self._pending_import: tuple[str, bytes] | None = None
         self._current_dialog: ft.AlertDialog | None = None
@@ -34,7 +34,7 @@ class SettingsPage(ft.Column):
 
         self.rating_mode_dropdown = ft.Dropdown(
             label="Rating system",
-            width=220,
+            width=190,
             value=self.state.data.letter_pair_rating_mode,
             options=[
                 ft.DropdownOption("numeric", "Numerical (1–5)"),
@@ -44,7 +44,7 @@ class SettingsPage(ft.Column):
             on_select=self._rating_mode_changed,
         )
         self.rating_levels_dropdown = ft.Dropdown(
-            label="Color levels", width=150, value=str(self.state.data.rating_color_levels),
+            label="Color levels", width=125, value=str(self.state.data.rating_color_levels),
             options=[ft.DropdownOption(str(x), str(x)) for x in (3, 4, 5)],
             on_select=self._rating_levels_changed,
         )
@@ -52,25 +52,24 @@ class SettingsPage(ft.Column):
         self._rebuild_rating_palette()
 
         self.controls = [
-            ft.Text("Settings", size=20, weight=ft.FontWeight.BOLD),
-            ft.Text("General", size=16, weight=ft.FontWeight.BOLD),
-            self.dark_mode_switch,
+            ft.Text("Settings", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("General", size=15, weight=ft.FontWeight.BOLD),
+            ft.Row([self.dark_mode_switch], spacing=8),
             ft.Text(
                 "Dark mode uses a softer teal accent so controls stay visible without being overly bright.",
                 size=12,
                 color=ft.Colors.ON_SURFACE_VARIANT,
             ),
             ft.Divider(),
-            ft.Text("Letter pairs settings", size=16, weight=ft.FontWeight.BOLD),
-            self.rating_mode_dropdown,
+            ft.Text("Letter pairs settings", size=15, weight=ft.FontWeight.BOLD),
+            ft.Row([self.rating_mode_dropdown, self.rating_levels_dropdown], wrap=True, spacing=10),
             ft.Text(
                 "Ratings are stored on a common 1–5 scale. Changing the color scale never rewrites old grades; those pairs can be reviewed with the Update grades filter.",
                 size=12, color=ft.Colors.ON_SURFACE_VARIANT,
             ),
-            ft.Row([self.rating_levels_dropdown], wrap=True),
             self.rating_palette_area,
             ft.Divider(),
-            ft.Text("Backup & data", size=16, weight=ft.FontWeight.BOLD),
+            ft.Text("Backup & data", size=15, weight=ft.FontWeight.BOLD),
             ft.Text("Autosave is on. Schemes, advanced settings, pair words/labels, timer sessions, and preferences are stored locally in this browser and survive app updates."),
             ft.Row(
                 [

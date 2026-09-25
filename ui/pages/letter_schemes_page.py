@@ -33,8 +33,8 @@ class LetterSchemesPage(ft.Column):
         # Edges first is only a UI/data-entry preference. It does not affect
         # memo/execution order.
         self.selected_category = "edges"
-        self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=200, on_submit=self._create_scheme)
-        self.rename_field = ft.TextField(hint_text="Rename active scheme", width=200, on_submit=self._rename_scheme)
+        self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=160, dense=True, on_submit=self._create_scheme)
+        self.rename_field = ft.TextField(hint_text="Rename active scheme", width=170, dense=True, on_submit=self._rename_scheme)
         self.scheme_list_view = ft.ListView(expand=True, spacing=2, scroll=ft.ScrollMode.AUTO)
         # Keep one scrollable body control mounted for the lifetime of the
         # page. Replacing the whole Column on every setting change reset its
@@ -42,8 +42,8 @@ class LetterSchemesPage(ft.Column):
         # edit. Updating its controls in place preserves the viewport.
         self.body_scroll = ft.ListView(
             expand=True,
-            spacing=12,
-            padding=ft.Padding.all(16),
+            spacing=8,
+            padding=ft.Padding.all(10),
             scroll=ft.ScrollMode.ALWAYS,
         )
         self.settings_message = ft.Text("", size=12, color=ft.Colors.ERROR)
@@ -60,12 +60,12 @@ class LetterSchemesPage(ft.Column):
 
     def _build_layout(self) -> ft.Control:
         sidebar = ft.Container(
-            width=260,
-            padding=12,
+            width=220,
+            padding=8,
             border=ft.Border.only(right=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
             content=ft.Column(
                 [
-                    ft.Text("Schemes", weight=ft.FontWeight.BOLD, size=16),
+                    ft.Text("Schemes", weight=ft.FontWeight.BOLD, size=15),
                     ft.Row([self.new_scheme_field, ft.IconButton(ft.Icons.ADD, on_click=self._create_scheme, tooltip="Create scheme")]),
                     ft.Divider(),
                     self.scheme_list_view,
@@ -108,7 +108,7 @@ class LetterSchemesPage(ft.Column):
                         ],
                         spacing=0,
                     ),
-                    padding=8,
+                    padding=ft.Padding.symmetric(horizontal=7, vertical=4),
                     border_radius=6,
                     bgcolor=ft.Colors.PRIMARY_CONTAINER if is_active else None,
                     on_click=lambda e, n=name: self._switch_scheme(n),
@@ -138,7 +138,7 @@ class LetterSchemesPage(ft.Column):
         common = [
             ft.Row(
                 [
-                    ft.Text(scheme.name, size=20, weight=ft.FontWeight.BOLD),
+                    ft.Text(scheme.name, size=18, weight=ft.FontWeight.BOLD),
                     self.rename_field,
                     ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme),
                 ]
@@ -172,7 +172,7 @@ class LetterSchemesPage(ft.Column):
 
         self.body_scroll.controls = common + [
             ft.Row([buffer_picker]),
-            ft.Container(content=grid, padding=ft.Padding.only(top=12)),
+            ft.Container(content=grid, padding=ft.Padding.only(top=6)),
             self.settings_message,
         ]
 

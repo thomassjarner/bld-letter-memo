@@ -21,6 +21,7 @@ async def main(page: ft.Page):
     page.title = "BLD Letter Memo"
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
     page.dark_theme = ft.Theme(color_scheme_seed=ft.Colors.TEAL_400)
+    page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
 
     repository = await SharedPreferencesAppDataRepository.create(page)
@@ -30,15 +31,34 @@ async def main(page: ft.Page):
     schemes_page = LetterSchemesPage(data=state)
     pairs_page = LetterPairsPage(data=state)
     scramble_page = ScrambleMemoPage(data=state)
-    nav_rail = None
     practice_page = None
     pages = None
     content_area = None
+    menu_button = None
+    current_index = 0
+
+    def refresh_menu_items():
+        nonlocal menu_button
+        if menu_button is None:
+            return
+        menu_button.items = [
+            ft.PopupMenuItem(
+                content=label,
+                icon=icon,
+                checked=(idx == current_index),
+                on_click=lambda e, i=idx: navigate_to(i),
+                height=42,
+            )
+            for idx, (label, icon) in enumerate(DESTINATIONS)
+        ]
+        if menu_button.page is not None:
+            menu_button.update()
 
     def navigate_to(index: int):
-        nonlocal nav_rail, practice_page, pages, content_area
+        nonlocal practice_page, pages, content_area, current_index
         if pages is None or content_area is None:
             return
+        current_index = index
         practice_page.set_active(index == 3)
         target = pages[index]
         if target is pairs_page:
@@ -50,10 +70,7 @@ async def main(page: ft.Page):
         elif target is practice_page:
             practice_page.refresh(update=False)
         content_area.content = target
-        if nav_rail is not None and nav_rail.selected_index != index:
-            nav_rail.selected_index = index
-            if nav_rail.page is not None:
-                nav_rail.update()
+        refresh_menu_items()
         if content_area.page is not None:
             content_area.update()
         else:
@@ -71,6 +88,7 @@ async def main(page: ft.Page):
 
     practice_page = PracticePage(data=state)
     practice_page.open_memo_callback = open_scramble_from_practice
+
     def apply_dark_mode(enabled: bool):
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
         page.update()
@@ -79,12 +97,13 @@ async def main(page: ft.Page):
     settings_page.theme_callback = apply_dark_mode
 
     pages = [schemes_page, pairs_page, scramble_page, practice_page, settings_page]
-    content_area = ft.Container(content=pages[0], expand=True, padding=16)
+    content_area = ft.Container(
+        content=pages[0],
+        expand=True,
+        padding=ft.Padding.only(left=12, top=10, right=12, bottom=66),
+    )
 
-    def on_nav_change(e):
-        navigate_to(e.control.selected_index)
-
-    save_status = ft.Text("Saved", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+    save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
 
     def on_save_status(status: str):
         save_status.value = status
@@ -93,51 +112,44 @@ async def main(page: ft.Page):
 
     state.on_save_status(on_save_status)
 
-    nav_rail = ft.NavigationRail(
-        expand=True,
-        selected_index=0,
-        label_type=ft.NavigationRailLabelType.ALL,
-        min_width=100,
-        min_extended_width=180,
-        destinations=[
-            ft.NavigationRailDestination(icon=icon, label=label) for label, icon in DESTINATIONS
-        ],
-        on_change=on_nav_change,
+    menu_button = ft.PopupMenuButton(
+        content=ft.Container(
+            content=ft.Row(
+                [ft.Icon(ft.Icons.MENU, size=18), ft.Text("Menu", weight=ft.FontWeight.BOLD, size=13)],
+                spacing=6,
+                tight=True,
+            ),
+            padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+            border_radius=18,
+            bgcolor=ft.Colors.SURFACE_CONTAINER,
+        ),
+        menu_position=ft.PopupMenuPosition.OVER,
+        menu_padding=4,
+        tooltip="Open navigation menu",
     )
+    refresh_menu_items()
 
-    # Letter Schemes changes (buffer/letters) affect which pairs are
-    # active, so refresh the Letter Pairs page whenever underlying data
-    # changes and it happens to be visible.
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
 
     def on_page_keyboard(e):
-        # Sticker-entry Backspace behavior is only active while Letter Schemes
-        # is the visible page, so it cannot interfere with the Practice timer.
         if content_area is not None and content_area.content is schemes_page:
             schemes_page.handle_keyboard_event(e)
 
     page.on_keyboard_event = on_page_keyboard
 
-    sidebar = ft.Container(
-        width=220,
-        padding=ft.Padding.only(top=8, bottom=4),
-        content=ft.Column(
-            [nav_rail, ft.Container(save_status, padding=8)],
-            expand=True,
-            spacing=0,
-        ),
+    floating_nav = ft.Container(
+        content=ft.Row([menu_button, save_status], spacing=8, tight=True),
+        left=12,
+        bottom=12,
+        padding=0,
     )
 
     page.add(
-        ft.Row(
-            [
-                sidebar,
-                ft.VerticalDivider(width=1),
-                content_area,
-            ],
+        ft.Stack(
+            controls=[content_area, floating_nav],
             expand=True,
-            spacing=0,
-            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            fit=ft.StackFit.EXPAND,
         )
     )
 
