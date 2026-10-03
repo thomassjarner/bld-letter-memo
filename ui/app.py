@@ -235,19 +235,12 @@ async def main(page: ft.Page):
         nonlocal current_index, popout_open
         current_index = index
 
-        # Timer and Practice intentionally share one PracticePage instance.
-        # Entering the Timer tab forces the fixed timer layout; entering
-        # Practice returns to the activity hub.
-        if index == TIMER_INDEX:
-            practice_page.show_timer(update=False)
-            practice_page.set_active(True)
-        elif index == PRACTICE_INDEX:
-            practice_page.show_menu(update=False)
-            practice_page.set_active(False)
-        else:
-            practice_page.set_active(False)
-
+        # Timer and Practice share one PracticePage instance, but the view
+        # change must happen AFTER that control is mounted in content_area.
+        # Updating an unmounted custom control can leave Flet's web client with
+        # the old child tree, which made the timer appear to vanish in 2.20.
         target = pages[index]
+
         if target is pairs_page:
             pairs_page.refresh(update=False)
         elif target is schemes_page:
@@ -256,10 +249,23 @@ async def main(page: ft.Page):
             scramble_page.refresh(update=False)
         elif target is practice_page:
             practice_page.refresh(update=False)
+
         content_area.content = target
         popout_open = False
         rebuild_navigation(update=False)
         page.update()
+
+        # Now that PracticePage is definitely mounted, explicitly switch and
+        # update its child tree. This makes both the Timer main tab and the
+        # Practice -> Blind Timer button reliable.
+        if index == TIMER_INDEX:
+            practice_page.show_timer(update=True)
+            practice_page.set_active(True)
+        elif index == PRACTICE_INDEX:
+            practice_page.show_menu(update=True)
+            practice_page.set_active(False)
+        else:
+            practice_page.set_active(False)
 
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
 

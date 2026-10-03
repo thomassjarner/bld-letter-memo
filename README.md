@@ -1,3 +1,10 @@
+# BLD Letter Memo Web 2.20.1
+
+Hotfix:
+- Fixes the Timer view becoming inaccessible from both the main Timer tab and Practice -> Blind Timer.
+- The shared Practice/Timer control is now mounted before its child view is switched and explicitly updated.
+- Keeps the bounded solve-history layout from 2.20.
+
 # BLD Letter Memo Web 2.20
 
 Changes:
