@@ -213,3 +213,47 @@ def test_rating_data_roundtrip_and_defaults():
     assert restored.pair_ratings["AB"] == 4.0
     assert restored.letter_pair_rating_mode == "colors"
     assert restored.rating_color_levels == 3
+
+
+def test_one_off_cycle_break_override_changes_trace_without_mutating_scheme_priority():
+    """Scramble Memo can replay a different valid cycle break for one scramble."""
+    tracer = ScrambleTracer()
+    scheme = make_gold_scheme()
+    case = GOLD_TESTS[1]
+
+    normal = tracer.trace(case["scramble"], scheme)
+    assert normal.corner_cycle_breaks, "gold test 2 should contain a corner cycle break"
+    first_break = normal.corner_cycle_breaks[0]
+    assert len(first_break.options) >= 2
+    assert first_break.options[0][0] == first_break.recommended_piece
+
+    saved_priority = list(scheme.corners.cycle_break_priority)
+    alternative_piece = first_break.options[1][0]
+    changed = tracer.trace(
+        case["scramble"],
+        scheme,
+        corner_cycle_break_overrides={0: alternative_piece},
+    )
+
+    changed_break = changed.corner_cycle_breaks[0]
+    assert changed_break.chosen_piece == alternative_piece
+    assert changed_break.recommended_piece == first_break.recommended_piece
+    assert scheme.corners.cycle_break_priority == saved_priority
+    # Everything before the break remains the same; the remainder is retraced.
+    idx = first_break.target_index
+    assert changed.corner_targets[:idx] == normal.corner_targets[:idx]
+    assert changed.corner_targets[idx:] != normal.corner_targets[idx:]
+
+
+def test_invalid_one_off_cycle_break_override_falls_back_to_recommended():
+    tracer = ScrambleTracer()
+    scheme = make_gold_scheme()
+    case = GOLD_TESTS[1]
+    normal = tracer.trace(case["scramble"], scheme)
+    changed = tracer.trace(
+        case["scramble"],
+        scheme,
+        corner_cycle_break_overrides={0: "NOT_A_PIECE"},
+    )
+    assert changed.corner_targets == normal.corner_targets
+    assert changed.corner_cycle_breaks[0].chosen_piece == normal.corner_cycle_breaks[0].recommended_piece

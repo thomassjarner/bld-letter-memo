@@ -7,7 +7,7 @@ the scheme's memo orientation before tracing permutation cycles.
 from dataclasses import dataclass, field
 from collections import deque
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from core.cube_definitions import CORNER_STICKER_ORDER, EDGE_STICKER_ORDER, CORNER_PIECES, EDGE_PIECES, find_piece_for_sticker
 from data.models import LetterScheme
@@ -147,6 +147,21 @@ def simulate(scramble, up="W", front="G", scramble_from_own_orientation=False):
     return _orient(state, up, front)
 
 @dataclass
+class CycleBreakInfo:
+    # 0-based cycle-break occurrence within this category.
+    break_index: int
+    # Index of the cycle-break shot in the ordinary target stream.
+    target_index: int
+    cycle_id: int
+    chosen_piece: str
+    chosen_sticker: str
+    recommended_piece: str
+    # Valid alternatives at the moment of the break, in the scheme's priority order.
+    # Each tuple is (physical piece, preferred target sticker).
+    options: List[Tuple[str, str]]=field(default_factory=list)
+
+
+@dataclass
 class TraceResult:
     corner_targets: List[str]
     edge_targets: List[str]
@@ -163,6 +178,8 @@ class TraceResult:
     # True for targets added specifically to memo a twist/flip in trace mode.
     corner_orientation_target_flags: List[bool]=field(default_factory=list)
     edge_orientation_target_flags: List[bool]=field(default_factory=list)
+    corner_cycle_breaks: List[CycleBreakInfo]=field(default_factory=list)
+    edge_cycle_breaks: List[CycleBreakInfo]=field(default_factory=list)
     three_style_parity_applied: bool=False
 
     @property
@@ -241,17 +258,35 @@ def _orientation_annotations(state, pieces, order, mode):
             out.append(f"({piece}{sign})")
     return out
 
-def _trace_category(state, cat, order, pieces, standard_priority, standard_stickers):
+def _trace_category(
+    state,
+    cat,
+    order,
+    pieces,
+    standard_priority,
+    standard_stickers,
+    cycle_break_overrides: Optional[Dict[int, str]] = None,
+):
+    """Trace one category and return targets plus cycle-break metadata.
+
+    ``cycle_break_overrides`` is intentionally ephemeral. Keys are 0-based
+    cycle-break occurrences and values are physical piece names. An override
+    is accepted only if that piece is genuinely available at that exact break.
+    This lets Scramble Memo reproduce a one-off human choice without changing
+    the scheme's saved priority list.
+    """
     buffer=cat.buffer_sticker or cat.buffer_piece
-    if not buffer: return [], [], [], []
+    if not buffer: return [], [], [], [], []
     buffer_piece=find_piece_for_sticker(buffer,pieces)
-    if not buffer_piece: return [], [], [], []
+    if not buffer_piece: return [], [], [], [], []
     buffer_stickers=pieces[buffer_piece]
+    overrides = cycle_break_overrides or {}
 
     # Only wrongly positioned pieces belong to permutation cycles. Correctly
     # positioned twists/flips are reserved for orientation memo.
     perm_unsolved={p for p in pieces if not _physical_correct(state,p,order)}
     targets=[]; covered=set(); cycle_ids=[]; orientation_target_flags=[]
+    cycle_breaks: List[CycleBreakInfo] = []
 
     def add_target(sticker, cycle_id=None, orientation_target=False):
         targets.append(sticker)
@@ -278,17 +313,45 @@ def _trace_category(state, cat, order, pieces, standard_priority, standard_stick
         add_target(t, current_cycle_id); cur=t
 
     priority=cat.cycle_break_priority if cat.cycle_break_priority else standard_priority
+    # Preserve priority order, but ensure omitted custom pieces are still available
+    # afterwards in the canonical piece order.
+    ordered_priority=[]
+    for p in list(priority) + list(pieces):
+        if p not in ordered_priority:
+            ordered_priority.append(p)
     preferred=dict(standard_stickers); preferred.update(cat.cycle_break_stickers)
+    break_index = 0
     while True:
-        remaining=[p for p in priority if p in perm_unsolved and p not in covered and p!=buffer_piece]
-        if not remaining:
-            # Safety fallback for a custom priority list that omitted a piece.
-            remaining=[p for p in pieces if p in perm_unsolved and p not in covered and p!=buffer_piece]
+        remaining=[p for p in ordered_priority if p in perm_unsolved and p not in covered and p!=buffer_piece]
         if not remaining: break
-        piece=remaining[0]; start=preferred.get(piece,piece)
+
+        recommended_piece=remaining[0]
+        requested_piece=overrides.get(break_index)
+        piece=requested_piece if requested_piece in remaining else recommended_piece
+
+        option_pairs=[]
+        for option_piece in remaining:
+            option_sticker=preferred.get(option_piece,option_piece)
+            if option_sticker not in pieces[option_piece]:
+                option_sticker=option_piece
+            option_pairs.append((option_piece, option_sticker))
+
+        start=preferred.get(piece,piece)
         if start not in pieces[piece]: start=piece
         cycle_id = next_cycle_id
         next_cycle_id += 1
+        target_index = len(targets)
+        cycle_breaks.append(CycleBreakInfo(
+            break_index=break_index,
+            target_index=target_index,
+            cycle_id=cycle_id,
+            chosen_piece=piece,
+            chosen_sticker=start,
+            recommended_piece=recommended_piece,
+            options=option_pairs,
+        ))
+        break_index += 1
+
         # A cycle break shoots to the configured sticker, so that sticker is
         # itself a memo target. The cycle closes when tracing reaches the SAME
         # PHYSICAL PIECE again -- it does not have to return to the exact same
@@ -321,7 +384,7 @@ def _trace_category(state, cat, order, pieces, standard_priority, standard_stick
             # These are orientation-memo targets, not another permutation cycle.
             add_target(first, None, True)
             add_target(second, None, True)
-    return targets, orientation, cycle_ids, orientation_target_flags
+    return targets, orientation, cycle_ids, orientation_target_flags, cycle_breaks
 
 
 def _memo_swap_edge_identities(state, buffer_piece: str, partner_piece: str):
@@ -343,14 +406,21 @@ def _memo_swap_edge_identities(state, buffer_piece: str, partner_piece: str):
     return {key: rename.get(home, home) for key, home in state.items()}
 
 class ScrambleTracer:
-    def trace(self, scramble: str, scheme: LetterScheme) -> TraceResult:
+    def trace(
+        self,
+        scramble: str,
+        scheme: LetterScheme,
+        corner_cycle_break_overrides: Optional[Dict[int, str]] = None,
+        edge_cycle_break_overrides: Optional[Dict[int, str]] = None,
+    ) -> TraceResult:
         state=simulate(scramble, scheme.memo_up, scheme.memo_front, scheme.scramble_from_own_orientation)
 
         # Corners are always traced first. In 3-style mode their parity decides
         # whether the configured edge memo-swap must be applied.
-        ct,co,ccycles,cflags=_trace_category(
+        ct,co,ccycles,cflags,cbreaks=_trace_category(
             state,scheme.corners,CORNER_STICKER_ORDER,CORNER_PIECES,
             STANDARD_CORNER_PRIORITY,STANDARD_CORNER_STICKER,
+            corner_cycle_break_overrides,
         )
 
         edge_state = state
@@ -364,9 +434,10 @@ class ScrambleTracer:
             edge_state = _memo_swap_edge_identities(state, buffer_piece, partner)
             three_style_parity_applied = True
 
-        et,eo,ecycles,eflags=_trace_category(
+        et,eo,ecycles,eflags,ebreaks=_trace_category(
             edge_state,scheme.edges,EDGE_STICKER_ORDER,EDGE_PIECES,
             STANDARD_EDGE_PRIORITY,STANDARD_EDGE_STICKER,
+            edge_cycle_break_overrides,
         )
 
         def letters(targets,cat):
@@ -397,6 +468,11 @@ class ScrambleTracer:
                 )
 
         return TraceResult(
-            ct, et, cl, el, _pair(cl), _pair(el), co, eo,
-            ccycles, ecycles, cflags, eflags, three_style_parity_applied,
+            corner_targets=ct, edge_targets=et, corner_letters=cl, edge_letters=el,
+            corner_pairs=_pair(cl), edge_pairs=_pair(el),
+            corner_orientation=co, edge_orientation=eo,
+            corner_cycle_ids=ccycles, edge_cycle_ids=ecycles,
+            corner_orientation_target_flags=cflags, edge_orientation_target_flags=eflags,
+            corner_cycle_breaks=cbreaks, edge_cycle_breaks=ebreaks,
+            three_style_parity_applied=three_style_parity_applied,
         )

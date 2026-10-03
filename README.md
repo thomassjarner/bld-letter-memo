@@ -1,3 +1,20 @@
+# BLD Letter Memo Web 2.19
+
+Changes:
+- Scramble Memo now supports one-off cycle-break overrides without changing the saved scheme priority.
+- Cycle-break starts are underlined/clickable in the generated memo.
+- Clicking one shows only valid unsolved alternatives, ordered by the scheme's saved cycle-break priority.
+- Choosing an alternative retraces the memo from that break onward; Reset cycle breaks returns to the recommended trace.
+- Diagnostic trace now lists the chosen corner/edge cycle breaks.
+- Letter Pairs -> Stats now includes average mnemonic-word length for every letter used in the active scheme.
+- Mnemonic length defaults to longest -> shortest; the Length button toggles shortest/longest.
+- Alphabetical sorting toggles A->Z / Z->A, with Danish Æ/Ø/Å placed after Z.
+- Word length counts letters/numbers and ignores spaces/punctuation.
+
+Regression status:
+- 13/13 automated tests pass, including new one-off cycle-break override tests.
+
+
 # BLD Letter Memo Web 2.18
 
 Changes:

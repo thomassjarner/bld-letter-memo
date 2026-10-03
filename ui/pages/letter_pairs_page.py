@@ -13,6 +13,8 @@ class LetterPairsPage(ft.Column):
         self.expand = True
         self.spacing = 0
         self.selected_view = "dictionary"
+        # Stats sub-sort: mnemonic length defaults to longest -> shortest.
+        self.word_length_sort = "length_desc"
 
         self.tabbar = ft.Tabs(
             length=2,
@@ -507,22 +509,70 @@ class LetterPairsPage(ft.Column):
             opacity=1.0 if is_active else 0.75,
         )
 
+    def _scheme_letters(self, scheme):
+        return sorted({
+            (letter or "").strip().upper()
+            for category in (scheme.corners, scheme.edges)
+            for letter in category.stickers.values()
+            if (letter or "").strip() and (letter or "").strip().upper() != "BUFFER"
+        }, key=self._letter_sort_key)
+
+    @staticmethod
+    def _letter_sort_key(letter: str):
+        """Stable alphabetic ordering with Danish Æ/Ø/Å after Z.
+
+        Other characters fall back to Unicode/casefold ordering, so custom
+        alphabets remain deterministic without needing browser locale support.
+        """
+        order = "ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ"
+        upper = (letter or "").upper()
+        if upper in order:
+            return (0, order.index(upper))
+        return (1, upper.casefold())
+
+    @staticmethod
+    def _mnemonic_length(word: str) -> int:
+        # Spaces and punctuation do not inflate the statistic. Unicode letters
+        # and digits (including Æ/Ø/Å) count naturally through isalnum().
+        return sum(1 for ch in (word or "") if ch.isalnum())
+
+    def _toggle_length_sort(self, e):
+        self.word_length_sort = (
+            "length_asc" if self.word_length_sort == "length_desc" else "length_desc"
+        )
+        self.refresh()
+
+    def _toggle_alpha_sort(self, e):
+        self.word_length_sort = (
+            "alpha_desc" if self.word_length_sort == "alpha_asc" else "alpha_asc"
+        )
+        self.refresh()
+
+    def _rank_rows_two_columns(self, items, row_builder):
+        if not items:
+            return ft.Text("No data yet.", color=ft.Colors.ON_SURFACE_VARIANT)
+        cells = [row_builder(index, item) for index, item in enumerate(items, start=1)]
+        split_at = (len(cells) + 1) // 2
+        left = ft.Column(cells[:split_at], spacing=1, expand=True)
+        right = ft.Column(cells[split_at:], spacing=1, expand=True)
+        return ft.Row(
+            [left, ft.VerticalDivider(width=12), right],
+            spacing=4,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+
     def _build_stats_view(self):
         scheme = self.state.active_scheme
         if scheme is None:
             return ft.Column([
                 ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
-                ft.Text("Create or select a letter scheme to see letter ratings.", color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Create or select a letter scheme to see letter statistics.", color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=10)
 
-        scheme_letters = sorted({
-            (letter or "").strip().upper()
-            for category in (scheme.corners, scheme.edges)
-            for letter in category.stickers.values()
-            if (letter or "").strip()
-        })
+        scheme_letters = self._scheme_letters(scheme)
 
-        by_letter = {letter: [] for letter in scheme_letters}
+        # --- Average quality rating by scheme letter -----------------------
+        by_letter_rating = {letter: [] for letter in scheme_letters}
         for pair, word in self.state.data.global_words.items():
             if not word.strip():
                 continue
@@ -532,39 +582,121 @@ class LetterPairsPage(ft.Column):
             canonical = (pair or "").upper()
             for letter in scheme_letters:
                 if letter in canonical:
-                    by_letter[letter].append(float(rating))
+                    by_letter_rating[letter].append(float(rating))
 
-        ranked = []
+        rating_ranked = []
         for letter in scheme_letters:
-            values = by_letter.get(letter, [])
+            values = by_letter_rating.get(letter, [])
             avg = (sum(values) / len(values)) if values else None
-            ranked.append((letter, avg, len(values)))
-        ranked.sort(key=lambda item: (item[1] is None, -(item[1] or 0), item[0]))
-
-        rows = []
-        for index, (letter, avg, count) in enumerate(ranked, start=1):
-            rows.append(
-                ft.Container(
-                    content=ft.Row([
-                        ft.Text(f"{index}.", width=34, color=ft.Colors.ON_SURFACE_VARIANT),
-                        ft.Text(letter, width=52, weight=ft.FontWeight.BOLD),
-                        ft.Text(f"{avg:.2f}" if avg is not None else "—", width=58, weight=ft.FontWeight.BOLD if avg is not None else None),
-                        ft.Text(f"{count} rated pairs" if count else "No rated pairs", color=ft.Colors.ON_SURFACE_VARIANT),
-                    ], spacing=8),
-                    padding=ft.Padding.symmetric(horizontal=6, vertical=3),
-                )
+            rating_ranked.append((letter, avg, len(values)))
+        rating_ranked.sort(
+            key=lambda item: (
+                item[1] is None,
+                -(item[1] or 0),
+                self._letter_sort_key(item[0]),
             )
+        )
+
+        def rating_row(index, item):
+            letter, avg, count = item
+            return ft.Container(
+                content=ft.Row([
+                    ft.Text(f"{index}.", width=28, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Text(letter, width=36, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"{avg:.2f}" if avg is not None else "—", width=48),
+                    ft.Text(f"{count}" if count else "—", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ], spacing=4),
+                padding=ft.Padding.symmetric(horizontal=4, vertical=1),
+            )
+
+        # --- Average mnemonic-word length by scheme letter -----------------
+        by_letter_length = {letter: [] for letter in scheme_letters}
+        for pair, word in self.state.data.global_words.items():
+            clean = (word or "").strip()
+            if not clean:
+                continue
+            canonical = (pair or "").upper()
+            length = self._mnemonic_length(clean)
+            for letter in scheme_letters:
+                if letter in canonical:
+                    by_letter_length[letter].append(length)
+
+        length_rows = []
+        for letter in scheme_letters:
+            values = by_letter_length.get(letter, [])
+            avg = (sum(values) / len(values)) if values else None
+            length_rows.append((letter, avg, len(values)))
+
+        if self.word_length_sort == "length_desc":
+            length_rows.sort(key=lambda x: (x[1] is None, -(x[1] or 0), self._letter_sort_key(x[0])))
+        elif self.word_length_sort == "length_asc":
+            length_rows.sort(key=lambda x: (x[1] is None, x[1] if x[1] is not None else 0, self._letter_sort_key(x[0])))
+        elif self.word_length_sort == "alpha_desc":
+            length_rows.sort(key=lambda x: self._letter_sort_key(x[0]), reverse=True)
+        else:  # alpha_asc
+            length_rows.sort(key=lambda x: self._letter_sort_key(x[0]))
+
+        def length_row(index, item):
+            letter, avg, count = item
+            return ft.Container(
+                content=ft.Row([
+                    ft.Text(f"{index}.", width=28, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Text(letter, width=36, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"{avg:.2f}" if avg is not None else "—", width=48),
+                    ft.Text(f"{count}" if count else "—", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ], spacing=4),
+                padding=ft.Padding.symmetric(horizontal=4, vertical=1),
+            )
+
+        length_label = "Length ↓" if self.word_length_sort == "length_desc" else "Length ↑"
+        alpha_label = "Alphabetical Z–A" if self.word_length_sort == "alpha_desc" else "Alphabetical A–Z"
+        if self.word_length_sort.startswith("alpha"):
+            # Keep the inactive length button's label showing its default direction.
+            length_label = "Length ↓"
+        if self.word_length_sort.startswith("length"):
+            alpha_label = "Alphabetical A–Z"
+
+        rating_section = ft.Container(
+            content=ft.Column([
+                ft.Text("Letter ratings", weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "All letters used in the active scheme, ranked by average pair rating.",
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+                self._rank_rows_two_columns(rating_ranked, rating_row),
+            ], spacing=4),
+            expand=True,
+            padding=ft.Padding.all(8),
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+            border_radius=8,
+        )
+
+        length_section = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Text("Average mnemonic length", weight=ft.FontWeight.BOLD),
+                    ft.OutlinedButton(length_label, on_click=self._toggle_length_sort),
+                    ft.OutlinedButton(alpha_label, on_click=self._toggle_alpha_sort),
+                ], wrap=True, spacing=6),
+                ft.Text(
+                    "Average letters/numbers in mnemonic words for pairs containing each scheme letter.",
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                ),
+                self._rank_rows_two_columns(length_rows, length_row),
+            ], spacing=4),
+            expand=True,
+            padding=ft.Padding.all(8),
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+            border_radius=8,
+        )
 
         return ft.Column(
             [
                 ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
-                ft.Text(
-                    f"Letters in {scheme.name}, ranked by average rating of rated pairs containing that letter.",
-                    size=12, color=ft.Colors.ON_SURFACE_VARIANT,
-                ),
-                *(rows or [ft.Text("No letters have been assigned in this scheme yet.", color=ft.Colors.ON_SURFACE_VARIANT)]),
+                ft.Text(f"Statistics for {scheme.name}.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Row([rating_section, length_section], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START),
             ],
-            spacing=4,
+            spacing=8,
         )
 
     def _edit_pair_alias(self, pair: str):
