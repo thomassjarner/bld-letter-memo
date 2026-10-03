@@ -1,3 +1,14 @@
+# BLD Letter Memo Web 2.19.1
+
+Changes:
+- Temporary cycle-break choices now use the word "priority" instead of "recommended".
+- The reset action is now "Reset to priority".
+- Blind Timer now locks its current scroll position while Space is held, including repeated Space key events, so Space is reserved for timer arming rather than page scrolling.
+
+Regression status:
+- 13/13 automated tests pass.
+
+
 # BLD Letter Memo Web 2.19
 
 Changes:

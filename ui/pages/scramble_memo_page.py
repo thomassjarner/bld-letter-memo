@@ -221,7 +221,7 @@ class ScrambleMemoPage(ft.Column):
         for piece, sticker in break_info.options:
             recommended = piece == break_info.recommended_piece
             selected = piece == break_info.chosen_piece
-            suffix = " · recommended" if recommended else ""
+            suffix = " · priority" if recommended else ""
             option_controls.append(
                 ft.ListTile(
                     title=ft.Text(f"{sticker}  ({piece}){suffix}"),
@@ -232,7 +232,7 @@ class ScrambleMemoPage(ft.Column):
         option_controls.append(ft.Divider())
         option_controls.append(
             ft.TextButton(
-                "Reset to recommended",
+                "Reset to priority",
                 icon=ft.Icons.RESTART_ALT,
                 on_click=lambda e: choose(None),
             )

@@ -100,6 +100,16 @@ class PracticePage(ft.Column):
     def init(self):
         self.expand = True
         self.scroll = ft.ScrollMode.AUTO
+        # Track this page's scroll offset so Space can be reserved entirely for
+        # the Blind Timer. Flet web still lets the focused scrollable react to
+        # Space in some browsers even when a KeyboardListener handles the key.
+        # While Space is held we immediately pin the scroll position back to
+        # where it was when the hold began.
+        self.scroll_interval = 0
+        self.on_scroll = self._on_practice_scroll
+        self._scroll_pixels = 0.0
+        self._space_scroll_lock = None
+        self._restoring_scroll = False
         self.generator = ScrambleGenerator()
 
         self.mode = "menu"
@@ -274,6 +284,7 @@ class PracticePage(ft.Column):
             content=listener_content,
             autofocus=True,
             on_key_down=self._on_key_down,
+            on_key_repeat=self._on_key_repeat,
             on_key_up=self._on_key_up,
         )
         self.controls = [self.keyboard_listener]
@@ -322,6 +333,34 @@ class PracticePage(ft.Column):
 
     # ---- keyboard/timer --------------------------------------------------
 
+    def _on_practice_scroll(self, e):
+        pixels = float(getattr(e, "pixels", 0.0) or 0.0)
+        if self._space_scroll_lock is None:
+            self._scroll_pixels = pixels
+            return
+        # Space is a timer control here, never a scroll command. If the web
+        # client applies its native Space-scroll anyway, snap back immediately.
+        if not self._restoring_scroll and abs(pixels - self._space_scroll_lock) > 0.5:
+            if self.page is not None:
+                self.page.run_task(self._restore_space_scroll_lock)
+
+    async def _restore_space_scroll_lock(self):
+        if self._space_scroll_lock is None or self._restoring_scroll:
+            return
+        self._restoring_scroll = True
+        try:
+            await self.scroll_to(offset=self._space_scroll_lock, duration=0)
+        except Exception:
+            pass
+        finally:
+            self._restoring_scroll = False
+
+    def _on_key_repeat(self, e):
+        if not self.active or self.mode != "timer":
+            return
+        if e.key in self.SPACE_KEYS and self.holding_space and self.page is not None:
+            self.page.run_task(self._restore_space_scroll_lock)
+
     def _focus_keyboard_listener(self):
         try:
             if self.timer_key_sink is not None and self.timer_key_sink.page is not None:
@@ -342,6 +381,7 @@ class PracticePage(ft.Column):
     def _reset_hold_state(self):
         self.holding_space = False
         self.armed = False
+        self._space_scroll_lock = None
         if not self.running:
             self.timer_text.color = None
 
@@ -370,6 +410,9 @@ class PracticePage(ft.Column):
         if e.key in self.SPACE_KEYS and not self.holding_space:
             self.holding_space = True
             self.armed = False
+            self._space_scroll_lock = self._scroll_pixels
+            if self.page is not None:
+                self.page.run_task(self._restore_space_scroll_lock)
             self.status_text.value = ""
             self.timer_text.value = "0.00"
             self.timer_text.color = None
@@ -386,6 +429,7 @@ class PracticePage(ft.Column):
         if self.armed:
             self.holding_space = False
             self.armed = False
+            self._space_scroll_lock = None
             self._start_timer(now)
         else:
             # Released before the arm delay elapsed -- a quick tap, not a
