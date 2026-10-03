@@ -12,9 +12,14 @@ DESTINATIONS = [
     ("Letter Schemes", ft.Icons.GRID_VIEW),
     ("Letter Pairs", ft.Icons.TABLE_CHART),
     ("Scramble Memo", ft.Icons.SHUFFLE),
+    ("Timer", ft.Icons.TIMER),
     ("Practice", ft.Icons.FITNESS_CENTER),
     ("Settings", ft.Icons.SETTINGS),
 ]
+
+SCRAMBLE_INDEX = 2
+TIMER_INDEX = 3
+PRACTICE_INDEX = 4
 
 
 async def main(page: ft.Page):
@@ -63,12 +68,16 @@ async def main(page: ft.Page):
         scramble_page.last_result = None
         scramble_page.details.value = ""
         scramble_page._render_result()
-        navigate_to(2)
+        navigate_to(SCRAMBLE_INDEX)
         if scramble_page.page is not None:
             scramble_page.update()
 
     practice_page = PracticePage(data=state)
     practice_page.open_memo_callback = open_scramble_from_practice
+    # The Timer has its own main navigation destination, while the Practice
+    # hub still links to the exact same timer view.
+    practice_page.open_timer_callback = lambda: navigate_to(TIMER_INDEX)
+    practice_page.open_practice_callback = lambda: navigate_to(PRACTICE_INDEX)
 
     def apply_dark_mode(enabled: bool):
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
@@ -77,7 +86,14 @@ async def main(page: ft.Page):
     settings_page = SettingsPage(data=state)
     settings_page.theme_callback = apply_dark_mode
 
-    pages = [schemes_page, pairs_page, scramble_page, practice_page, settings_page]
+    pages = [
+        schemes_page,
+        pairs_page,
+        scramble_page,
+        practice_page,  # Timer main tab
+        practice_page,  # Practice hub
+        settings_page,
+    ]
     content_area.content = pages[0]
 
     def make_nav_button(index: int, compact: bool = False):
@@ -218,7 +234,19 @@ async def main(page: ft.Page):
     def navigate_to(index: int):
         nonlocal current_index, popout_open
         current_index = index
-        practice_page.set_active(index == 3)
+
+        # Timer and Practice intentionally share one PracticePage instance.
+        # Entering the Timer tab forces the fixed timer layout; entering
+        # Practice returns to the activity hub.
+        if index == TIMER_INDEX:
+            practice_page.show_timer(update=False)
+            practice_page.set_active(True)
+        elif index == PRACTICE_INDEX:
+            practice_page.show_menu(update=False)
+            practice_page.set_active(False)
+        else:
+            practice_page.set_active(False)
+
         target = pages[index]
         if target is pairs_page:
             pairs_page.refresh(update=False)

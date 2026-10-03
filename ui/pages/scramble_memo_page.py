@@ -46,7 +46,7 @@ class ScrambleMemoPage(ft.Column):
         self.last_trace_input_key = None
         self.toggle_button = ft.OutlinedButton("Show words", icon=ft.Icons.TRANSLATE, on_click=self._toggle_words)
         self.reset_breaks_button = ft.OutlinedButton(
-            "Reset cycle breaks",
+            "Reset to priority",
             icon=ft.Icons.RESTART_ALT,
             on_click=self._reset_cycle_breaks,
             visible=False,

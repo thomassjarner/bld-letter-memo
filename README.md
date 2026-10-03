@@ -1,3 +1,17 @@
+# BLD Letter Memo Web 2.20
+
+Changes:
+- Added **Timer** as its own main navigation tab in all navigation styles.
+- The Blind Timer remains accessible from the **Practice** hub; opening it there switches to the Timer main tab.
+- Reworked Blind Timer layout so the timer page itself stays fixed to the available app viewport.
+- Session solve history now lives in its own expanding, internally scrollable panel instead of making the whole page taller after every solve.
+- Removed the old page-scroll-position workaround; Space is still consumed by the timer keyboard input, while the main timer page no longer has a scrolling document to move.
+- The timer's Back button returns to the Practice hub.
+- Scramble Memo's cycle-break reset button now says **Reset to priority**.
+
+Regression status:
+- 13/13 automated tests pass.
+
 # BLD Letter Memo Web 2.19.1
 
 Changes:
@@ -15,7 +29,7 @@ Changes:
 - Scramble Memo now supports one-off cycle-break overrides without changing the saved scheme priority.
 - Cycle-break starts are underlined/clickable in the generated memo.
 - Clicking one shows only valid unsolved alternatives, ordered by the scheme's saved cycle-break priority.
-- Choosing an alternative retraces the memo from that break onward; Reset cycle breaks returns to the recommended trace.
+- Choosing an alternative retraces the memo from that break onward; Reset to priority returns to the saved-priority trace.
 - Diagnostic trace now lists the chosen corner/edge cycle breaks.
 - Letter Pairs -> Stats now includes average mnemonic-word length for every letter used in the active scheme.
 - Mnemonic length defaults to longest -> shortest; the Length button toggles shortest/longest.

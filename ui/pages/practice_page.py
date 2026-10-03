@@ -78,6 +78,8 @@ class PracticePage(ft.Column):
         return self.data
 
     open_memo_callback = None
+    open_timer_callback = None
+    open_practice_callback = None
 
     """Practice hub plus Blind Timer.
 
@@ -99,17 +101,11 @@ class PracticePage(ft.Column):
 
     def init(self):
         self.expand = True
+        self.spacing = 0
+        # The Practice hub may scroll, but the timer view itself is deliberately
+        # fixed to the available app viewport. Solve history gets its own
+        # independent scroll area instead of making the whole page taller.
         self.scroll = ft.ScrollMode.AUTO
-        # Track this page's scroll offset so Space can be reserved entirely for
-        # the Blind Timer. Flet web still lets the focused scrollable react to
-        # Space in some browsers even when a KeyboardListener handles the key.
-        # While Space is held we immediately pin the scroll position back to
-        # where it was when the hold began.
-        self.scroll_interval = 0
-        self.on_scroll = self._on_practice_scroll
-        self._scroll_pixels = 0.0
-        self._space_scroll_lock = None
-        self._restoring_scroll = False
         self.generator = ScrambleGenerator()
 
         self.mode = "menu"
@@ -134,7 +130,14 @@ class PracticePage(ft.Column):
         self.stats_text = ft.Text("")
         self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12)
         self._copy_notice_token = 0
-        self.history = ft.Column(spacing=6)
+        self.history = ft.ListView(spacing=6, expand=True, scroll=ft.ScrollMode.AUTO)
+        self.history_panel = ft.Container(
+            content=self.history,
+            expand=True,
+            padding=6,
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+            border_radius=8,
+        )
         self.session_dropdown = ft.Dropdown(
             label="Session",
             width=150,
@@ -187,10 +190,31 @@ class PracticePage(ft.Column):
             width=300,
         )
 
+    def show_menu(self, update: bool = True):
+        self._show_menu(update=update)
+
+    def show_timer(self, update: bool = True):
+        self._show_timer(update=update)
+
+    def _open_timer_from_practice(self, e=None):
+        if self.open_timer_callback:
+            self.open_timer_callback()
+        else:
+            self._show_timer()
+
+    def _back_to_practice(self, e=None):
+        if self.running:
+            return
+        if self.open_practice_callback:
+            self.open_practice_callback()
+        else:
+            self._show_menu()
+
     def _show_menu(self, e=None, update=True):
         if self.running:
             return
         self.mode = "menu"
+        self.scroll = ft.ScrollMode.AUTO
         self._reset_hold_state()
         self.controls = [
             ft.Text("Practice", size=20, weight=ft.FontWeight.BOLD),
@@ -201,7 +225,7 @@ class PracticePage(ft.Column):
                     "Generate a scramble and time a full blind attempt.",
                     ft.Icons.TIMER,
                     True,
-                    self._show_timer,
+                    self._open_timer_from_practice,
                 ),
                 self._practice_card(
                     "Progressive Memo",
@@ -230,14 +254,24 @@ class PracticePage(ft.Column):
 
     def _show_timer(self, e=None, update=True):
         self.mode = "timer"
+        # Critical layout rule: the Blind Timer itself never scrolls. Its
+        # history list is the only scrollable region, so adding solves cannot
+        # increase the browser/page height.
+        self.scroll = None
+
         body = ft.Column(
             [
                 ft.Row([
-                    ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._show_menu),
-                    ft.Text("Practice — Blind Timer", size=18, weight=ft.FontWeight.BOLD),
+                    ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._back_to_practice),
+                    ft.Text("Blind Timer", size=18, weight=ft.FontWeight.BOLD),
                     self.session_dropdown,
                 ], wrap=True),
-                ft.Container(self.scramble_text, padding=12, border=ft.Border.all(1, ft.Colors.OUTLINE), border_radius=8),
+                ft.Container(
+                    self.scramble_text,
+                    padding=10,
+                    border=ft.Border.all(1, ft.Colors.OUTLINE),
+                    border_radius=8,
+                ),
                 ft.Row(
                     [self.previous_scramble_button, self.new_scramble_button],
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -250,23 +284,25 @@ class PracticePage(ft.Column):
                         spacing=8,
                     ),
                     alignment=ft.Alignment.CENTER,
-                    padding=36,
-                    height=250,
+                    padding=20,
+                    height=210,
                 ),
                 ft.Row([self.success_button, self.plus2_button, self.dnf_button, self.memo_button], wrap=True),
-                ft.Divider(),
+                ft.Divider(height=8),
                 self.stats_text,
                 ft.Row([
-                    ft.Text("Session solves", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text("Session solves", size=17, weight=ft.FontWeight.BOLD),
                     ft.TextButton("Reset session", icon=ft.Icons.DELETE_SWEEP, on_click=self._confirm_reset),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 self.copy_notice,
-                self.history,
+                self.history_panel,
             ],
+            expand=True,
+            spacing=7,
         )
         # Keep an invisible editable field focused while timing. Browsers treat
-        # Space inside an input as text input rather than page-scroll, while the
-        # surrounding KeyboardListener still receives key-down/key-up events.
+        # Space inside an input as text input rather than a page-scroll command,
+        # while KeyboardListener still receives key-down/key-up events.
         self.timer_key_sink = ft.TextField(
             value="",
             width=1,
@@ -279,6 +315,7 @@ class PracticePage(ft.Column):
         listener_content = ft.Stack(
             [body, ft.Container(self.timer_key_sink, left=0, top=0, width=1, height=1)],
             expand=True,
+            fit=ft.StackFit.EXPAND,
         )
         self.keyboard_listener = ft.KeyboardListener(
             content=listener_content,
@@ -286,6 +323,7 @@ class PracticePage(ft.Column):
             on_key_down=self._on_key_down,
             on_key_repeat=self._on_key_repeat,
             on_key_up=self._on_key_up,
+            expand=True,
         )
         self.controls = [self.keyboard_listener]
         self._refresh_stats_and_history(update=False)
@@ -333,33 +371,10 @@ class PracticePage(ft.Column):
 
     # ---- keyboard/timer --------------------------------------------------
 
-    def _on_practice_scroll(self, e):
-        pixels = float(getattr(e, "pixels", 0.0) or 0.0)
-        if self._space_scroll_lock is None:
-            self._scroll_pixels = pixels
-            return
-        # Space is a timer control here, never a scroll command. If the web
-        # client applies its native Space-scroll anyway, snap back immediately.
-        if not self._restoring_scroll and abs(pixels - self._space_scroll_lock) > 0.5:
-            if self.page is not None:
-                self.page.run_task(self._restore_space_scroll_lock)
-
-    async def _restore_space_scroll_lock(self):
-        if self._space_scroll_lock is None or self._restoring_scroll:
-            return
-        self._restoring_scroll = True
-        try:
-            await self.scroll_to(offset=self._space_scroll_lock, duration=0)
-        except Exception:
-            pass
-        finally:
-            self._restoring_scroll = False
-
     def _on_key_repeat(self, e):
-        if not self.active or self.mode != "timer":
-            return
-        if e.key in self.SPACE_KEYS and self.holding_space and self.page is not None:
-            self.page.run_task(self._restore_space_scroll_lock)
+        # Repeated Space key-down events are intentionally ignored. The timer
+        # is armed from the first key-down and starts only on key-up.
+        return
 
     def _focus_keyboard_listener(self):
         try:
@@ -381,7 +396,6 @@ class PracticePage(ft.Column):
     def _reset_hold_state(self):
         self.holding_space = False
         self.armed = False
-        self._space_scroll_lock = None
         if not self.running:
             self.timer_text.color = None
 
@@ -410,9 +424,6 @@ class PracticePage(ft.Column):
         if e.key in self.SPACE_KEYS and not self.holding_space:
             self.holding_space = True
             self.armed = False
-            self._space_scroll_lock = self._scroll_pixels
-            if self.page is not None:
-                self.page.run_task(self._restore_space_scroll_lock)
             self.status_text.value = ""
             self.timer_text.value = "0.00"
             self.timer_text.color = None
@@ -429,7 +440,6 @@ class PracticePage(ft.Column):
         if self.armed:
             self.holding_space = False
             self.armed = False
-            self._space_scroll_lock = None
             self._start_timer(now)
         else:
             # Released before the arm delay elapsed -- a quick tap, not a
