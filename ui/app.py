@@ -36,6 +36,7 @@ async def main(page: ft.Page):
     schemes_page = LetterSchemesPage(data=state)
     pairs_page = LetterPairsPage(data=state)
     scramble_page = ScrambleMemoPage(data=state)
+    timer_page = None
     practice_page = None
     pages = None
     current_index = 0
@@ -72,12 +73,18 @@ async def main(page: ft.Page):
         if scramble_page.page is not None:
             scramble_page.update()
 
+    # Timer and Practice deliberately use separate mounted controls. Sharing one
+    # custom control between two navigation destinations caused focus/mounting
+    # edge cases in Flet web: the Timer could be visible but not receive keys.
+    timer_page = PracticePage(data=state)
+    timer_page.open_memo_callback = open_scramble_from_practice
+    timer_page.open_practice_callback = lambda: navigate_to(PRACTICE_INDEX)
+    timer_page.show_timer(update=False)
+
     practice_page = PracticePage(data=state)
     practice_page.open_memo_callback = open_scramble_from_practice
-    # The Timer has its own main navigation destination, while the Practice
-    # hub still links to the exact same timer view.
     practice_page.open_timer_callback = lambda: navigate_to(TIMER_INDEX)
-    practice_page.open_practice_callback = lambda: navigate_to(PRACTICE_INDEX)
+    practice_page.show_menu(update=False)
 
     def apply_dark_mode(enabled: bool):
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
@@ -90,8 +97,8 @@ async def main(page: ft.Page):
         schemes_page,
         pairs_page,
         scramble_page,
-        practice_page,  # Timer main tab
-        practice_page,  # Practice hub
+        timer_page,
+        practice_page,
         settings_page,
     ]
     content_area.content = pages[0]
@@ -247,6 +254,8 @@ async def main(page: ft.Page):
             schemes_page.refresh(update=False)
         elif target is scramble_page:
             scramble_page.refresh(update=False)
+        elif target is timer_page:
+            timer_page.refresh(update=False)
         elif target is practice_page:
             practice_page.refresh(update=False)
 
@@ -255,17 +264,10 @@ async def main(page: ft.Page):
         rebuild_navigation(update=False)
         page.update()
 
-        # Now that PracticePage is definitely mounted, explicitly switch and
-        # update its child tree. This makes both the Timer main tab and the
-        # Practice -> Blind Timer button reliable.
-        if index == TIMER_INDEX:
-            practice_page.show_timer(update=True)
-            practice_page.set_active(True)
-        elif index == PRACTICE_INDEX:
-            practice_page.show_menu(update=True)
-            practice_page.set_active(False)
-        else:
-            practice_page.set_active(False)
+        # Timer and Practice are separate controls. Activate keyboard capture
+        # only on the Timer destination, and keep the Practice hub passive.
+        timer_page.set_active(index == TIMER_INDEX)
+        practice_page.set_active(False)
 
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
 

@@ -1,3 +1,16 @@
+# BLD Letter Memo Web 2.20.2
+
+Timer hotfix:
+- Timer and Practice now use separate mounted controls instead of sharing one custom control across two navigation destinations.
+- Removed the invisible TextField keyboard-focus workaround. The timer page itself is fixed-height, so only solve history scrolls.
+- KeyboardListener now receives focus directly.
+- Flet 0.86 focus() is awaited asynchronously, so returning to the Timer tab reliably restores Space-key control.
+- Practice -> Blind Timer still opens the main Timer destination.
+
+Regression status:
+- Existing automated test suite passes.
+
+
 # BLD Letter Memo Web 2.20.1
 
 Hotfix:

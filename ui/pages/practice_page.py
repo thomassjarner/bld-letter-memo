@@ -122,7 +122,6 @@ class PracticePage(ft.Column):
         self.last_display_second = -1
         self.last_solve_index = None
         self.keyboard_listener: ft.KeyboardListener | None = None
-        self.timer_key_sink: ft.TextField | None = None
 
         self.scramble_text = ft.Text(self.current_scramble, size=18, selectable=True)
         self.timer_text = ft.Text("0.00", size=64, weight=ft.FontWeight.BOLD)
@@ -300,25 +299,12 @@ class PracticePage(ft.Column):
             expand=True,
             spacing=7,
         )
-        # Keep an invisible editable field focused while timing. Browsers treat
-        # Space inside an input as text input rather than a page-scroll command,
-        # while KeyboardListener still receives key-down/key-up events.
-        self.timer_key_sink = ft.TextField(
-            value="",
-            width=1,
-            height=1,
-            opacity=0.01,
-            border=ft.InputBorder.NONE,
-            text_size=1,
-            on_change=self._clear_timer_key_sink,
-        )
-        listener_content = ft.Stack(
-            [body, ft.Container(self.timer_key_sink, left=0, top=0, width=1, height=1)],
-            expand=True,
-            fit=ft.StackFit.EXPAND,
-        )
+        # The timer page itself is no longer scrollable; only the solve-history
+        # ListView scrolls. Keep focus on KeyboardListener directly. An invisible
+        # TextField used in earlier builds could take keyboard focus away from the
+        # listener in the web client, making Space appear to do nothing.
         self.keyboard_listener = ft.KeyboardListener(
-            content=listener_content,
+            content=body,
             autofocus=True,
             on_key_down=self._on_key_down,
             on_key_repeat=self._on_key_repeat,
@@ -377,21 +363,19 @@ class PracticePage(ft.Column):
         return
 
     def _focus_keyboard_listener(self):
-        try:
-            if self.timer_key_sink is not None and self.timer_key_sink.page is not None:
-                self.timer_key_sink.focus()
-            elif self.keyboard_listener is not None and self.keyboard_listener.page is not None:
-                self.keyboard_listener.focus()
-        except Exception:
-            pass
+        # In Flet 0.86 focus() is async. Calling it without awaiting only creates
+        # a coroutine and does not reliably move browser focus, which can leave
+        # the timer deaf to Space after navigation.
+        if self.page is not None:
+            self.page.run_task(self._focus_keyboard_listener_async)
 
-    def _clear_timer_key_sink(self, e):
-        # Keep the invisible input empty so it can continue consuming Space and
-        # other browser-default keystrokes without altering visible UI.
-        if e.control.value:
-            e.control.value = ""
-            if e.control.page is not None:
-                e.control.update()
+    async def _focus_keyboard_listener_async(self):
+        try:
+            if self.keyboard_listener is not None and self.keyboard_listener.page is not None:
+                await self.keyboard_listener.focus()
+        except Exception:
+            # Autofocus remains as a fallback when the control is first mounted.
+            pass
 
     def _reset_hold_state(self):
         self.holding_space = False
