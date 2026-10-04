@@ -2,6 +2,7 @@ import flet as ft
 
 from data.shared_preferences_repository import SharedPreferencesAppDataRepository
 from ui.design import build_theme
+from ui.theme_colors import apply_palette
 from ui.pages.home_page import build_home
 from ui.pages.letter_pairs_page import LetterPairsPage
 from ui.pages.letter_schemes_page import LetterSchemesPage
@@ -23,7 +24,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_IN
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo"
+    page.title = "BLD Letter Memo · 2.21.2"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -71,7 +72,7 @@ async def main(page: ft.Page):
     practice_page.open_memo_callback = open_scramble_from_practice
     practice_page.open_timer_callback = lambda: navigate_to(TIMER_INDEX)
     practice_page.show_menu(update=False)
-    home_page = build_home(lambda name: navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name)))
+    home_page = build_home(lambda name: navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name)), data=state)
     pages = [home_page, schemes_page, pairs_page, scramble_page, practice_page, timer_page, settings_page]
     content_area.content = home_page
 
@@ -100,7 +101,7 @@ async def main(page: ft.Page):
                          bgcolor=ft.Colors.PRIMARY, padding=7, border_radius=7),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.21.2", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)
@@ -180,6 +181,10 @@ async def main(page: ft.Page):
         content_area.top = top_nav.height if style == "top_tabs" else 0
         content_area.padding = ft.Padding.only(left=12 if width < 700 else 20, top=16,
             right=12 if width < 700 else 20, bottom=64 if style == "popout" else 16)
+        for view in pages:
+            apply_palette(view, state.data.dark_mode)
+        for chrome in (top_nav, sidebar_nav, popout_panel, popout_button):
+            apply_palette(chrome, state.data.dark_mode)
         if update:
             page.update()
 

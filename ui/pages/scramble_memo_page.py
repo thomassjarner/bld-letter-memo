@@ -1,4 +1,5 @@
 import flet as ft
+from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from core.tracer import ScrambleTracer, ScrambleError
 from ui.design import page_heading, panel, eyebrow
@@ -16,7 +17,7 @@ DARK_ORIENTATION_COLOR = "#42A5F5"
 
 
 @ft.control
-class ScrambleMemoPage(ft.Column):
+class ScrambleMemoPage(ThemeAwarePage, ft.Column):
     @property
     def state(self):
         # BaseControl.data is a Flet skip_field(), so Python-only AppState
@@ -255,7 +256,7 @@ class ScrambleMemoPage(ft.Column):
             ),
         )
         if self.page is not None:
-            self.page.show_dialog(dialog)
+            show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
 
     def _memo_control(self, category, letters, pairs, orientation, cycle_ids, orientation_flags, cycle_breaks):
         if not letters and not orientation:

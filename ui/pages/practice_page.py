@@ -5,6 +5,7 @@ import asyncio
 import time
 
 import flet as ft
+from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from core.scramble_generator import ScrambleGenerator
 from ui.design import activity_card, page_heading, panel, eyebrow
@@ -71,7 +72,7 @@ def _best_wca_average(solves, count: int):
     return best
 
 @ft.control
-class PracticePage(ft.Column):
+class PracticePage(ThemeAwarePage, ft.Column):
     @property
     def state(self):
         # BaseControl.data is a Flet skip_field(), so Python-only AppState
@@ -710,4 +711,4 @@ class PracticePage(ft.Column):
                 ft.TextButton("Reset", on_click=lambda e: reset(dialog)),
             ],
         )
-        self.page.show_dialog(dialog)
+        show_themed_dialog(self.page, dialog, self.state.data.dark_mode)

@@ -1,3 +1,23 @@
+# BLD Letter Memo Web 2.21.2
+
+Explicit control-color update:
+- Dark mode uses near-white primary text (#F0F4F3), muted secondary text
+  (#BACBC6), and soft turquoise accents (#6DD8C3).
+- Semantic colors are resolved to concrete colors before sending UI controls
+  to Flet, on startup, navigation, updates, and theme switches.
+- Labels, fields, tabs, buttons, and dialogs receive explicit foregrounds.
+- Light/dark switching retains each control's color role; user rating colors
+  and memo cycle highlights retain their meaning.
+- The header and browser tab display version 2.21.2.
+
+26 automated tests pass, including concrete control colors across repeated
+mode changes, newly created controls, dialogs, and button wire styles.
+Browser visual verification remains outstanding in this environment.
+Core logic, data models, persistence and backup formats are unchanged.
+See PATCHING.md to apply this release.
+
+---
+
 # BLD Letter Memo Web 2.21.1
 
 Dark/light text contrast hotfix:

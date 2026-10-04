@@ -2,6 +2,7 @@ import json
 from datetime import date
 
 import flet as ft
+from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from data.models import AppData
 from ui.state import AppState
@@ -9,7 +10,7 @@ from ui.design import page_heading, panel, eyebrow
 
 
 @ft.control
-class SettingsPage(ft.Column):
+class SettingsPage(ThemeAwarePage, ft.Column):
     @property
     def state(self):
         # BaseControl.data is a Flet skip_field(), so Python-only AppState
@@ -213,7 +214,7 @@ class SettingsPage(ft.Column):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         self._current_dialog = dialog
-        self.page.show_dialog(dialog)
+        show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
 
     def _close_dialog(self, e=None):
         if self._current_dialog is not None:

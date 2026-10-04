@@ -1,11 +1,12 @@
 import flet as ft
+from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from core.pairs import get_active_pairs
 from ui.design import page_heading, panel
 
 
 @ft.control
-class LetterPairsPage(ft.Column):
+class LetterPairsPage(ThemeAwarePage, ft.Column):
     @property
     def state(self):
         return self.data

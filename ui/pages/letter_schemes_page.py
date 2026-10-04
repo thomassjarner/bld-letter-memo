@@ -1,4 +1,5 @@
 import flet as ft
+from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
 from core.tracer import STANDARD_CORNER_PRIORITY, STANDARD_EDGE_PRIORITY
@@ -20,7 +21,7 @@ OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 
 
 @ft.control
-class LetterSchemesPage(ft.Column):
+class LetterSchemesPage(ThemeAwarePage, ft.Column):
     @property
     def state(self):
         # BaseControl.data is a Flet skip_field(), so Python-only AppState

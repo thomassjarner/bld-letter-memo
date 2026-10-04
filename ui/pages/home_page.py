@@ -1,10 +1,16 @@
 """An introduction and route chooser, deliberately without embedded tools."""
 import flet as ft
+from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 from ui.design import activity_card, eyebrow, panel
 
 
-def build_home(navigate):
-    return ft.Column([
+@ft.control
+class HomePage(ThemeAwarePage, ft.Column):
+    pass
+
+
+def build_home(navigate, data=None):
+    return HomePage([
         ft.Container(ft.Column([
             eyebrow("3×3 blindfolded / training workspace"),
             ft.Text("Build your memo.\nTrain your recall.", size=36,
@@ -38,4 +44,4 @@ def build_home(navigate):
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT, expand=True),
             ft.TextButton("Settings", on_click=lambda e: navigate("Settings")),
         ], spacing=10), padding=12),
-    ], expand=True, spacing=14, scroll=ft.ScrollMode.AUTO)
+    ], data=data, expand=True, spacing=14, scroll=ft.ScrollMode.AUTO)
