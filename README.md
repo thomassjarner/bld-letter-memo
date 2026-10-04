@@ -1,3 +1,22 @@
+# BLD Letter Memo Web 2.22.1
+
+Letter Pairs layout and scrolling fix:
+- Compact heading and full-width filter toolbar replace the tall filter block.
+- Search, scheme/status/grade filters, search modes, progress, and averages use horizontal rows on wide screens.
+- Dictionary rows have an explicit viewport and a visible scrollbar, including large filtered results.
+- Wide screens retain two pair columns; medium screens use one; narrow screens place row metadata below the mnemonic.
+- Stats uses a separate bounded scrolling area and fills the available width.
+- Word entry, aliases, ratings, filtering, progress and letter statistics retain their data behavior.
+- The Timer page is byte-identical to 2.22.0.
+
+39 automated tests pass, including all 650 filtered pairs remaining available,
+resizing, typing without rebuilding fields, word commits, alias/rating edits,
+and Stats scrolling. Browser rendering remains unverified here.
+Update by copying the release contents into your existing project, then committing
+and pushing as usual. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.22.0
 
 A more spacious timer workspace:

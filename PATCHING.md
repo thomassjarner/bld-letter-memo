@@ -1,40 +1,44 @@
-# Update to 2.22.0
+# Update to 2.22.1
 
-Copy the contents of `bld-letter-memo-web-2.22.0/` into your existing project
-folder, replacing matching files. Do not copy the versioned wrapper as a new
-nested folder. Use the same GitHub Pages deployment workflow.
+Copy the contents of `bld-letter-memo-web-2.22.1/` into your existing project
+folder, replacing matching files. Do not nest the versioned folder inside the
+project. The normal GitHub Pages deployment process is unchanged.
 
-After the files are copied, run these commands from your existing Terminal
-window, already inside the project:
+After copying the files, run these commands from your existing Terminal window,
+already inside the project:
 
 ```sh
 git add -A &&
-git commit -m "Make timer spacious and improve solve history" &&
+git commit -m "Compact letter pair filters and fix scrolling" &&
 git push
 ```
 
-After GitHub Actions finishes, reload the site and check for **2.22.0** in
-the header or browser tab title. Command+Shift+R can refresh the browser build
-on macOS. Keep browser storage; no data import or migration is required.
+Wait for GitHub Actions, then reload and confirm **2.22.1** in the header or
+browser-tab title. Command+Shift+R can refresh the build on macOS. Keep browser
+storage; no data migration or import is needed.
 
-## What changed
+## Changes
 
-The timer's scramble and Previous/Next controls share one row. Wide screens
-place the larger timer to the left of solve history; narrow screens stack them.
-History uses a bounded ListView and a visible scrollbar. Scroll the first 50
-solves and click Older solves to reach older records, 50 at a time. In compact
-layouts, use the Session statistics icon in the history header to see all averages.
-The brand mark is a static outline cube without a filled button-like background.
+The Letter Pairs filter panel now uses the whole width in compact horizontal
+rows. The heading is smaller. Dictionary and Stats each have an explicit
+scrolling viewport and visible scrollbar. Two dictionary columns are retained
+on wide screens; smaller windows use one column. On narrow screens, rating,
+status and scheme information move below the pair/word line. Full scheme names
+and detailed summaries are available in tooltips when shortened on screen.
 
-## Verification
+Only Letter Pairs presentation, its viewport wiring, version labels, tests and
+documentation change. The Timer file, core logic, models, repositories, state,
+color handling, dependencies and deployment workflow are byte-identical to 2.22.0.
+Pair search/filter logic, canonical pairs, aliases and rating callbacks were
+compared with the previous release and are unchanged.
 
-32 automated tests pass. Existing BLD logic, data repositories, models, state,
-theme-color handling, dependencies, entrypoint and deployment workflow were
-verified byte-identical to 2.21.2. Keyboard and timing methods were also compared
-and are unchanged. Resize tests retain the live timer and keyboard-listener
-instances. History tests reach all records and exercise actions on the oldest
-solve without changing other saved data.
+## Validation
 
-Browser visual testing was not available in this environment. After deployment,
-check a wide and a narrow window, both themes, long-history scrolling, and
-Space-key timing after a resize. No live deployment was made during development.
+39 tests pass, including the original BLD and Timer checks. New tests cover a
+650-pair filtered result, all records remaining reachable, bounded layout at
+multiple widths, preserving word fields during typing, commit behavior, aliases,
+ratings, empty results and Stats resizing/scrolling.
+
+Browser rendering was not available in this development environment. After
+deployment, check Dictionary and Stats scrolling, filters and word editing in
+both themes. No live deployment was performed here.

@@ -2,7 +2,7 @@ import flet as ft
 from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from core.pairs import get_active_pairs
-from ui.design import page_heading, panel
+from ui.design import panel
 
 
 @ft.control
@@ -13,7 +13,10 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
 
     def init(self):
         self.expand = True
-        self.spacing = 0
+        self.spacing = 8
+        self._viewport = (1400.0, 760.0)
+        self._table_columns = 2
+        self._compact_cells = False
         self.selected_view = "dictionary"
         # Stats sub-sort: mnemonic length defaults to longest -> shortest.
         self.word_length_sort = "length_desc"
@@ -24,43 +27,49 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             on_change=self._on_tab_change,
             content=ft.TabBar(tabs=[ft.Tab(label="Dictionary"), ft.Tab(label="Stats")]),
         )
-        self.content_area = ft.Column(expand=True, spacing=10, scroll=ft.ScrollMode.AUTO)
+        self.tabbar.height = 40
+        self.content_area = ft.Column(spacing=8)
+        self.stats_scroll = ft.ListView(spacing=12, scroll=ft.ScrollMode.ALWAYS,
+                                        build_controls_on_demand=False)
 
         self.search_field = ft.TextField(
             hint_text="Search letter pairs (AC, A-, -S)...",
             expand=True,
             prefix_icon=ft.Icons.SEARCH,
             on_change=self._on_search_change,
-            dense=True,
+            dense=True, height=42,
             border_radius=7,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.search_pairs = ft.Checkbox(
-            label="Search letter pairs", value=True, on_change=self._on_search_mode_change
+            label="Pairs", width=96, height=32, tooltip="Search letter pairs", value=True, on_change=self._on_search_mode_change
         )
         self.search_words = ft.Checkbox(
-            label="Search within words", value=False, on_change=self._on_search_mode_change
+            label="Words", width=104, height=32, tooltip="Search within mnemonic words", value=False, on_change=self._on_search_mode_change
         )
         self.scheme_filter = ft.Dropdown(
-            width=185, dense=True,
+            width=210, height=42, dense=True,
             value="__all__",
             label="Letter scheme",
-            options=[ft.DropdownOption("__all__", "All letter schemes")],
+            options=[ft.DropdownOption("__all__", "All schemes")],
             on_select=self._on_search_change,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.status_filter = ft.Dropdown(
-            width=145, dense=True, value="all", label="Status", options=[], on_select=self._on_search_change
+            width=154, height=42, dense=True, value="all", label="Status", options=[], on_select=self._on_search_change
         , color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.grade_sort = ft.Dropdown(
-            width=165, dense=True, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
+            width=164, height=42, dense=True, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
         , color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
-        self.progress_text = ft.Text(size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
-        self.duplicate_warning = ft.Text(size=12, color=ft.Colors.TERTIARY)
-        self.progress_bar = ft.ProgressBar(width=180, value=0)
+        self.progress_text = ft.Text(size=11, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
+        self.duplicate_warning = ft.Text(size=11, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.TERTIARY)
+        self.progress_bar = ft.ProgressBar(width=100, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.filter_average_text = ft.Text(size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
-        self.overall_average_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.filter_average_text = ft.Text(size=11, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
+        self.overall_average_text = ft.Text(size=11, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE_VARIANT)
 
-        self.rows_view = ft.Column(spacing=0)
+        # A stable ListView with an explicit height prevents rows from extending
+        # past the browser viewport, including long filtered result sets.
+        self.rows_view = ft.ListView(spacing=0, scroll=ft.ScrollMode.ALWAYS,
+                                    build_controls_on_demand=False)
         self.current_group: str | None = "A"
         self.available_groups: list[str] = []
         self.group_label = ft.Text("A pairs", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
@@ -69,47 +78,114 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         self._word_fields: list[ft.TextField] = []
         self._editing_alias_pair: str | None = None
 
-        self.filters_area = ft.Column(
-            [
-                ft.Row([self.search_field], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                ft.Row([self.search_pairs, self.search_words], wrap=True),
-                ft.Row([self.scheme_filter, self.status_filter, self.grade_sort], wrap=True),
-                ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
-                ft.Row([self.filter_average_text, self.overall_average_text], wrap=True, spacing=18),
-                self.duplicate_warning,
-                ft.Text(
-                    "Tip: double-click a pair label to edit how it is displayed (for example AB → ØB).",
-                    size=11, color=ft.Colors.ON_SURFACE_VARIANT,
-                ),
-            ],
-            spacing=5,
-        )
-        self.table_header = ft.Row(
-            [self._compact_header(), ft.VerticalDivider(width=8), self._compact_header()],
-            spacing=0,
-        )
-        self.group_controls = ft.Row(
-            [self.prev_group, self.group_label, self.next_group],
-            alignment=ft.MainAxisAlignment.CENTER,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-        self.controls = [page_heading("Letter Pairs", "Make each pair memorable. Build, rate, and refine your dictionary.", "02 / Association"), self.tabbar, self.content_area]
+        self.search_modes = ft.Row([
+            ft.Text("Search in", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            self.search_pairs, self.search_words,
+        ], spacing=4, width=270, height=32)
+        self.progress_line = ft.Row([self.progress_text, self.progress_bar], spacing=12, height=22)
+        self.summary_line = ft.Row([
+            self.filter_average_text, self.overall_average_text,
+            ft.Icon(ft.Icons.INFO_OUTLINE, size=16, color=ft.Colors.ON_SURFACE_VARIANT,
+                    tooltip="Double-click a pair label to edit its display alias (for example AB → ØB)."),
+        ], spacing=12, height=22)
+        self.filters_area = ft.Column(spacing=6)
+        self.filters_panel = panel(self.filters_area, padding=10)
+        self.table_header = ft.Row(spacing=16, height=28)
+        self.group_controls = ft.Row([
+            ft.Row([self.prev_group, self.group_label, self.next_group], spacing=4, tight=True),
+            self.count_text,
+        ], height=32, alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+           vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        self.heading_description = ft.Text("Build, rate, and refine your mnemonic dictionary.",
+                                           size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.heading = ft.Container(ft.Row([
+            ft.Text("Letter Pairs", size=24, weight=ft.FontWeight.W_600,
+                    color=ft.Colors.ON_SURFACE, expand=True),
+            self.heading_description,
+        ], spacing=16), height=42)
+        self.controls = [self.heading, self.tabbar, self.content_area]
+        self._layout_viewport()
         self.refresh(update=False)
 
+    def set_viewport(self, width, height):
+        old_mode = (self._table_columns, self._compact_cells)
+        self._viewport = (max(280.0, float(width)), max(320.0, float(height)))
+        self._table_columns = 2 if self._viewport[0] >= 1100 else 1
+        self._compact_cells = self._viewport[0] < 600
+        if self.selected_view == "stats" or old_mode != (self._table_columns, self._compact_cells):
+            self.refresh(update=False)
+        else:
+            self._layout_viewport()
+
+    def _layout_viewport(self):
+        width, height = self._viewport
+        self.width = width
+        self.heading.width = width
+        self.heading_description.visible = width >= 800
+        self.tabbar.width = width
+        self.content_area.width = width
+        self.content_area.height = height - 98
+        self.filters_panel.width = width
+        inner = width - 20
+        self.search_field.expand = True
+        self.search_modes.expand = False
+        self.progress_line.expand = True
+        for control in (self.scheme_filter, self.status_filter, self.grade_sort):
+            control.expand = False
+        if width >= 800:
+            self.scheme_filter.width, self.status_filter.width, self.grade_sort.width = 210, 154, 164
+            self.filters_area.controls = [
+                ft.Row([self.search_field, self.scheme_filter, self.status_filter, self.grade_sort],
+                       spacing=10, height=42),
+                ft.Row([self.search_modes, self.progress_line], spacing=16, height=32),
+                self.summary_line,
+            ]
+            filter_height = 128
+        else:
+            self.progress_line.expand = False
+            for control in (self.scheme_filter, self.status_filter, self.grade_sort):
+                control.width = (inner - 16) / 3
+            self.filters_area.controls = [
+                ft.Row([self.search_field], height=42),
+                ft.Row([self.scheme_filter, self.status_filter, self.grade_sort], spacing=8, height=42),
+                self.search_modes, self.progress_line, self.summary_line,
+            ]
+            filter_height = 204
+        self.duplicate_warning.visible = bool(self.duplicate_warning.value)
+        if self.duplicate_warning.visible:
+            self.filters_area.controls.append(self.duplicate_warning)
+            filter_height += 22
+        self.duplicate_warning.tooltip = self.duplicate_warning.value or None
+        self.progress_text.tooltip = self.progress_text.value or None
+        self.filter_average_text.tooltip = self.filter_average_text.value or None
+        self.overall_average_text.tooltip = self.overall_average_text.value or None
+        self.filters_panel.height = filter_height
+        self.filters_area.width = inner
+        self.summary_line.width = inner
+        self.group_controls.width = width
+        self.table_header.width = width
+        self.rows_view.width = width
+        self.rows_view.height = max(24, self.content_area.height - filter_height - 32 - 28 - 24)
+        self.stats_scroll.width = width
+        self.stats_scroll.height = self.content_area.height
+        if self.selected_view == "stats":
+            self.content_area.controls = [self.stats_scroll]
+        else:
+            self.content_area.controls = [self.filters_panel, self.group_controls, self.table_header, self.rows_view]
+
     def _compact_header(self):
+        if self._compact_cells:
+            return ft.Text("Pair / mnemonic", size=12, weight=ft.FontWeight.W_600,
+                           color=ft.Colors.ON_SURFACE)
         return ft.Container(
-            content=ft.Row(
-                [
-                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=48),
-                    ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), expand=True),
-                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=118),
-                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=62),
-                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=82),
-                ],
-                spacing=4,
-            ),
-            padding=ft.Padding.symmetric(horizontal=4),
-            expand=True,
+            ft.Row([
+                ft.Container(ft.Text("Pair", size=11, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE), width=48),
+                ft.Container(ft.Text("Word", size=11, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE), expand=True),
+                ft.Container(ft.Text("Rating", size=11, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE), width=122),
+                ft.Container(ft.Text("Status", size=11, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE), width=72),
+                ft.Container(ft.Text("Active in", size=11, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE), width=110),
+            ], spacing=6), expand=True,
+            padding=ft.Padding.symmetric(horizontal=6),
         )
 
     def _on_tab_change(self, e):
@@ -119,13 +195,10 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
     def refresh(self, update: bool = True):
         self._sync_filters()
         if self.selected_view == "stats":
-            self.content_area.controls = [self._build_stats_view()]
+            self.stats_scroll.controls = [self._build_stats_view()]
         else:
             self._refresh_dictionary()
-            self.content_area.controls = [
-                panel(self.filters_area, padding=12), self.group_controls, self.table_header,
-                ft.Divider(height=1), self.rows_view,
-            ]
+        self._layout_viewport()
         if update and self.page is not None:
             self.update()
 
@@ -133,7 +206,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         selected_scheme = self.scheme_filter.value or "__all__"
         if selected_scheme != "__all__" and selected_scheme not in self.state.data.schemes:
             self.scheme_filter.value = "__all__"
-        self.scheme_filter.options = [ft.DropdownOption("__all__", "All letter schemes")] + [
+        self.scheme_filter.options = [ft.DropdownOption("__all__", "All schemes")] + [
             ft.DropdownOption(name, name) for name in self.state.scheme_names
         ]
 
@@ -243,8 +316,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         remaining = active_total - completed
         percent = int(round((completed / active_total) * 100)) if active_total else 0
         self.progress_text.value = (
-            f"Letter-pair dictionary: {completed} / {active_total} complete — "
-            f"{remaining} remaining ({percent}%)"
+            f"{completed}/{active_total} complete · {percent}% · {remaining} left"
         )
         self.progress_bar.value = completed / active_total if active_total else 0
         self._update_duplicate_warning()
@@ -298,19 +370,22 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         )
 
         cells = [self._build_compact_row(*row) for row in page_rows]
-        split_at = (len(cells) + 1) // 2
-        left, right = cells[:split_at], cells[split_at:]
-        visual_rows = []
-        for i in range(split_at):
-            right_cell = right[i] if i < len(right) else ft.Container(expand=True)
-            visual_rows.append(
-                ft.Row(
-                    [left[i], ft.VerticalDivider(width=8), right_cell],
-                    spacing=0,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                )
-            )
-        self.rows_view.controls = visual_rows
+        self.table_header.controls = [self._compact_header() for _ in range(self._table_columns)]
+        if self._table_columns == 2:
+            split_at = (len(cells) + 1) // 2
+            left, right = cells[:split_at], cells[split_at:]
+            visual_rows = [
+                ft.Row([left[i], right[i] if i < len(right) else ft.Container(expand=True)],
+                       spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+                for i in range(split_at)
+            ]
+        else:
+            for cell in cells:
+                cell.expand = False
+            visual_rows = cells
+        self.rows_view.controls = visual_rows or [
+            ft.Container(ft.Text("No matching letter pairs.", color=ft.Colors.ON_SURFACE_VARIANT), padding=16)
+        ]
 
     def _average_for_rows(self, items):
         values = []
@@ -394,7 +469,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             controls.append(
                 ft.IconButton(
                     ft.Icons.RESTART_ALT,
-                    icon_size=16,
+                    icon_size=16, width=28, height=28,
                     tooltip="Ungraded",
                     disabled=False,
                     on_click=lambda e, p=pair: self._rating_changed(p, None),
@@ -407,8 +482,8 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             if rating is not None:
                 value = "bad" if rating < 2 else ("mid" if rating < 4 else "good")
             return ft.Dropdown(
-                width=104,
-                dense=True,
+                width=104, height=34,
+                dense=True, content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
                 value=value,
                 disabled=not has_word,
                 options=[
@@ -424,8 +499,8 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
 
         value = "__none__" if rating is None else str(int(round(float(rating))))
         return ft.Dropdown(
-            width=84,
-            dense=True,
+            width=84, height=34,
+            dense=True, content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
             value=value,
             disabled=not has_word,
             options=[ft.DropdownOption("__none__", "—")]
@@ -441,7 +516,9 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         field = ft.TextField(
             value=word,
             dense=True,
-            height=30,
+            height=34,
+            text_size=13,
+            content_padding=ft.Padding.symmetric(horizontal=0, vertical=4),
             border=ft.InputBorder.UNDERLINE,
             expand=True,
             on_change=lambda e, p=pair: self._word_changed(p, e.control.value),
@@ -487,28 +564,29 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             padding=ft.Padding.symmetric(horizontal=6, vertical=2),
             border_radius=12,
         )
+        sources_text = ft.Text(
+            ", ".join(sources), size=10, max_lines=2,
+            overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE_VARIANT,
+            tooltip=", ".join(sources) or "Not active in a scheme",
+        )
+        rating = self._rating_control(pair, word)
+        if self._compact_cells:
+            body = ft.Column([
+                ft.Row([pair_label, ft.Container(field, expand=True)], spacing=8),
+                ft.Row([ft.Container(rating, width=122), status_chip,
+                        ft.Container(sources_text, expand=True)], spacing=8),
+            ], spacing=4)
+        else:
+            body = ft.Row([
+                pair_label, ft.Container(field, expand=True),
+                ft.Container(rating, width=122),
+                ft.Container(status_chip, width=72),
+                ft.Container(sources_text, width=110),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6)
         return ft.Container(
-            expand=True,
-            content=ft.Row(
-                [
-                    pair_label,
-                    ft.Container(field, expand=True),
-                    ft.Container(self._rating_control(pair, word), width=128),
-                    ft.Container(status_chip, width=72),
-                    ft.Container(
-                        ft.Text(
-                            ", ".join(sources),
-                            size=11,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                            no_wrap=False,
-                        ),
-                        width=90,
-                    ),
-                ],
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=6,
-            ),
-            padding=ft.Padding.symmetric(horizontal=6, vertical=0),
+            expand=True, content=body,
+            padding=ft.Padding.symmetric(horizontal=6, vertical=5),
+            border=ft.Border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
             bgcolor=None if is_active else ft.Colors.SURFACE_CONTAINER_LOW,
             opacity=1.0 if is_active else 0.75,
         )
@@ -694,14 +772,19 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             border_radius=8,
         )
 
-        return ft.Column(
-            [
-                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text(f"Statistics for {scheme.name}.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Row([rating_section, length_section], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START),
-            ],
-            spacing=8,
-        )
+        width = self._viewport[0]
+        if width >= 900:
+            sections = ft.Row([rating_section, length_section], spacing=12,
+                              vertical_alignment=ft.CrossAxisAlignment.START)
+        else:
+            for section in (rating_section, length_section):
+                section.expand = False
+                section.width = width
+            sections = ft.Column([rating_section, length_section], spacing=12)
+        return ft.Column([
+            ft.Text(f"Statistics for {scheme.name}.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            sections,
+        ], spacing=12, width=width)
 
     def _edit_pair_alias(self, pair: str):
         self._editing_alias_pair = pair
@@ -752,11 +835,11 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         self.state.set_word(pair, value)
         self._update_duplicate_warning()
         self._refresh_average_labels_only()
-        self.progress_text.update()
-        self.progress_bar.update()
-        self.duplicate_warning.update()
-        self.filter_average_text.update()
-        self.overall_average_text.update()
+        # Only sizing/labels change during typing; keep the current fields
+        # mounted and preserve their focus while counters or warnings update.
+        self._layout_viewport()
+        if self.page is not None:
+            self.update()
 
     def _refresh_average_labels_only(self):
         rows, active_pairs = self._base_rows()
@@ -777,8 +860,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         remaining = active_total - completed
         percent = int(round((completed / active_total) * 100)) if active_total else 0
         self.progress_text.value = (
-            f"Letter-pair dictionary: {completed} / {active_total} complete — "
-            f"{remaining} remaining ({percent}%)"
+            f"{completed}/{active_total} complete · {percent}% · {remaining} left"
         )
         self.progress_bar.value = completed / active_total if active_total else 0
 

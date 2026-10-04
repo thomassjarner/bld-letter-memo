@@ -24,7 +24,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_IN
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.22.0"
+    page.title = "BLD Letter Memo · 2.22.1"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -99,7 +99,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE · v2.22.0", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.22.1", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)
@@ -180,6 +180,8 @@ async def main(page: ft.Page):
         horizontal_padding = 24 if width < 700 else 40
         bottom_padding = 64 if style == "popout" else 16
         timer_page.set_viewport(width - content_area.left - horizontal_padding,
+                                (page.height or 800) - content_area.top - 16 - bottom_padding)
+        pairs_page.set_viewport(width - content_area.left - horizontal_padding,
                                 (page.height or 800) - content_area.top - 16 - bottom_padding)
         for view in pages:
             apply_palette(view, state.data.dark_mode)
