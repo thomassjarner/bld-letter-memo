@@ -26,7 +26,10 @@ def test_compact_filters_leave_a_bounded_scrolling_pair_list():
     assert pairs.scheme_filter in pairs.filters_area.controls[0].controls
     assert pairs.status_filter in pairs.filters_area.controls[0].controls
     assert pairs.grade_sort in pairs.filters_area.controls[0].controls
-    assert pairs.search_pairs.width == 96 and pairs.search_words.width == 104
+    for checkbox in (pairs.search_pairs, pairs.search_words):
+        # Explicit rectangular dimensions scale both the checkbox and its label.
+        assert checkbox.width is None and checkbox.height is None
+        assert checkbox.visual_density == ft.VisualDensity.COMPACT
     assert len(pairs._word_fields) == 25
     assert pairs._word_fields[-1].value == 'word AZ'
 

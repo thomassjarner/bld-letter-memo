@@ -41,10 +41,14 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             border_radius=7,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.search_pairs = ft.Checkbox(
-            label="Pairs", width=96, height=32, tooltip="Search letter pairs", value=True, on_change=self._on_search_mode_change
+            label="Pairs", label_style=ft.TextStyle(size=12),
+            visual_density=ft.VisualDensity.COMPACT,
+            tooltip="Search letter pairs", value=True, on_change=self._on_search_mode_change
         )
         self.search_words = ft.Checkbox(
-            label="Words", width=104, height=32, tooltip="Search within mnemonic words", value=False, on_change=self._on_search_mode_change
+            label="Words", label_style=ft.TextStyle(size=12),
+            visual_density=ft.VisualDensity.COMPACT,
+            tooltip="Search within mnemonic words", value=False, on_change=self._on_search_mode_change
         )
         self.scheme_filter = ft.Dropdown(
             width=210, height=42, dense=True,
@@ -81,7 +85,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         self.search_modes = ft.Row([
             ft.Text("Search in", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
             self.search_pairs, self.search_words,
-        ], spacing=4, width=270, height=32)
+        ], spacing=4, width=240, height=32)
         self.progress_line = ft.Row([self.progress_text, self.progress_bar], spacing=12, height=22)
         self.summary_line = ft.Row([
             self.filter_average_text, self.overall_average_text,
@@ -361,12 +365,12 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         ]
         overall_avg, overall_n = self._average_for_rows(overall_rows)
         self.filter_average_text.value = (
-            f"Filter average: {filter_avg:.2f} ({filter_n} rated)"
-            if filter_avg is not None else "Filter average: —"
+            f"Filtered rating average: {filter_avg:.2f} ({filter_n} rated)"
+            if filter_avg is not None else "Filtered rating average: —"
         )
         self.overall_average_text.value = (
-            f"Overall average: {overall_avg:.2f} ({overall_n} rated)"
-            if overall_avg is not None else "Overall average: —"
+            f"Overall rating average: {overall_avg:.2f} ({overall_n} rated)"
+            if overall_avg is not None else "Overall rating average: —"
         )
 
         cells = [self._build_compact_row(*row) for row in page_rows]
@@ -432,7 +436,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         # handler-less disabled detector causes the red runtime error seen on web.
         if not has_word:
             return ft.Container(
-                ft.Text("—", color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("—", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 width=118,
                 alignment=ft.Alignment.CENTER_LEFT,
             )
@@ -482,7 +486,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             if rating is not None:
                 value = "bad" if rating < 2 else ("mid" if rating < 4 else "good")
             return ft.Dropdown(
-                width=104, height=34,
+                width=104, height=32, text_size=12,
                 dense=True, content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
                 value=value,
                 disabled=not has_word,
@@ -499,7 +503,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
 
         value = "__none__" if rating is None else str(int(round(float(rating))))
         return ft.Dropdown(
-            width=84, height=34,
+            width=84, height=32, text_size=12,
             dense=True, content_padding=ft.Padding.symmetric(horizontal=8, vertical=0),
             value=value,
             disabled=not has_word,
@@ -516,9 +520,9 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         field = ft.TextField(
             value=word,
             dense=True,
-            height=34,
-            text_size=13,
-            content_padding=ft.Padding.symmetric(horizontal=0, vertical=4),
+            height=32,
+            text_size=12,
+            content_padding=ft.Padding.symmetric(horizontal=0, vertical=3),
             border=ft.InputBorder.UNDERLINE,
             expand=True,
             on_change=lambda e, p=pair: self._word_changed(p, e.control.value),
@@ -548,6 +552,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
                 content=ft.Container(
                     ft.Text(
                         display_pair,
+                        size=12,
                         weight=ft.FontWeight.BOLD,
                         tooltip=f"Underlying pair: {pair}",
                     color=ft.Colors.ON_SURFACE),
@@ -561,7 +566,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
                 "Active" if is_active else "Inactive", size=10, color=ft.Colors.ON_PRIMARY_CONTAINER if is_active else ft.Colors.ON_SURFACE_VARIANT
             ),
             bgcolor=ft.Colors.PRIMARY_CONTAINER if is_active else ft.Colors.SURFACE_CONTAINER_HIGHEST,
-            padding=ft.Padding.symmetric(horizontal=6, vertical=2),
+            padding=ft.Padding.symmetric(horizontal=6, vertical=1),
             border_radius=12,
         )
         sources_text = ft.Text(
@@ -575,7 +580,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
                 ft.Row([pair_label, ft.Container(field, expand=True)], spacing=8),
                 ft.Row([ft.Container(rating, width=122), status_chip,
                         ft.Container(sources_text, expand=True)], spacing=8),
-            ], spacing=4)
+            ], spacing=3)
         else:
             body = ft.Row([
                 pair_label, ft.Container(field, expand=True),
@@ -585,7 +590,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6)
         return ft.Container(
             expand=True, content=body,
-            padding=ft.Padding.symmetric(horizontal=6, vertical=5),
+            padding=ft.Padding.symmetric(horizontal=6, vertical=3),
             border=ft.Border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
             bgcolor=None if is_active else ft.Colors.SURFACE_CONTAINER_LOW,
             opacity=1.0 if is_active else 0.75,
@@ -872,10 +877,10 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         ]
         oavg, on = self._average_for_rows(overall_rows)
         self.filter_average_text.value = (
-            f"Filter average: {avg:.2f} ({n} rated)" if avg is not None else "Filter average: —"
+            f"Filtered rating average: {avg:.2f} ({n} rated)" if avg is not None else "Filtered rating average: —"
         )
         self.overall_average_text.value = (
-            f"Overall average: {oavg:.2f} ({on} rated)" if oavg is not None else "Overall average: —"
+            f"Overall rating average: {oavg:.2f} ({on} rated)" if oavg is not None else "Overall rating average: —"
         )
 
     def _update_duplicate_warning(self):

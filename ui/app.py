@@ -24,7 +24,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_IN
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.22.1"
+    page.title = "BLD Letter Memo · 2.22.2"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -99,7 +99,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE · v2.22.1", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.22.2", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)

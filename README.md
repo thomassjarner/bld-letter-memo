@@ -1,3 +1,19 @@
+# BLD Letter Memo Web 2.22.2
+
+Letter Pairs presentation refinement:
+- Summary labels now say "Filtered rating average" and "Overall rating average".
+- Search checkboxes use compact native sizing and smaller labels, without forced
+  rectangular dimensions that distort the boxes and text.
+- Pair rows have less vertical padding, slightly smaller type and 32px editors.
+- Existing two-column layout, scrolling, aliases, word editing and ratings remain.
+- The Timer page and all core, data and persistence code are unchanged.
+
+39 automated tests pass. Browser rendering remains unverified here.
+Apply by copying the release contents into your existing project, then committing
+and pushing as usual. The patching process is unchanged; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.22.1
 
 Letter Pairs layout and scrolling fix:
