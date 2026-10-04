@@ -2,7 +2,20 @@
 import flet as ft
 
 
+TEXT_ROLES = (
+    "body_large", "body_medium", "body_small",
+    "display_large", "display_medium", "display_small",
+    "headline_large", "headline_medium", "headline_small",
+    "label_large", "label_medium", "label_small",
+    "title_large", "title_medium", "title_small",
+)
+
+
 def build_theme(dark=False):
+    overrides = {
+        "body_medium": {"size": 13}, "body_small": {"size": 12},
+        "title_medium": {"size": 16, "weight": ft.FontWeight.W_600},
+    }
     colors = dict(
         primary="#6DD8C3" if dark else "#006B5B",
         on_primary="#00382F" if dark else "#FFFFFF",
@@ -22,6 +35,7 @@ def build_theme(dark=False):
         outline="#72867A" if dark else "#7C8F82",
         outline_variant="#35473D" if dark else "#D7E1D5",
         error="#FFB4AB" if dark else "#BA1A1A",
+        tertiary="#FFD08A" if dark else "#825000",
     )
     button = ft.ButtonStyle(
         shape=ft.RoundedRectangleBorder(radius=7),
@@ -31,10 +45,12 @@ def build_theme(dark=False):
     return ft.Theme(
         color_scheme_seed=colors["primary"], color_scheme=ft.ColorScheme(**colors),
         visual_density=ft.VisualDensity.COMPACT,
-        text_theme=ft.TextTheme(
-            body_medium=ft.TextStyle(size=13), body_small=ft.TextStyle(size=12),
-            title_medium=ft.TextStyle(size=16, weight=ft.FontWeight.W_600),
-        ),
+        # Explicit foregrounds prevent Flet defaults from leaving dark text on
+        # dark surfaces. Cover every Material role, including form/dialog labels.
+        text_theme=ft.TextTheme(**{
+            role: ft.TextStyle(color=colors["on_surface"], **overrides.get(role, {}))
+            for role in TEXT_ROLES
+        }),
         button_theme=ft.ButtonTheme(style=button),
         outlined_button_theme=ft.OutlinedButtonTheme(style=button),
         text_button_theme=ft.TextButtonTheme(style=button),
@@ -52,7 +68,7 @@ def page_heading(title, description, label=None):
     return ft.Container(
         ft.Column([
             *([eyebrow(label)] if label else []),
-            ft.Text(title, size=25, weight=ft.FontWeight.W_600),
+            ft.Text(title, size=25, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
             ft.Text(description, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
         ], spacing=4),
         padding=ft.Padding.only(bottom=14),
@@ -76,7 +92,7 @@ def activity_card(title, description, icon, action, on_click=None, number=None, 
             ft.Text(number or ("READY" if enabled else "PLANNED"), size=10,
                     color=ft.Colors.ON_SURFACE_VARIANT, weight=ft.FontWeight.W_600),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        ft.Text(title, size=19, weight=ft.FontWeight.W_600),
+        ft.Text(title, size=19, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
         ft.Text(description, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
         ft.TextButton(action, icon=ft.Icons.ARROW_FORWARD,
                       disabled=not enabled, on_click=on_click),

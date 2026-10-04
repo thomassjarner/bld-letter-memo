@@ -34,8 +34,8 @@ class LetterSchemesPage(ft.Column):
         # Edges first is only a UI/data-entry preference. It does not affect
         # memo/execution order.
         self.selected_category = "edges"
-        self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=144, dense=True, on_submit=self._create_scheme)
-        self.rename_field = ft.TextField(hint_text="Rename active scheme", width=170, dense=True, on_submit=self._rename_scheme)
+        self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=144, dense=True, on_submit=self._create_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
+        self.rename_field = ft.TextField(hint_text="Rename active scheme", width=170, dense=True, on_submit=self._rename_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.scheme_list_view = ft.ListView(expand=True, spacing=2, scroll=ft.ScrollMode.AUTO)
         # Keep one scrollable body control mounted for the lifetime of the
         # page. Replacing the whole Column on every setting change reset its
@@ -103,7 +103,7 @@ class LetterSchemesPage(ft.Column):
                 ft.Container(
                     content=ft.Row(
                         [
-                            ft.Text(name, weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL, expand=True),
+                            ft.Text(name, weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL, expand=True, color=ft.Colors.ON_SURFACE),
                             ft.IconButton(ft.Icons.CONTENT_COPY, icon_size=16, tooltip="Duplicate",
                                           on_click=lambda e, n=name: self._duplicate_scheme(n)),
                             ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=16, tooltip="Delete",
@@ -121,7 +121,7 @@ class LetterSchemesPage(ft.Column):
     def _refresh_body(self):
         scheme = self.state.active_scheme
         if scheme is None:
-            self.body_scroll.controls = [ft.Text("Create a scheme to get started.", italic=True)]
+            self.body_scroll.controls = [ft.Text("Create a scheme to get started.", italic=True, color=ft.Colors.ON_SURFACE)]
             return
 
         tab_index = {"edges": 0, "corners": 1, "preferences": 2}[self.selected_category]
@@ -141,7 +141,7 @@ class LetterSchemesPage(ft.Column):
         common = [
             ft.Row(
                 [
-                    ft.Text(scheme.name, size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text(scheme.name, size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                     self.rename_field,
                     ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme),
                 ], wrap=True
@@ -191,16 +191,16 @@ class LetterSchemesPage(ft.Column):
             value=scheme.memo_up,
             options=[ft.DropdownOption(c, COLOR_LABELS[c]) for c in COLOR_LABELS],
             on_select=self._orientation_up_changed,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         front = ft.Dropdown(
             label="Front color",
             width=150,
             value=scheme.memo_front if scheme.memo_front in front_options else front_options[0],
             options=[ft.DropdownOption(c, COLOR_LABELS[c]) for c in front_options],
             on_select=self._orientation_front_changed,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         return ft.Row([
-            ft.Text("Memo orientation", weight=ft.FontWeight.BOLD),
+            ft.Text("Memo orientation", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
             up,
             front,
         ], wrap=True)
@@ -234,13 +234,13 @@ class LetterSchemesPage(ft.Column):
                 capitalization=ft.TextCapitalization.CHARACTERS,
                 on_submit=lambda e: self._save_order("memo", e.control),
                 on_blur=lambda e: self._save_order("memo", e.control),
-            )
+            color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             exec_field = ft.TextField(
                 label="Exec", hint_text="EC", value=scheme.execution_order, width=90, max_length=2,
                 capitalization=ft.TextCapitalization.CHARACTERS,
                 on_submit=lambda e: self._save_order("execution", e.control),
                 on_blur=lambda e: self._save_order("execution", e.control),
-            )
+            color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             content = ft.Column(
                 [
                     self._build_orientation_settings(scheme),
@@ -254,8 +254,8 @@ class LetterSchemesPage(ft.Column):
                         size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.Row([
-                        ft.Text("Order", weight=ft.FontWeight.BOLD),
-                        memo_field, ft.Text("/"), exec_field,
+                        ft.Text("Order", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                        memo_field, ft.Text("/", color=ft.Colors.ON_SURFACE), exec_field,
                         ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                     ], wrap=True),
                     self._build_three_style_settings(scheme),
@@ -281,7 +281,7 @@ class LetterSchemesPage(ft.Column):
 
         return ft.Column(
             [
-                ft.Text("Preferences", size=18, weight=ft.FontWeight.BOLD),
+                ft.Text("Preferences", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Text(
                     "Scheme-specific settings used automatically by Scramble Memo and future practice tools.",
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
@@ -315,7 +315,7 @@ class LetterSchemesPage(ft.Column):
                     value=preferred,
                     options=[ft.DropdownOption(p, p) for p in pieces],
                     on_select=lambda e: self._edge_parity_partner_changed(e.control.value),
-                ),
+                color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT)),
                 ft.Text(
                     "Default: UR. When the corner trace is odd, the edge buffer and parity partner are memo-swapped before the edge trace.",
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
@@ -336,7 +336,7 @@ class LetterSchemesPage(ft.Column):
                 ft.DropdownOption("trace", f"Trace / shoot {noun}"),
             ],
             on_select=lambda e, c=category: self._orientation_mode_changed(c, e.control.value),
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         mode_label = "Standard" if cat.tracing_mode == "standard" else "Custom"
         rows = self._build_cycle_break_rows(scheme, category)
         split = (len(rows) + 1) // 2
@@ -351,7 +351,7 @@ class LetterSchemesPage(ft.Column):
         return ft.Column(
             [
                 ft.Row([
-                    ft.Text(f"{title} tracing — {mode_label}", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"{title} tracing — {mode_label}", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                     mode,
                     ft.OutlinedButton(
                         "Reset to Standard", icon=ft.Icons.RESTART_ALT,
@@ -397,14 +397,14 @@ class LetterSchemesPage(ft.Column):
                 options.append(ft.DropdownOption(sticker, label))
             rows.append(
                 ft.Row([
-                    ft.Container(ft.Text(f"{i + 1}. {piece}", weight=ft.FontWeight.BOLD), width=85),
+                    ft.Container(ft.Text(f"{i + 1}. {piece}", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE), width=85),
                     ft.Dropdown(
                         label="Preferred sticker",
                         width=170,
                         value=preferred,
                         options=options,
                         on_select=lambda e, c=category, p=piece: self._cycle_sticker_changed(c, p, e.control.value),
-                    ),
+                    color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT)),
                     ft.IconButton(
                         ft.Icons.ARROW_UPWARD,
                         tooltip="Higher priority",

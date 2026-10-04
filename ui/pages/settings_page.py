@@ -24,7 +24,7 @@ class SettingsPage(ft.Column):
         self.expand = True
         self.spacing = 12
         self.scroll = ft.ScrollMode.AUTO
-        self.status_text = ft.Text("")
+        self.status_text = ft.Text("", color=ft.Colors.ON_SURFACE)
         self._pending_import: tuple[str, bytes] | None = None
         self._current_dialog: ft.AlertDialog | None = None
 
@@ -44,7 +44,7 @@ class SettingsPage(ft.Column):
                 ft.DropdownOption("popout", "Pop-out menu"),
             ],
             on_select=self._navigation_style_changed,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
         self.rating_mode_dropdown = ft.Dropdown(
             label="Rating system",
@@ -56,12 +56,12 @@ class SettingsPage(ft.Column):
                 ft.DropdownOption("qualitative", "Bad / Mid / Good"),
             ],
             on_select=self._rating_mode_changed,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.rating_levels_dropdown = ft.Dropdown(
             label="Color levels", width=125, value=str(self.state.data.rating_color_levels),
             options=[ft.DropdownOption(str(x), str(x)) for x in (3, 4, 5)],
             on_select=self._rating_levels_changed,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.rating_palette_area = ft.Column(spacing=6)
         self._rebuild_rating_palette()
 
@@ -82,8 +82,8 @@ class SettingsPage(ft.Column):
             ], spacing=12)),
             panel(ft.Column([
                 eyebrow("Backup & data"),
-                ft.Text("Saved in this browser", size=18, weight=ft.FontWeight.W_600),
-                ft.Text("Schemes, pair words, ratings, aliases, timer sessions, and preferences save automatically and survive updates on the same site."),
+                ft.Text("Saved in this browser", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text("Schemes, pair words, ratings, aliases, timer sessions, and preferences save automatically and survive updates on the same site.", color=ft.Colors.ON_SURFACE),
                 ft.Row([
                     ft.FilledButton("Export backup", icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
                     ft.OutlinedButton("Import backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
@@ -128,12 +128,12 @@ class SettingsPage(ft.Column):
                 label=f"Level {i+1} color", value=color, width=150, dense=True,
                 on_blur=lambda e, idx=i: self._save_rating_color(idx, e.control),
                 on_submit=lambda e, idx=i: self._save_rating_color(idx, e.control),
-            )
+            color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             grade_field = ft.TextField(
                 label="Grade", value=(f"{grade:.2f}".rstrip("0").rstrip(".")), width=90, dense=True,
                 on_blur=lambda e, idx=i: self._save_rating_grade(idx, e.control),
                 on_submit=lambda e, idx=i: self._save_rating_grade(idx, e.control),
-            )
+            color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             rows.append(ft.Row([
                 ft.Container(width=22, height=22, bgcolor=color, border_radius=11),
                 color_field, grade_field,
@@ -202,10 +202,10 @@ class SettingsPage(ft.Column):
         self._pending_import = (selected.name, selected.bytes)
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Import backup?"),
+            title=ft.Text("Import backup?", color=ft.Colors.ON_SURFACE),
             content=ft.Text(
                 "This will replace your current schemes, letter-pair data, timer sessions, and settings with the selected backup."
-            ),
+            , color=ft.Colors.ON_SURFACE),
             actions=[
                 ft.TextButton("Cancel", on_click=self._close_dialog),
                 ft.ElevatedButton("Import", on_click=self._confirm_import),

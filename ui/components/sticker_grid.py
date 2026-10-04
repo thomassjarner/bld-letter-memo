@@ -52,7 +52,7 @@ def build_sticker_grid(
                                 "BUFFER ★" if sticker == category_scheme.buffer_sticker else "BUFFER PIECE",
                                 size=12,
                                 weight=ft.FontWeight.BOLD,
-                            ),
+                            color=ft.Colors.ON_SURFACE),
                         ],
                         spacing=2,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -76,7 +76,7 @@ def build_sticker_grid(
                     text_size=18,
                     on_change=lambda e, s=sticker: on_letter_change(s, e.control.value),
                     on_focus=(lambda e, s=sticker: on_field_focus(s)) if on_field_focus else None,
-                )
+                color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
                 if field_registry is not None:
                     field_registry[sticker] = field
                 cell = field
@@ -86,7 +86,7 @@ def build_sticker_grid(
             ft.Container(
                 content=ft.Column(
                     [
-                        ft.Text(f"{face} — {FACE_NAMES[face]}", weight=ft.FontWeight.BOLD, size=13),
+                        ft.Text(f"{face} — {FACE_NAMES[face]}", weight=ft.FontWeight.BOLD, size=13, color=ft.Colors.ON_SURFACE),
                         ft.Row(cells, spacing=8, wrap=True),
                     ],
                     spacing=6,
@@ -102,7 +102,7 @@ def build_sticker_grid(
     if duplicates:
         details = "; ".join(f"{letter}: {', '.join(stickers)}" for letter, stickers in duplicates.items())
         warning = ft.Container(
-            content=ft.Text(f"⚠ Duplicate letters assigned: {details}", color=ft.Colors.RED, size=12),
+            content=ft.Text(f"⚠ Duplicate letters assigned: {details}", color=ft.Colors.ERROR, size=12),
             padding=ft.Padding.only(bottom=8),
         )
 

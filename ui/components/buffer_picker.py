@@ -12,4 +12,4 @@ def build_buffer_picker(category: str, current_buffer_sticker: str | None, on_ch
         value=current_buffer_sticker,
         options=[ft.DropdownOption(s) for s in stickers],
         on_select=lambda e: on_change(e.control.value),
-    )
+    color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))

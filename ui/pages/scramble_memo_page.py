@@ -34,7 +34,7 @@ class ScrambleMemoPage(ft.Column):
             min_lines=2,
             max_lines=4,
             hint_text="Paste a 3x3 scramble here",
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.error = ft.Text("", color=ft.Colors.ERROR)
         self.details = ft.Text("", size=12, color=ft.Colors.ON_SURFACE_VARIANT, selectable=True)
         self.result_area = ft.Column(spacing=10)
@@ -73,7 +73,7 @@ class ScrambleMemoPage(ft.Column):
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.result_area,
             ], spacing=12)),
-            ft.ExpansionTile(title=ft.Text("Diagnostic trace", size=13), controls=[self.details]),
+            ft.ExpansionTile(title=ft.Text("Diagnostic trace", size=13, color=ft.Colors.ON_SURFACE), controls=[self.details]),
         ]
         self._render_result()
 
@@ -225,7 +225,7 @@ class ScrambleMemoPage(ft.Column):
             suffix = " · priority" if recommended else ""
             option_controls.append(
                 ft.ListTile(
-                    title=ft.Text(f"{sticker}  ({piece}){suffix}"),
+                    title=ft.Text(f"{sticker}  ({piece}){suffix}", color=ft.Colors.ON_SURFACE),
                     leading=ft.Icon(ft.Icons.CHECK_CIRCLE if selected else ft.Icons.RADIO_BUTTON_UNCHECKED),
                     on_click=lambda e, p=piece: choose(p),
                 )
@@ -239,7 +239,7 @@ class ScrambleMemoPage(ft.Column):
             )
         )
         dialog = ft.AlertDialog(
-            title=ft.Text(f"Temporary {category[:-1]} cycle break"),
+            title=ft.Text(f"Temporary {category[:-1]} cycle break", color=ft.Colors.ON_SURFACE),
             content=ft.Column(
                 [
                     ft.Text(
@@ -259,11 +259,11 @@ class ScrambleMemoPage(ft.Column):
 
     def _memo_control(self, category, letters, pairs, orientation, cycle_ids, orientation_flags, cycle_breaks):
         if not letters and not orientation:
-            return ft.Text("(solved)", size=18, selectable=True)
+            return ft.Text("(solved)", size=18, selectable=True, color=ft.Colors.ON_SURFACE)
 
         scheme = self.state.active_scheme
         if scheme is None:
-            return ft.Text("—", size=18, selectable=True)
+            return ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)
 
         breaks_by_target = {b.target_index: b for b in cycle_breaks}
         spans = []
@@ -324,7 +324,7 @@ class ScrambleMemoPage(ft.Column):
         for annotation in orientation:
             spans.append(ft.TextSpan(text=f"{annotation} "))
 
-        return ft.Text(spans=spans, size=18, selectable=True)
+        return ft.Text(spans=spans, size=18, selectable=True, color=ft.Colors.ON_SURFACE)
 
     def _render_result(self):
         if self.last_result is None:
@@ -335,8 +335,8 @@ class ScrambleMemoPage(ft.Column):
 
         if self.last_result is None:
             sections = {
-                "C": ("Corners", ft.Text("—", size=18, selectable=True)),
-                "E": ("Edges", ft.Text("—", size=18, selectable=True)),
+                "C": ("Corners", ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)),
+                "E": ("Edges", ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)),
             }
         else:
             r = self.last_result
@@ -355,7 +355,7 @@ class ScrambleMemoPage(ft.Column):
         for key in order:
             title, memo_control = sections[key]
             controls.extend([
-                ft.Text(title, weight=ft.FontWeight.BOLD),
+                ft.Text(title, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 memo_control,
             ])
         self.result_area.controls = controls

@@ -1,3 +1,20 @@
+# BLD Letter Memo Web 2.21.1
+
+Dark/light text contrast hotfix:
+- All Material text roles now have explicit foreground colors for each theme.
+- Screen text, editable values, dropdowns, labels, and hints use theme-aware colors.
+- Warning, error, timer, and pair-status colors adapt to the selected mode.
+- Existing memo cycle highlights refresh immediately when switching themes.
+- Core logic, saved data, storage keys, and import/export formats are unchanged.
+
+Validation: 22 automated tests pass, including contrast checks for both palettes.
+Browser rendering remains unverified in this environment.
+
+Copy the contents of this release folder into your existing project, replacing
+files, then commit and push as usual. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.21.0
 
 A new Home-first interface for the existing BLD training app.

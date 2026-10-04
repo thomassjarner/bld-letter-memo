@@ -32,7 +32,7 @@ class LetterPairsPage(ft.Column):
             on_change=self._on_search_change,
             dense=True,
             border_radius=7,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.search_pairs = ft.Checkbox(
             label="Search letter pairs", value=True, on_change=self._on_search_mode_change
         )
@@ -45,24 +45,24 @@ class LetterPairsPage(ft.Column):
             label="Letter scheme",
             options=[ft.DropdownOption("__all__", "All letter schemes")],
             on_select=self._on_search_change,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.status_filter = ft.Dropdown(
             width=145, dense=True, value="all", label="Status", options=[], on_select=self._on_search_change
-        )
+        , color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.grade_sort = ft.Dropdown(
             width=165, dense=True, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
-        )
-        self.progress_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
-        self.duplicate_warning = ft.Text(size=12, color=ft.Colors.ORANGE_700)
+        , color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
+        self.progress_text = ft.Text(size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
+        self.duplicate_warning = ft.Text(size=12, color=ft.Colors.TERTIARY)
         self.progress_bar = ft.ProgressBar(width=180, value=0)
         self.count_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.filter_average_text = ft.Text(size=12, weight=ft.FontWeight.BOLD)
+        self.filter_average_text = ft.Text(size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
         self.overall_average_text = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
 
         self.rows_view = ft.Column(spacing=0)
         self.current_group: str | None = "A"
         self.available_groups: list[str] = []
-        self.group_label = ft.Text("A pairs", weight=ft.FontWeight.BOLD)
+        self.group_label = ft.Text("A pairs", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
         self.prev_group = ft.IconButton(ft.Icons.CHEVRON_LEFT, tooltip="Previous letter", on_click=self._previous_group)
         self.next_group = ft.IconButton(ft.Icons.CHEVRON_RIGHT, tooltip="Next letter", on_click=self._next_group)
         self._word_fields: list[ft.TextField] = []
@@ -99,11 +99,11 @@ class LetterPairsPage(ft.Column):
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD, size=12), width=48),
-                    ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD, size=12), expand=True),
-                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD, size=12), width=118),
-                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12), width=62),
-                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD, size=12), width=82),
+                    ft.Container(ft.Text("Pair", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=48),
+                    ft.Container(ft.Text("Word", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), expand=True),
+                    ft.Container(ft.Text("Rating", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=118),
+                    ft.Container(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=62),
+                    ft.Container(ft.Text("Active in", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.ON_SURFACE), width=82),
                 ],
                 spacing=4,
             ),
@@ -419,7 +419,7 @@ class LetterPairsPage(ft.Column):
                 on_select=lambda e, p=pair: self._rating_changed(
                     p, {"bad": 1, "mid": 3, "good": 5}.get(e.control.value)
                 ),
-            )
+            color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
         value = "__none__" if rating is None else str(int(round(float(rating))))
         return ft.Dropdown(
@@ -430,7 +430,7 @@ class LetterPairsPage(ft.Column):
             options=[ft.DropdownOption("__none__", "—")]
             + [ft.DropdownOption(str(i), str(i)) for i in range(1, 6)],
             on_select=lambda e, p=pair: self._rating_changed(p, e.control.value),
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
     def _rating_changed(self, pair: str, value):
         self.state.set_pair_rating(pair, value)
@@ -446,7 +446,7 @@ class LetterPairsPage(ft.Column):
             on_change=lambda e, p=pair: self._word_changed(p, e.control.value),
             on_blur=lambda e, p=pair: self._word_committed(p, e.control.value),
             on_submit=lambda e, p=pair: self._word_submitted(p, e.control.value),
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self._word_fields.append(field)
 
         display_pair = self.state.get_pair_display(pair)
@@ -462,7 +462,7 @@ class LetterPairsPage(ft.Column):
                     tooltip=f"Underlying pair: {pair}",
                     on_blur=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
                     on_submit=lambda e, p=pair: self._save_pair_alias_inline(p, e.control.value),
-                ),
+                color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT)),
                 width=48,
             )
         else:
@@ -472,7 +472,7 @@ class LetterPairsPage(ft.Column):
                         display_pair,
                         weight=ft.FontWeight.BOLD,
                         tooltip=f"Underlying pair: {pair}",
-                    ),
+                    color=ft.Colors.ON_SURFACE),
                     width=48,
                 ),
                 on_double_tap=lambda e, p=pair: self._edit_pair_alias(p),
@@ -480,9 +480,9 @@ class LetterPairsPage(ft.Column):
 
         status_chip = ft.Container(
             content=ft.Text(
-                "Active" if is_active else "Inactive", size=10, color=ft.Colors.WHITE
+                "Active" if is_active else "Inactive", size=10, color=ft.Colors.ON_PRIMARY_CONTAINER if is_active else ft.Colors.ON_SURFACE_VARIANT
             ),
-            bgcolor=ft.Colors.GREEN_600 if is_active else ft.Colors.GREY_500,
+            bgcolor=ft.Colors.PRIMARY_CONTAINER if is_active else ft.Colors.SURFACE_CONTAINER_HIGHEST,
             padding=ft.Padding.symmetric(horizontal=6, vertical=2),
             border_radius=12,
         )
@@ -568,7 +568,7 @@ class LetterPairsPage(ft.Column):
         scheme = self.state.active_scheme
         if scheme is None:
             return ft.Column([
-                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Text("Create or select a letter scheme to see letter statistics.", color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=10)
 
@@ -605,8 +605,8 @@ class LetterPairsPage(ft.Column):
             return ft.Container(
                 content=ft.Row([
                     ft.Text(f"{index}.", width=28, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                    ft.Text(letter, width=36, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"{avg:.2f}" if avg is not None else "—", width=48),
+                    ft.Text(letter, width=36, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                    ft.Text(f"{avg:.2f}" if avg is not None else "—", width=48, color=ft.Colors.ON_SURFACE),
                     ft.Text(f"{count}" if count else "—", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                 ], spacing=4),
                 padding=ft.Padding.symmetric(horizontal=4, vertical=1),
@@ -644,8 +644,8 @@ class LetterPairsPage(ft.Column):
             return ft.Container(
                 content=ft.Row([
                     ft.Text(f"{index}.", width=28, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                    ft.Text(letter, width=36, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"{avg:.2f}" if avg is not None else "—", width=48),
+                    ft.Text(letter, width=36, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                    ft.Text(f"{avg:.2f}" if avg is not None else "—", width=48, color=ft.Colors.ON_SURFACE),
                     ft.Text(f"{count}" if count else "—", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                 ], spacing=4),
                 padding=ft.Padding.symmetric(horizontal=4, vertical=1),
@@ -661,7 +661,7 @@ class LetterPairsPage(ft.Column):
 
         rating_section = ft.Container(
             content=ft.Column([
-                ft.Text("Letter ratings", weight=ft.FontWeight.BOLD),
+                ft.Text("Letter ratings", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Text(
                     "All letters used in the active scheme, ranked by average pair rating.",
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
@@ -677,7 +677,7 @@ class LetterPairsPage(ft.Column):
         length_section = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Text("Average mnemonic length", weight=ft.FontWeight.BOLD),
+                    ft.Text("Average mnemonic length", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                     ft.OutlinedButton(length_label, on_click=self._toggle_length_sort),
                     ft.OutlinedButton(alpha_label, on_click=self._toggle_alpha_sort),
                 ], wrap=True, spacing=6),
@@ -695,7 +695,7 @@ class LetterPairsPage(ft.Column):
 
         return ft.Column(
             [
-                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text("Stats", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Text(f"Statistics for {scheme.name}.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Row([rating_section, length_section], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START),
             ],

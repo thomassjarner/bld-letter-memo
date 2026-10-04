@@ -124,11 +124,11 @@ class PracticePage(ft.Column):
         self.last_solve_index = None
         self.keyboard_listener: ft.KeyboardListener | None = None
 
-        self.scramble_text = ft.Text(self.current_scramble, size=17, selectable=True, font_family="monospace")
-        self.timer_text = ft.Text("0.00", size=68, weight=ft.FontWeight.W_500, font_family="monospace")
-        self.status_text = ft.Text("", size=14)
-        self.stats_text = ft.Text("")
-        self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12)
+        self.scramble_text = ft.Text(self.current_scramble, size=17, selectable=True, font_family="monospace", color=ft.Colors.ON_SURFACE)
+        self.timer_text = ft.Text("0.00", size=68, weight=ft.FontWeight.W_500, font_family="monospace", color=ft.Colors.ON_SURFACE)
+        self.status_text = ft.Text("", size=14, color=ft.Colors.ON_SURFACE)
+        self.stats_text = ft.Text("", color=ft.Colors.ON_SURFACE)
+        self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12, color=ft.Colors.ON_SURFACE)
         self._copy_notice_token = 0
         self.history = ft.ListView(spacing=6, expand=True, scroll=ft.ScrollMode.AUTO)
         self.history_panel = ft.Container(
@@ -145,7 +145,7 @@ class PracticePage(ft.Column):
             value=self.state.data.active_practice_session,
             options=[ft.DropdownOption(name, name) for name in self.state.practice_session_names],
             on_select=self._switch_session,
-        )
+        color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
         self.previous_scramble_button = ft.OutlinedButton(
             "Previous", icon=ft.Icons.ARROW_BACK, on_click=self._previous_scramble, disabled=True
@@ -232,7 +232,7 @@ class PracticePage(ft.Column):
             [
                 ft.Row([
                     ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._back_to_practice),
-                    ft.Text("Blind Timer", size=24, weight=ft.FontWeight.W_600),
+                    ft.Text("Blind Timer", size=24, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                     self.session_dropdown,
                 ], wrap=True),
                 ft.Container(
@@ -263,7 +263,7 @@ class PracticePage(ft.Column):
                 ft.Divider(height=8),
                 self.stats_text,
                 ft.Row([
-                    ft.Text("Session history", size=15, weight=ft.FontWeight.W_600),
+                    ft.Text("Session history", size=15, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                     ft.TextButton("Reset session", icon=ft.Icons.DELETE_SWEEP, on_click=self._confirm_reset),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 self.copy_notice,
@@ -318,7 +318,7 @@ class PracticePage(ft.Column):
         self.scramble_text.value = self.current_scramble
         self.previous_scramble_button.disabled = True
         self.timer_text.value = "0.00"
-        self.timer_text.color = None
+        self.timer_text.color = ft.Colors.ON_SURFACE
         self.status_text.value = ""
         self.memo_button.disabled = True
         self.success_button.disabled = True
@@ -354,7 +354,7 @@ class PracticePage(ft.Column):
         self.holding_space = False
         self.armed = False
         if not self.running:
-            self.timer_text.color = None
+            self.timer_text.color = ft.Colors.ON_SURFACE
 
     def _on_key_down(self, e: ft.KeyDownEvent):
         if not self.active or self.mode != "timer":
@@ -383,7 +383,7 @@ class PracticePage(ft.Column):
             self.armed = False
             self.status_text.value = ""
             self.timer_text.value = "0.00"
-            self.timer_text.color = None
+            self.timer_text.color = ft.Colors.ON_SURFACE
             self._safe_update()
             self.page.run_task(self._arm_after_delay)
 
@@ -409,7 +409,7 @@ class PracticePage(ft.Column):
         await asyncio.sleep(self.HOLD_ARM_SECONDS)
         if self.holding_space and not self.armed and self.active and self.mode == "timer" and not self.running:
             self.armed = True
-            self.timer_text.color = ft.Colors.GREEN
+            self.timer_text.color = ft.Colors.PRIMARY
             self._safe_update()
 
     async def _tick_loop(self):
@@ -433,7 +433,7 @@ class PracticePage(ft.Column):
         self.running = True
         self.started_at = now
         self.last_display_second = -1
-        self.timer_text.color = None
+        self.timer_text.color = ft.Colors.ON_SURFACE
         self.status_text.value = "RUNNING — press any key to stop"
         self.previous_scramble_button.disabled = True
         self.new_scramble_button.disabled = True
@@ -450,7 +450,7 @@ class PracticePage(ft.Column):
         centiseconds = max(0, int(round(elapsed * 100)))
         solved_scramble = self.current_scramble
         self.timer_text.value = _format_centiseconds(centiseconds)
-        self.timer_text.color = None
+        self.timer_text.color = ft.Colors.ON_SURFACE
         self.status_text.value = "Stopped — mark Success, +2, or DNF"
         self.last_solve_index = self.state.add_practice_solve(
             centiseconds, solved_scramble, dnf=False, plus2=False
@@ -520,7 +520,7 @@ class PracticePage(ft.Column):
             self.success_button.disabled = True
             self.plus2_button.disabled = True
             self.dnf_button.disabled = True
-        self.timer_text.color = None
+        self.timer_text.color = ft.Colors.ON_SURFACE
 
     def _new_scramble(self, e=None):
         if self.running:
@@ -616,12 +616,12 @@ class PracticePage(ft.Column):
                 result_color = ft.Colors.ERROR
             else:
                 result = _format_centiseconds(effective) + ("+" if getattr(solve, "plus2", False) else "")
-                result_color = ft.Colors.GREEN if best is not None and effective == best else None
+                result_color = ft.Colors.PRIMARY if best is not None and effective == best else ft.Colors.ON_SURFACE
 
             rows.append(
                 ft.Container(
                     ft.Row([
-                        ft.Text(f"#{idx + 1}", width=50),
+                        ft.Text(f"#{idx + 1}", width=50, color=ft.Colors.ON_SURFACE),
                         ft.Container(
                             content=ft.Text(result, weight=ft.FontWeight.BOLD, color=result_color),
                             width=100,
@@ -630,7 +630,7 @@ class PracticePage(ft.Column):
                             on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
                         ),
                         ft.GestureDetector(
-                            content=ft.Text(solve.scramble, expand=True, max_lines=2, tooltip="Click to copy scramble"),
+                            content=ft.Text(solve.scramble, expand=True, max_lines=2, tooltip="Click to copy scramble", color=ft.Colors.ON_SURFACE),
                             on_tap=lambda e, text=solve.scramble: self._copy_text(text, "Scramble copied"),
                         ),
                         ft.IconButton(ft.Icons.SHUFFLE, tooltip="Take to Scramble Memo", on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
@@ -641,7 +641,7 @@ class PracticePage(ft.Column):
                     border_radius=0,
                 )
             )
-        self.history.controls = rows or [ft.Text("No solves yet.", italic=True)]
+        self.history.controls = rows or [ft.Text("No solves yet.", italic=True, color=ft.Colors.ON_SURFACE)]
         if update:
             self._safe_update()
 
@@ -703,8 +703,8 @@ class PracticePage(ft.Column):
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Reset timer session?"),
-            content=ft.Text("This deletes all saved timer solves in the current session."),
+            title=ft.Text("Reset timer session?", color=ft.Colors.ON_SURFACE),
+            content=ft.Text("This deletes all saved timer solves in the current session.", color=ft.Colors.ON_SURFACE),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda e: close(dialog)),
                 ft.TextButton("Reset", on_click=lambda e: reset(dialog)),

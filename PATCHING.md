@@ -1,4 +1,4 @@
-# Updating 2.20.2 → 2.21.0
+# Updating 2.21.0 → 2.21.1
 
 The patch and deployment process has not changed. This is still the same
 Flet 0.86.3 / Python app, published by the existing GitHub Pages workflow.
@@ -7,7 +7,7 @@ No React migration, new backend, dependency change, or data migration is require
 ## Apply the update
 
 1. In the current app, use **Settings → Export backup** to keep a copy of your data.
-2. Extract this ZIP. Copy the **contents** of `bld-letter-memo-web-2.21.0/`
+2. Extract this ZIP. Copy the **contents** of `bld-letter-memo-web-2.21.1/`
    into your existing project root, overwriting matching files. `main.py`,
    `requirements.txt`, and `ui/` must remain at the project root; do not add
    the versioned wrapper folder as a new level in your repository.
@@ -51,7 +51,7 @@ controls and asynchronous keyboard-focus behavior from 2.20.2 are retained.
 
 ## Validation
 
-- 19 automated checks pass: 13 original checks plus 6 new presentation-wiring checks.
+- 22 automated checks pass: 13 original checks, 6 presentation-wiring checks, and 3 theme/contrast checks.
 - The new checks cover Home routes, navigation order, both Timer entry points,
   return navigation, sending a scramble to Memo, navigation preferences, and theme persistence.
 - These are Python control-tree tests. They do not simulate Flutter rendering,
@@ -67,3 +67,12 @@ and backup export/import using a separate test browser profile.
 Progressive Memo, Delayed Recall, and Letter Pair Drill were placeholders in
 2.20.2 and remain clearly marked **Coming soon**. This release does not implement
 their training logic.
+
+## Terminal commands after copying the files
+
+```sh
+cd /letterpairscheme-helper-web &&
+git add -A &&
+git commit -m "Fix dark and light mode text contrast" &&
+git push
+```

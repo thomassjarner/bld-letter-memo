@@ -78,6 +78,8 @@ async def main(page: ft.Page):
     def apply_dark_mode(enabled):
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
         settings_page.dark_mode_switch.value = enabled
+        # Memo spans use computed cycle colors rather than semantic color tokens.
+        scramble_page.refresh(update=False)
         rebuild_navigation(update=False)
         page.update()
     settings_page.theme_callback = apply_dark_mode
@@ -97,7 +99,7 @@ async def main(page: ft.Page):
             ft.Container(ft.Icon(ft.Icons.GRID_VIEW, size=20, color=ft.Colors.ON_PRIMARY),
                          bgcolor=ft.Colors.PRIMARY, padding=7, border_radius=7),
             *([] if compact else [ft.Column([
-                ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD),
+                ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Text("TRAINING WORKSPACE", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),

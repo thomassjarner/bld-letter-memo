@@ -8,7 +8,7 @@ def build_home(navigate):
         ft.Container(ft.Column([
             eyebrow("3×3 blindfolded / training workspace"),
             ft.Text("Build your memo.\nTrain your recall.", size=36,
-                    weight=ft.FontWeight.W_600, style=ft.TextStyle(height=1.1)),
+                    weight=ft.FontWeight.W_600, style=ft.TextStyle(height=1.1), color=ft.Colors.ON_SURFACE),
             ft.Text(
                 "A focused workspace for blindfolded cubing. Set up your sticker letters, "
                 "turn letter pairs into memorable words, and connect your memo to real solves.",
