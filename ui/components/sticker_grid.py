@@ -71,7 +71,9 @@ def build_sticker_grid(
                     max_length=1,
                     capitalization=ft.TextCapitalization.CHARACTERS,
                     text_align=ft.TextAlign.CENTER,
-                    border_color=ft.Colors.RED if sticker in duplicated_stickers else None,
+                    border_color=ft.Colors.ERROR if sticker in duplicated_stickers else ft.Colors.OUTLINE_VARIANT,
+                    border_radius=7,
+                    text_size=18,
                     on_change=lambda e, s=sticker: on_letter_change(s, e.control.value),
                     on_focus=(lambda e, s=sticker: on_field_focus(s)) if on_field_focus else None,
                 )
@@ -90,6 +92,7 @@ def build_sticker_grid(
                     spacing=6,
                 ),
                 padding=12,
+                bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
                 border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
                 border_radius=10,
             )

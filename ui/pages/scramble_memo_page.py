@@ -1,6 +1,7 @@
 import flet as ft
 
 from core.tracer import ScrambleTracer, ScrambleError
+from ui.design import page_heading, panel, eyebrow
 
 
 # Chosen for legibility in both themes. The dark palette is intentionally
@@ -24,6 +25,7 @@ class ScrambleMemoPage(ft.Column):
 
     def init(self):
         self.expand = True
+        self.spacing = 12
         self.scroll = ft.ScrollMode.AUTO
         self.tracer = ScrambleTracer()
         self.scramble = ft.TextField(
@@ -53,26 +55,25 @@ class ScrambleMemoPage(ft.Column):
         )
 
         self.controls = [
-            ft.Text("Scramble → Memo", size=20, weight=ft.FontWeight.BOLD),
-            ft.Text(
-                "Scramble interpretation follows the active scheme: fixed White-top / Green-front by default, or the scheme's own orientation when that preference is enabled."
-            ),
-            self.scramble,
-            ft.Row([
-                ft.ElevatedButton("Generate memo", icon=ft.Icons.PLAY_ARROW, on_click=self.generate),
-                self.toggle_button,
-                self.reset_breaks_button,
-            ], wrap=True),
-            self.error,
-            ft.Divider(),
-            ft.Text(
-                "Underlined memo targets start cycle breaks. Click one to temporarily choose another valid cycle break for this scramble.",
-                size=11,
-                color=ft.Colors.ON_SURFACE_VARIANT,
-            ),
-            self.result_area,
-            ft.Divider(),
-            ft.ExpansionTile(title=ft.Text("Diagnostic trace"), controls=[self.details]),
+            page_heading("Scramble Memo", "Trace a real scramble through your own letter scheme.", "04 / Understanding"),
+            panel(ft.Column([
+                eyebrow("Scramble input"),
+                ft.Text("Uses White-top / Green-front unless your scheme enables its own orientation.",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.scramble,
+                ft.Row([
+                    ft.FilledButton("Generate memo", icon=ft.Icons.PLAY_ARROW, on_click=self.generate),
+                    self.toggle_button, self.reset_breaks_button,
+                ], wrap=True),
+                self.error,
+            ], spacing=12)),
+            panel(ft.Column([
+                eyebrow("Memo output"),
+                ft.Text("Click an underlined cycle-break target to try another valid break for this scramble. Your saved priorities stay unchanged.",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.result_area,
+            ], spacing=12)),
+            ft.ExpansionTile(title=ft.Text("Diagnostic trace", size=13), controls=[self.details]),
         ]
         self._render_result()
 

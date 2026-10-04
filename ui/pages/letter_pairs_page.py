@@ -1,6 +1,7 @@
 import flet as ft
 
 from core.pairs import get_active_pairs
+from ui.design import page_heading, panel
 
 
 @ft.control
@@ -22,13 +23,15 @@ class LetterPairsPage(ft.Column):
             on_change=self._on_tab_change,
             content=ft.TabBar(tabs=[ft.Tab(label="Dictionary"), ft.Tab(label="Stats")]),
         )
-        self.content_area = ft.Column(expand=True, spacing=0)
+        self.content_area = ft.Column(expand=True, spacing=10, scroll=ft.ScrollMode.AUTO)
 
         self.search_field = ft.TextField(
             hint_text="Search letter pairs (AC, A-, -S)...",
             expand=True,
             prefix_icon=ft.Icons.SEARCH,
             on_change=self._on_search_change,
+            dense=True,
+            border_radius=7,
         )
         self.search_pairs = ft.Checkbox(
             label="Search letter pairs", value=True, on_change=self._on_search_mode_change
@@ -67,8 +70,8 @@ class LetterPairsPage(ft.Column):
 
         self.filters_area = ft.Column(
             [
-                ft.Row([self.search_field, self.search_pairs, self.search_words],
-                       wrap=False, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Row([self.search_field], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Row([self.search_pairs, self.search_words], wrap=True),
                 ft.Row([self.scheme_filter, self.status_filter, self.grade_sort], wrap=True),
                 ft.Row([self.progress_text, self.progress_bar, self.count_text], wrap=True),
                 ft.Row([self.filter_average_text, self.overall_average_text], wrap=True, spacing=18),
@@ -89,7 +92,7 @@ class LetterPairsPage(ft.Column):
             alignment=ft.MainAxisAlignment.CENTER,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
-        self.controls = [self.tabbar, self.content_area]
+        self.controls = [page_heading("Letter Pairs", "Make each pair memorable. Build, rate, and refine your dictionary.", "02 / Association"), self.tabbar, self.content_area]
         self.refresh(update=False)
 
     def _compact_header(self):
@@ -119,7 +122,7 @@ class LetterPairsPage(ft.Column):
         else:
             self._refresh_dictionary()
             self.content_area.controls = [
-                self.filters_area, self.group_controls, self.table_header,
+                panel(self.filters_area, padding=12), self.group_controls, self.table_header,
                 ft.Divider(height=1), self.rows_view,
             ]
         if update and self.page is not None:

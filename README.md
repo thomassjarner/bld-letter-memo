@@ -1,3 +1,36 @@
+# BLD Letter Memo Web 2.21.0
+
+A new Home-first interface for the existing BLD training app.
+
+- Home explains the workflow and routes into Letter Schemes, Letter Pairs,
+  Practice, and Scramble Memo. It contains no embedded training tools.
+- Main navigation: **Home · Letter Schemes · Letter Pairs · Scramble Memo ·
+  Practice · Timer · Settings**.
+- Timer remains available directly and through Practice → Blind Timer.
+- Shared neutral/teal light and dark themes, compact navigation, consistent
+  headings, bordered workspace panels, and a quick theme switch.
+- All three saved navigation styles remain available. On narrow screens,
+  a saved compact sidebar temporarily becomes a scrollable top navigation
+  without changing the preference.
+- Refreshed Practice hub, compact timer surface, dictionary filters, scheme
+  panels, memo input/output, and Settings sections.
+- Progressive Memo, Delayed Recall, and Letter Pair Drill remain planned
+  activities, as in 2.20.2.
+
+**Update instructions:** see [PATCHING.md](PATCHING.md). The existing patch and
+GitHub Pages deployment process is unchanged; include the two new UI modules.
+
+**Preservation:** core logic, repositories, models, state management, dependency
+versions, original tests, entrypoint, and deployment workflow are byte-identical
+to 2.20.2. Browser storage keys and import/export formats are unchanged.
+
+**Validation:** 19 automated checks pass (13 existing + 6 navigation/theme tests).
+Browser visual and keyboard testing remains unverified because Chromium could
+not be downloaded in the development environment. See PATCHING.md for the
+post-deployment checks. No live deployment was made.
+
+---
+
 # BLD Letter Memo Web 2.20.2
 
 Timer hotfix:

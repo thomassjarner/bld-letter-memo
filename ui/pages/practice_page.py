@@ -7,6 +7,7 @@ import time
 import flet as ft
 
 from core.scramble_generator import ScrambleGenerator
+from ui.design import activity_card, page_heading, panel, eyebrow
 
 
 def _format_centiseconds(cs: int) -> str:
@@ -123,8 +124,8 @@ class PracticePage(ft.Column):
         self.last_solve_index = None
         self.keyboard_listener: ft.KeyboardListener | None = None
 
-        self.scramble_text = ft.Text(self.current_scramble, size=18, selectable=True)
-        self.timer_text = ft.Text("0.00", size=64, weight=ft.FontWeight.BOLD)
+        self.scramble_text = ft.Text(self.current_scramble, size=17, selectable=True, font_family="monospace")
+        self.timer_text = ft.Text("0.00", size=68, weight=ft.FontWeight.W_500, font_family="monospace")
         self.status_text = ft.Text("", size=14)
         self.stats_text = ft.Text("")
         self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12)
@@ -133,7 +134,8 @@ class PracticePage(ft.Column):
         self.history_panel = ft.Container(
             content=self.history,
             expand=True,
-            padding=6,
+            padding=8,
+            bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
             border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
             border_radius=8,
         )
@@ -170,24 +172,9 @@ class PracticePage(ft.Column):
     # ---- navigation inside Practice -------------------------------------
 
     def _practice_card(self, title: str, subtitle: str, icon, enabled: bool, on_click=None):
-        button = ft.ElevatedButton(
-            title if enabled else f"{title} — coming soon",
-            icon=icon,
-            on_click=on_click if enabled else None,
-            disabled=not enabled,
-        )
-        return ft.Container(
-            content=ft.Column([
-                ft.Icon(icon, size=28),
-                ft.Text(title, size=17, weight=ft.FontWeight.BOLD),
-                ft.Text(subtitle, color=ft.Colors.ON_SURFACE_VARIANT),
-                button,
-            ], spacing=8),
-            padding=12,
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=10,
-            width=300,
-        )
+        return activity_card(title, subtitle, icon,
+            "Open Blind Timer" if enabled else "Coming soon",
+            on_click=on_click, enabled=enabled)
 
     def show_menu(self, update: bool = True):
         self._show_menu(update=update)
@@ -215,38 +202,21 @@ class PracticePage(ft.Column):
         self.mode = "menu"
         self.scroll = ft.ScrollMode.AUTO
         self._reset_hold_state()
+        self.spacing = 12
         self.controls = [
-            ft.Text("Practice", size=20, weight=ft.FontWeight.BOLD),
-            ft.Text("Choose a practice activity.", color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Row([
-                self._practice_card(
-                    "Blind Timer",
-                    "Generate a scramble and time a full blind attempt.",
-                    ft.Icons.TIMER,
-                    True,
-                    self._open_timer_from_practice,
-                ),
-                self._practice_card(
-                    "Progressive Memo",
-                    "Memo a real cube one pair at a time, then recall it.",
-                    ft.Icons.PSYCHOLOGY,
-                    False,
-                ),
-            ], wrap=True, spacing=12, run_spacing=12),
-            ft.Row([
-                self._practice_card(
-                    "Delayed Recall",
-                    "Memo, wait for a countdown, then type what you remember.",
-                    ft.Icons.HOURGLASS_BOTTOM,
-                    False,
-                ),
-                self._practice_card(
-                    "Letter Pair Drill",
-                    "Practice fast pair-to-word recall.",
-                    ft.Icons.BOLT,
-                    False,
-                ),
-            ], wrap=True, spacing=12, run_spacing=12),
+            page_heading("Practice", "Choose a focused session. Build confidence one attempt at a time.", "03 / Repetition"),
+            ft.ResponsiveRow([
+                self._practice_card("Blind Timer", "Generate scrambles, time full blind attempts, and review your session history.",
+                                    ft.Icons.TIMER, True, self._open_timer_from_practice),
+                self._practice_card("Progressive Memo", "Memo a real cube one pair at a time, then recall it.",
+                                    ft.Icons.PSYCHOLOGY, False),
+                self._practice_card("Delayed Recall", "Memo, wait for a countdown, then type what you remember.",
+                                    ft.Icons.HOURGLASS_BOTTOM, False),
+                self._practice_card("Letter Pair Drill", "Build fast, reliable pair-to-word recall from your dictionary.",
+                                    ft.Icons.BOLT, False),
+            ], spacing=12, run_spacing=12),
+            ft.Text("Blind Timer is ready to use. The other three activities are planned.",
+                    size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
         if update:
             self._safe_update()
@@ -262,13 +232,14 @@ class PracticePage(ft.Column):
             [
                 ft.Row([
                     ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._back_to_practice),
-                    ft.Text("Blind Timer", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text("Blind Timer", size=24, weight=ft.FontWeight.W_600),
                     self.session_dropdown,
                 ], wrap=True),
                 ft.Container(
                     self.scramble_text,
-                    padding=10,
-                    border=ft.Border.all(1, ft.Colors.OUTLINE),
+                    padding=14,
+                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+                    border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
                     border_radius=8,
                 ),
                 ft.Row(
@@ -277,20 +248,22 @@ class PracticePage(ft.Column):
                 ),
                 ft.Container(
                     ft.Column(
-                        [self.timer_text, self.status_text],
+                        [self.timer_text, self.status_text, ft.Text("Hold Space to arm · Release to start · Any key to stop", size=11, color=ft.Colors.ON_SURFACE_VARIANT)],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         alignment=ft.MainAxisAlignment.CENTER,
                         spacing=8,
                     ),
                     alignment=ft.Alignment.CENTER,
-                    padding=20,
-                    height=210,
+                    padding=10,
+                    height=154,
+                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+                    border_radius=10,
                 ),
                 ft.Row([self.success_button, self.plus2_button, self.dnf_button, self.memo_button], wrap=True),
                 ft.Divider(height=8),
                 self.stats_text,
                 ft.Row([
-                    ft.Text("Session solves", size=17, weight=ft.FontWeight.BOLD),
+                    ft.Text("Session history", size=15, weight=ft.FontWeight.W_600),
                     ft.TextButton("Reset session", icon=ft.Icons.DELETE_SWEEP, on_click=self._confirm_reset),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 self.copy_notice,
@@ -664,8 +637,8 @@ class PracticePage(ft.Column):
                         ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip="Delete solve", on_click=lambda e, i=idx: self._delete_solve(i)),
                     ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     padding=8,
-                    border=ft.Border.all(1, ft.Colors.OUTLINE),
-                    border_radius=6,
+                    border=ft.Border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
+                    border_radius=0,
                 )
             )
         self.history.controls = rows or [ft.Text("No solves yet.", italic=True)]

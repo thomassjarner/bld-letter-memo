@@ -5,6 +5,7 @@ import flet as ft
 
 from data.models import AppData
 from ui.state import AppState
+from ui.design import page_heading, panel, eyebrow
 
 
 @ft.control
@@ -21,7 +22,8 @@ class SettingsPage(ft.Column):
 
     def init(self):
         self.expand = True
-        self.spacing = 8
+        self.spacing = 12
+        self.scroll = ft.ScrollMode.AUTO
         self.status_text = ft.Text("")
         self._pending_import: tuple[str, bytes] | None = None
         self._current_dialog: ft.AlertDialog | None = None
@@ -64,37 +66,32 @@ class SettingsPage(ft.Column):
         self._rebuild_rating_palette()
 
         self.controls = [
-            ft.Text("Settings", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text("General", size=15, weight=ft.FontWeight.BOLD),
-            ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=10, wrap=True),
-            ft.Text(
-                "Dark mode uses a softer teal accent so controls stay visible without being overly bright.",
-                size=12,
-                color=ft.Colors.ON_SURFACE_VARIANT,
-            ),
-            ft.Divider(),
-            ft.Text("Letter pairs settings", size=15, weight=ft.FontWeight.BOLD),
-            ft.Row([self.rating_mode_dropdown, self.rating_levels_dropdown], wrap=True, spacing=10),
-            ft.Text(
-                "Ratings are stored on a common 1–5 scale. Changing the color scale never rewrites old grades; those pairs can be reviewed with the Update grades filter.",
-                size=12, color=ft.Colors.ON_SURFACE_VARIANT,
-            ),
-            self.rating_palette_area,
-            ft.Divider(),
-            ft.Text("Backup & data", size=15, weight=ft.FontWeight.BOLD),
-            ft.Text("Autosave is on. Schemes, advanced settings, pair words/labels, timer sessions, and preferences are stored locally in this browser and survive app updates."),
-            ft.Row(
-                [
-                    ft.ElevatedButton("Export Backup", icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
-                    ft.ElevatedButton("Import Backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
-                ]
-            ),
-            ft.Text(
-                "Importing a backup replaces the current schemes, letter-pair data, timer sessions, and settings.",
-                size=12,
-                color=ft.Colors.ON_SURFACE_VARIANT,
-            ),
-            self.status_text,
+            page_heading("Settings", "Make the workspace yours. Manage appearance, ratings, and backups."),
+            panel(ft.Column([
+                eyebrow("Appearance"),
+                ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=18, wrap=True),
+                ft.Text("Light and dark themes share the same quiet surfaces and teal accent.",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=12)),
+            panel(ft.Column([
+                eyebrow("Letter pair ratings"),
+                ft.Row([self.rating_mode_dropdown, self.rating_levels_dropdown], wrap=True, spacing=10),
+                ft.Text("Ratings stay on a common 1–5 scale. Changing the color scale never rewrites old grades; review those pairs with the Update grades filter.",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.rating_palette_area,
+            ], spacing=12)),
+            panel(ft.Column([
+                eyebrow("Backup & data"),
+                ft.Text("Saved in this browser", size=18, weight=ft.FontWeight.W_600),
+                ft.Text("Schemes, pair words, ratings, aliases, timer sessions, and preferences save automatically and survive updates on the same site."),
+                ft.Row([
+                    ft.FilledButton("Export backup", icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
+                    ft.OutlinedButton("Import backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
+                ], wrap=True),
+                ft.Text("Import replaces the current schemes, letter-pair data, timer sessions, and settings.",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.status_text,
+            ], spacing=12)),
         ]
 
     def _dark_mode_changed(self, e):

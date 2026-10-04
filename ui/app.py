@@ -1,6 +1,8 @@
 import flet as ft
 
 from data.shared_preferences_repository import SharedPreferencesAppDataRepository
+from ui.design import build_theme
+from ui.pages.home_page import build_home
 from ui.pages.letter_pairs_page import LetterPairsPage
 from ui.pages.letter_schemes_page import LetterSchemesPage
 from ui.pages.practice_page import PracticePage
@@ -9,61 +11,48 @@ from ui.pages.settings_page import SettingsPage
 from ui.state import AppState
 
 DESTINATIONS = [
+    ("Home", ft.Icons.HOME_OUTLINED),
     ("Letter Schemes", ft.Icons.GRID_VIEW),
     ("Letter Pairs", ft.Icons.TABLE_CHART),
     ("Scramble Memo", ft.Icons.SHUFFLE),
-    ("Timer", ft.Icons.TIMER),
     ("Practice", ft.Icons.FITNESS_CENTER),
+    ("Timer", ft.Icons.TIMER),
     ("Settings", ft.Icons.SETTINGS),
 ]
-
-SCRAMBLE_INDEX = 2
-TIMER_INDEX = 3
-PRACTICE_INDEX = 4
+HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_INDEX, SETTINGS_INDEX = range(7)
 
 
 async def main(page: ft.Page):
     page.title = "BLD Letter Memo"
-    page.theme = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
-    page.dark_theme = ft.Theme(color_scheme_seed=ft.Colors.TEAL_400)
-    page.theme_mode = ft.ThemeMode.LIGHT
+    page.theme = build_theme()
+    page.dark_theme = build_theme(dark=True)
     page.padding = 0
+    page.bgcolor = ft.Colors.SURFACE_CONTAINER_LOW
 
     repository = await SharedPreferencesAppDataRepository.create(page)
     state = AppState(repository)
     page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
+    current_index = HOME_INDEX
+    popout_open = False
+    last_layout = None
 
     schemes_page = LetterSchemesPage(data=state)
     pairs_page = LetterPairsPage(data=state)
     scramble_page = ScrambleMemoPage(data=state)
-    timer_page = None
-    practice_page = None
-    pages = None
-    current_index = 0
-    popout_open = False
+    settings_page = SettingsPage(data=state)
 
-    content_area = ft.Container(
-        expand=True,
-        padding=ft.Padding.only(left=14, top=62, right=14, bottom=14),
-        left=0,
-        right=0,
-        top=0,
-        bottom=0,
-    )
+    content_area = ft.Container(expand=True, left=0, right=0, top=64, bottom=0,
+                                padding=16)
+    save_status = [ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT) for _ in range(3)]
 
-    top_save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
-    side_save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
-    pop_save_status = ft.Text("Saved", size=10, color=ft.Colors.ON_SURFACE_VARIANT)
-
-    def on_save_status(status: str):
-        for control in (top_save_status, side_save_status, pop_save_status):
+    def on_save_status(status):
+        for control in save_status:
             control.value = status
             if control.page is not None:
                 control.update()
-
     state.on_save_status(on_save_status)
 
-    def open_scramble_from_practice(scramble: str):
+    def open_scramble_from_practice(scramble):
         scramble_page.scramble.value = scramble
         scramble_page.error.value = ""
         scramble_page.last_result = None
@@ -73,217 +62,159 @@ async def main(page: ft.Page):
         if scramble_page.page is not None:
             scramble_page.update()
 
-    # Timer and Practice deliberately use separate mounted controls. Sharing one
-    # custom control between two navigation destinations caused focus/mounting
-    # edge cases in Flet web: the Timer could be visible but not receive keys.
+    # Preserve 2.20.2's separate control instances and asynchronous focus.
     timer_page = PracticePage(data=state)
     timer_page.open_memo_callback = open_scramble_from_practice
     timer_page.open_practice_callback = lambda: navigate_to(PRACTICE_INDEX)
     timer_page.show_timer(update=False)
-
     practice_page = PracticePage(data=state)
     practice_page.open_memo_callback = open_scramble_from_practice
     practice_page.open_timer_callback = lambda: navigate_to(TIMER_INDEX)
     practice_page.show_menu(update=False)
+    home_page = build_home(lambda name: navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name)))
+    pages = [home_page, schemes_page, pairs_page, scramble_page, practice_page, timer_page, settings_page]
+    content_area.content = home_page
 
-    def apply_dark_mode(enabled: bool):
+    def apply_dark_mode(enabled):
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
+        settings_page.dark_mode_switch.value = enabled
+        rebuild_navigation(update=False)
         page.update()
-
-    settings_page = SettingsPage(data=state)
     settings_page.theme_callback = apply_dark_mode
 
-    pages = [
-        schemes_page,
-        pairs_page,
-        scramble_page,
-        timer_page,
-        practice_page,
-        settings_page,
-    ]
-    content_area.content = pages[0]
+    def toggle_theme(e):
+        enabled = not state.data.dark_mode
+        state.set_dark_mode(enabled)
+        apply_dark_mode(enabled)
 
-    def make_nav_button(index: int, compact: bool = False):
+    def theme_button():
+        return ft.IconButton(ft.Icons.LIGHT_MODE_OUTLINED if state.data.dark_mode else ft.Icons.DARK_MODE_OUTLINED,
+                             tooltip="Switch to light mode" if state.data.dark_mode else "Switch to dark mode",
+                             icon_size=19, on_click=toggle_theme)
+
+    def brand(compact=False):
+        return ft.Row([
+            ft.Container(ft.Icon(ft.Icons.GRID_VIEW, size=20, color=ft.Colors.ON_PRIMARY),
+                         bgcolor=ft.Colors.PRIMARY, padding=7, border_radius=7),
+            *([] if compact else [ft.Column([
+                ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD),
+                ft.Text("TRAINING WORKSPACE", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                        style=ft.TextStyle(letter_spacing=1.2)),
+            ], spacing=1)]),
+        ], spacing=9, tight=True)
+
+    def nav_button(index, compact=False):
         label, icon = DESTINATIONS[index]
         selected = index == current_index
-        return ft.Container(
-            content=ft.Row(
-                [ft.Icon(icon, size=18), ft.Text(label, size=12, weight=ft.FontWeight.BOLD if selected else None)],
-                spacing=5,
-                tight=True,
-            ) if not compact else ft.Column(
-                [ft.Icon(icon, size=19), ft.Text(label.replace(" ", "\n"), size=10, text_align=ft.TextAlign.CENTER)],
-                spacing=3,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                tight=True,
-            ),
-            padding=ft.Padding.symmetric(horizontal=9 if not compact else 6, vertical=7),
-            border_radius=8,
-            bgcolor=ft.Colors.SECONDARY_CONTAINER if selected else None,
-            ink=True,
-            on_click=lambda e, i=index: navigate_to(i),
+        color = ft.Colors.ON_PRIMARY_CONTAINER if selected else ft.Colors.ON_SURFACE_VARIANT
+        content = ft.Column([
+            ft.Icon(icon, size=19, color=color),
+            ft.Text(label.replace(" ", "\n"), size=10, text_align=ft.TextAlign.CENTER, color=color),
+        ], spacing=3, horizontal_alignment=ft.CrossAxisAlignment.CENTER, tight=True) if compact else ft.Row([
+            ft.Icon(icon, size=17, color=color),
+            ft.Text(label, size=12, color=color, weight=ft.FontWeight.W_600),
+        ], spacing=6, tight=True)
+        return ft.TextButton(
+            content=content, tooltip=label,
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.PRIMARY_CONTAINER if selected else ft.Colors.TRANSPARENT,
+                shape=ft.RoundedRectangleBorder(radius=7),
+                padding=ft.Padding.symmetric(horizontal=10, vertical=9),
+            ), on_click=lambda e, i=index: navigate_to(i),
         )
 
-    top_nav = ft.Container(
-        left=0,
-        right=0,
-        top=0,
-        height=52,
-        padding=ft.Padding.symmetric(horizontal=14, vertical=7),
-        bgcolor=ft.Colors.SURFACE,
-        border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
-    )
-    sidebar_nav = ft.Container(
-        left=0,
-        top=0,
-        bottom=0,
-        width=108,
-        padding=ft.Padding.symmetric(horizontal=6, vertical=8),
-        bgcolor=ft.Colors.SURFACE,
-        border=ft.Border(right=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
-    )
-    popout_panel = ft.Container(
-        left=12,
-        bottom=54,
-        width=190,
-        padding=7,
-        bgcolor=ft.Colors.SURFACE_CONTAINER,
-        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-        border_radius=10,
-        visible=False,
-    )
-    popout_button = ft.Container(
-        left=12,
-        bottom=12,
-        padding=ft.Padding.symmetric(horizontal=12, vertical=8),
-        bgcolor=ft.Colors.SURFACE_CONTAINER,
-        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-        border_radius=18,
-        ink=True,
-    )
+    top_nav = ft.Container(left=0, right=0, top=0, height=60,
+        padding=ft.Padding.symmetric(horizontal=16, vertical=8), bgcolor=ft.Colors.SURFACE,
+        border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)))
+    sidebar_nav = ft.Container(left=0, top=0, bottom=0, width=106, padding=8,
+        bgcolor=ft.Colors.SURFACE, border=ft.Border(right=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)))
+    popout_panel = ft.Container(left=12, bottom=64, width=212, padding=8,
+        bgcolor=ft.Colors.SURFACE, border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+        border_radius=10, visible=False)
 
     def toggle_popout(e=None):
         nonlocal popout_open
         popout_open = not popout_open
         popout_panel.visible = popout_open
-        if popout_panel.page is not None:
-            popout_panel.update()
+        popout_panel.update()
 
-    popout_button.content = ft.Row(
-        [ft.Icon(ft.Icons.MENU, size=18), ft.Text("Menu", size=12, weight=ft.FontWeight.BOLD), pop_save_status],
-        spacing=6,
-        tight=True,
+    popout_button = ft.Container(
+        ft.FilledButton("Menu", icon=ft.Icons.MENU, on_click=toggle_popout),
+        left=12, bottom=12,
     )
-    popout_button.on_click = toggle_popout
 
-    def rebuild_navigation(update: bool = True):
-        nonlocal popout_open
+    def rebuild_navigation(update=True):
+        nonlocal last_layout
+        width = page.width or 1200
+        narrow = width < 1120
+        # Small screens get a scrollable top nav; the saved preference is unchanged.
         style = state.data.navigation_style
-
+        if style == "compact_sidebar" and width < 700:
+            style = "top_tabs"
+        last_layout = (narrow, style)
         top_nav.visible = style == "top_tabs"
         sidebar_nav.visible = style == "compact_sidebar"
         popout_button.visible = style == "popout"
         popout_panel.visible = style == "popout" and popout_open
-
-        top_nav.content = ft.Row(
-            [
-                ft.Row([
-                    ft.Text("BLD Letter Memo", size=15, weight=ft.FontWeight.BOLD),
-                    top_save_status,
-                ], spacing=8, tight=True),
-                ft.Row([make_nav_button(i) for i in range(len(DESTINATIONS))], spacing=2, tight=True),
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
-        sidebar_nav.content = ft.Column(
-            [
-                ft.Text("BLD", size=13, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
-                ft.Divider(height=8),
-                *[make_nav_button(i, compact=True) for i in range(len(DESTINATIONS))],
-                ft.Container(expand=True),
-                side_save_status,
-            ],
-            spacing=3,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
-        popout_panel.content = ft.Column(
-            [make_nav_button(i) for i in range(len(DESTINATIONS))],
-            spacing=2,
-            tight=True,
-        )
-
-        if style == "top_tabs":
-            content_area.left = 0
-            content_area.top = 52
-            content_area.padding = ft.Padding.only(left=14, top=10, right=14, bottom=14)
-        elif style == "compact_sidebar":
-            content_area.left = 108
-            content_area.top = 0
-            content_area.padding = ft.Padding.all(14)
-        else:
-            content_area.left = 0
-            content_area.top = 0
-            content_area.padding = ft.Padding.only(left=14, top=14, right=14, bottom=58)
-
+        nav_row = ft.Row([nav_button(i) for i in range(len(DESTINATIONS))],
+                         spacing=2, scroll=ft.ScrollMode.AUTO, expand=not narrow)
+        tools = ft.Row([save_status[0], theme_button()], spacing=4, tight=True)
+        top_nav.height = 98 if narrow else 60
+        top_nav.content = ft.Column([
+            ft.Row([brand(), tools], alignment=ft.MainAxisAlignment.SPACE_BETWEEN), nav_row,
+        ], spacing=2) if narrow else ft.Row([brand(), nav_row, tools], spacing=18)
+        sidebar_nav.content = ft.Column([
+            brand(compact=True), ft.Divider(height=10),
+            ft.Column([nav_button(i, compact=True) for i in range(len(DESTINATIONS))],
+                      spacing=3, scroll=ft.ScrollMode.AUTO, expand=True),
+            theme_button(), save_status[1],
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4)
+        popout_panel.content = ft.Column([
+            *[nav_button(i) for i in range(len(DESTINATIONS))], ft.Divider(height=8),
+            ft.Row([save_status[2], theme_button()], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        ], spacing=3, tight=True, scroll=ft.ScrollMode.AUTO)
+        popout_panel.height = min(450, max(160, (page.height or 800) - 88))
+        content_area.left = 106 if style == "compact_sidebar" else 0
+        content_area.top = top_nav.height if style == "top_tabs" else 0
+        content_area.padding = ft.Padding.only(left=12 if width < 700 else 20, top=16,
+            right=12 if width < 700 else 20, bottom=64 if style == "popout" else 16)
         if update:
             page.update()
 
-    def apply_navigation_style(style: str):
+    def apply_navigation_style(style):
         nonlocal popout_open
         popout_open = False
-        rebuild_navigation(update=True)
-
+        rebuild_navigation()
     settings_page.navigation_callback = apply_navigation_style
 
-    def navigate_to(index: int):
+    def navigate_to(index):
         nonlocal current_index, popout_open
         current_index = index
-
-        # Timer and Practice share one PracticePage instance, but the view
-        # change must happen AFTER that control is mounted in content_area.
-        # Updating an unmounted custom control can leave Flet's web client with
-        # the old child tree, which made the timer appear to vanish in 2.20.
         target = pages[index]
-
-        if target is pairs_page:
-            pairs_page.refresh(update=False)
-        elif target is schemes_page:
-            schemes_page.refresh(update=False)
-        elif target is scramble_page:
-            scramble_page.refresh(update=False)
-        elif target is timer_page:
-            timer_page.refresh(update=False)
-        elif target is practice_page:
-            practice_page.refresh(update=False)
-
+        if hasattr(target, "refresh"):
+            target.refresh(update=False)
         content_area.content = target
         popout_open = False
         rebuild_navigation(update=False)
         page.update()
-
-        # Timer and Practice are separate controls. Activate keyboard capture
-        # only on the Timer destination, and keep the Practice hub passive.
         timer_page.set_active(index == TIMER_INDEX)
         practice_page.set_active(False)
 
+    def on_resize(e):
+        width = page.width or 1200
+        style = state.data.navigation_style
+        if style == "compact_sidebar" and width < 700:
+            style = "top_tabs"
+        # Never reconstruct the timer's KeyboardListener on a resize.
+        if last_layout != (width < 1120, style):
+            rebuild_navigation()
+
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
-
-    def on_page_keyboard(e):
-        if content_area.content is schemes_page:
-            schemes_page.handle_keyboard_event(e)
-
-    page.on_keyboard_event = on_page_keyboard
-
-    root = ft.Stack(
-        controls=[content_area, top_nav, sidebar_nav, popout_panel, popout_button],
-        expand=True,
-        fit=ft.StackFit.EXPAND,
-    )
-    page.add(root)
-    rebuild_navigation(update=True)
+    page.on_keyboard_event = lambda e: schemes_page.handle_keyboard_event(e) if content_area.content is schemes_page else None
+    page.on_resize = on_resize
+    page.add(ft.Stack([content_area, top_nav, sidebar_nav, popout_panel, popout_button],
+                      expand=True, fit=ft.StackFit.EXPAND))
+    rebuild_navigation()
 
 
 def run():
