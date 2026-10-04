@@ -84,12 +84,12 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             panel(ft.Column([
                 eyebrow("Backup & data"),
                 ft.Text("Saved in this browser", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Schemes, pair words, ratings, aliases, timer sessions, and preferences save automatically and survive updates on the same site.", color=ft.Colors.ON_SURFACE),
+                ft.Text("Schemes, pair words, ratings, aliases, timer sessions, Progressive Memo history, and preferences save automatically and survive updates on the same site.", color=ft.Colors.ON_SURFACE),
                 ft.Row([
                     ft.FilledButton("Export backup", icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
                     ft.OutlinedButton("Import backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
                 ], wrap=True),
-                ft.Text("Import replaces the current schemes, letter-pair data, timer sessions, and settings.",
+                ft.Text("Import replaces the current schemes, letter-pair data, timer sessions, Progressive Memo history, and settings.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.status_text,
             ], spacing=12)),

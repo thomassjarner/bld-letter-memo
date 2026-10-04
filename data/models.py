@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 13
+CURRENT_VERSION = 14
 
 
 @dataclass
@@ -132,6 +132,76 @@ class PracticeSolve:
 
 
 @dataclass
+class ProgressiveRecall:
+    category: str
+    kind: str
+    expected: str
+    entered: str
+
+    def to_dict(self) -> dict:
+        return {"category": self.category, "kind": self.kind,
+                "expected": self.expected, "entered": self.entered}
+
+    @staticmethod
+    def from_dict(d: dict) -> "ProgressiveRecall":
+        return ProgressiveRecall(str(d.get("category", "")), str(d.get("kind", "pair")),
+                                 str(d.get("expected", "")), str(d.get("entered", "")))
+
+
+@dataclass
+class ProgressiveMemoAttempt:
+    id: str
+    created_at: str
+    scramble: str
+    scheme_name: str
+    scheme_snapshot: dict
+    memo_order: str
+    execution_order: str
+    memo_centiseconds: int
+    recall_centiseconds: int
+    correct_letters: int
+    scored_letters: int
+    recall: List[ProgressiveRecall] = field(default_factory=list)
+
+    @property
+    def centiseconds(self) -> int:
+        return self.memo_centiseconds + self.recall_centiseconds
+
+    @property
+    def accuracy(self) -> float:
+        return 100 * self.correct_letters / self.scored_letters if self.scored_letters else 0.0
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "created_at": self.created_at, "scramble": self.scramble,
+                "scheme_name": self.scheme_name, "scheme_snapshot": self.scheme_snapshot,
+                "memo_order": self.memo_order, "execution_order": self.execution_order,
+                "centiseconds": self.centiseconds, "memo_centiseconds": self.memo_centiseconds,
+                "recall_centiseconds": self.recall_centiseconds, "accuracy": self.accuracy,
+                "correct_letters": self.correct_letters, "scored_letters": self.scored_letters,
+                "recall": [item.to_dict() for item in self.recall]}
+
+    @staticmethod
+    def from_dict(d: dict) -> "ProgressiveMemoAttempt":
+        def number(key):
+            try:
+                return max(0, int(d.get(key, 0)))
+            except (TypeError, ValueError, OverflowError):
+                return 0
+        scored = number("scored_letters")
+        raw_recall = d.get("recall", [])
+        snapshot = d.get("scheme_snapshot", {})
+        return ProgressiveMemoAttempt(
+            id=str(d.get("id", "")), created_at=str(d.get("created_at", "")),
+            scramble=str(d.get("scramble", "")), scheme_name=str(d.get("scheme_name", "")),
+            scheme_snapshot=dict(snapshot) if isinstance(snapshot, dict) else {},
+            memo_order=str(d.get("memo_order", "CE")), execution_order=str(d.get("execution_order", "EC")),
+            memo_centiseconds=number("memo_centiseconds"), recall_centiseconds=number("recall_centiseconds"),
+            correct_letters=min(scored, number("correct_letters")), scored_letters=scored,
+            recall=[ProgressiveRecall.from_dict(item) for item in raw_recall if isinstance(item, dict)] if isinstance(raw_recall, list) else [],
+        )
+
+
+@dataclass
 class AppData:
     version: int = CURRENT_VERSION
     active_scheme: Optional[str] = None
@@ -153,6 +223,7 @@ class AppData:
         default_factory=lambda: {"Session 1": [], "Session 2": [], "Session 3": []}
     )
     active_practice_session: str = "Session 1"
+    progressive_memo_history: List[ProgressiveMemoAttempt] = field(default_factory=list)
     dark_mode: bool = False
     navigation_style: str = "top_tabs"  # top_tabs / compact_sidebar / popout
 
@@ -192,6 +263,7 @@ class AppData:
                 for name, solves in self.practice_sessions.items()
             },
             "active_practice_session": self.active_practice_session,
+            "progressive_memo_history": [attempt.to_dict() for attempt in self.progressive_memo_history],
             "dark_mode": bool(self.dark_mode),
             "navigation_style": self.navigation_style,
         }
@@ -282,6 +354,9 @@ class AppData:
             rating_color_grades=raw_grades,
             practice_sessions=sessions,
             active_practice_session=str(d.get("active_practice_session", "Session 1")),
+            progressive_memo_history=[ProgressiveMemoAttempt.from_dict(item)
+                                      for item in d.get("progressive_memo_history", []) if isinstance(item, dict)]
+                                     if isinstance(d.get("progressive_memo_history", []), list) else [],
             dark_mode=bool(d.get("dark_mode", False)),
             navigation_style=(str(d.get("navigation_style", "top_tabs") or "top_tabs") if str(d.get("navigation_style", "top_tabs") or "top_tabs") in {"top_tabs", "compact_sidebar", "popout"} else "top_tabs"),
         )

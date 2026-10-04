@@ -364,6 +364,15 @@ class AppState:
     def has_outdated_pair_ratings(self) -> bool:
         return any(self.pair_rating_needs_update(pair) for pair in self.data.pair_ratings)
 
+    # ---- progressive memo ------------------------------------------------
+
+    def add_progressive_memo_attempt(self, attempt) -> None:
+        # Keep activity history separate from the Blind Timer's solve sessions.
+        if any(saved.id == attempt.id for saved in self.data.progressive_memo_history):
+            return
+        self.data.progressive_memo_history.append(attempt)
+        self._save(notify=False)
+
     # ---- practice timer ---------------------------------------------------
 
     @property

@@ -58,6 +58,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
             + len(data.global_words) * 20
             + len(data.pair_aliases) * 10
             + solves * 5
+            + len(data.progressive_memo_history) * 5
             + (1 if data.dark_mode else 0)
         )
 

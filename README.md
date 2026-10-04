@@ -1,3 +1,56 @@
+# BLD Letter Memo Web 2.23.0
+
+First Progressive Memo release, available from **Practice → Progressive Memo**.
+
+- Uses the existing Blind Timer scramble generator and Scramble Memo tracer.
+- Applies the selected letter scheme, buffers, cube orientation, own-orientation
+  scramble setting, saved cycle-break priority/stickers, and 3-style parity.
+- Displays categories in memo order (default CE); recall follows execution order
+  (default EC). Each attempt freezes its scheme and expected answer.
+- Start shows the category name for one second. The clock starts with the first
+  actual letters, then continues until the final recall answer is confirmed.
+- Space shows the next ordinary pair. An odd final target stays a single letter.
+- Letter-based twists are displayed together, and letter-based flips together.
+  Visual orientation annotations are omitted from this activity.
+- After the last prompt in each category, all of that category's letters remain
+  visible until Space starts the next category or the recall phase.
+- Recall accepts typed letters, confirmed with Space or Enter. Skip records a
+  missing answer. No expected letters are displayed during recall.
+- Results compare your answer with the correct solution using green/red tiles,
+  including explicit missing and extra letters, and show letter accuracy.
+- Finished attempts save total time, memo time, recall time, accuracy, scramble,
+  answers, timestamp and scheme snapshot in a separate Progressive Memo history.
+  They are included in browser persistence and exported/imported backups.
+- History is scrollable; Older attempts makes every saved result reachable.
+- Cancel or navigation away ends unfinished work without creating a record.
+
+Accuracy uses a minimum-edit comparison within each prompt. Green positions are
+correct; red positions are substituted, missing or extra letters. Accuracy is
+correct positions divided by all comparison positions. Letter case and whitespace
+are ignored, including composed/decomposed Unicode scheme letters.
+
+The initial category title is excluded from timing. Once the first letters
+appear, the timer runs continuously through category reviews, the second category
+intro and recall typing. Results show memo and recall portions separately.
+
+Existing Timer and Letter Pairs pages, all pre-existing AppState methods,
+category/letter-scheme/timer-solve models, tracing and scramble generation are
+unchanged. Data version 14 adds Progressive Memo history; version-13 backups
+load with an empty history and preserve their existing fields. Storage keys,
+dependencies and deployment workflow remain unchanged.
+
+67 automated tests pass. These cover the original 39 checks plus real-scramble
+practice plans, custom and temporary cycle breaks, orientation/parity preferences,
+CE/EC ordering, grouped twists/flips, intro timing, empty categories, Unicode
+recall, mistake scoring, held Space, cancellation, focus, resizing, theme changes,
+saving once, history pagination, old backups and SharedPreferences save/reload.
+Browser rendering remains unverified in this environment.
+
+Apply by copying the release contents into your existing project and committing
+and pushing as usual. See PATCHING.md. No live deployment was performed here.
+
+---
+
 # BLD Letter Memo Web 2.22.2
 
 Letter Pairs presentation refinement:

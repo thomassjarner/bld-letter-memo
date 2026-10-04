@@ -7,6 +7,7 @@ from ui.pages.home_page import build_home
 from ui.pages.letter_pairs_page import LetterPairsPage
 from ui.pages.letter_schemes_page import LetterSchemesPage
 from ui.pages.practice_page import PracticePage
+from ui.pages.practice_hub_page import PracticeHubPage
 from ui.pages.scramble_memo_page import ScrambleMemoPage
 from ui.pages.settings_page import SettingsPage
 from ui.state import AppState
@@ -24,7 +25,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_IN
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.22.2"
+    page.title = "BLD Letter Memo · 2.23.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -67,9 +68,10 @@ async def main(page: ft.Page):
     timer_page.open_memo_callback = open_scramble_from_practice
     timer_page.open_practice_callback = lambda: navigate_to(PRACTICE_INDEX)
     timer_page.show_timer(update=False)
-    practice_page = PracticePage(data=state)
+    practice_page = PracticeHubPage(data=state)
     practice_page.open_memo_callback = open_scramble_from_practice
     practice_page.open_timer_callback = lambda: navigate_to(TIMER_INDEX)
+    practice_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     practice_page.show_menu(update=False)
     home_page = build_home(lambda name: navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name)), data=state)
     pages = [home_page, schemes_page, pairs_page, scramble_page, practice_page, timer_page, settings_page]
@@ -80,6 +82,7 @@ async def main(page: ft.Page):
         settings_page.dark_mode_switch.value = enabled
         # Memo spans use computed cycle colors rather than semantic color tokens.
         scramble_page.refresh(update=False)
+        practice_page.refresh(update=False)
         rebuild_navigation(update=False)
         page.update()
     settings_page.theme_callback = apply_dark_mode
@@ -99,7 +102,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE · v2.22.2", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.23.0", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)
@@ -183,6 +186,8 @@ async def main(page: ft.Page):
                                 (page.height or 800) - content_area.top - 16 - bottom_padding)
         pairs_page.set_viewport(width - content_area.left - horizontal_padding,
                                 (page.height or 800) - content_area.top - 16 - bottom_padding)
+        practice_page.set_viewport(width - content_area.left - horizontal_padding,
+                                   (page.height or 800) - content_area.top - 16 - bottom_padding)
         for view in pages:
             apply_palette(view, state.data.dark_mode)
         for chrome in (top_nav, sidebar_nav, popout_panel, popout_button):
@@ -207,7 +212,7 @@ async def main(page: ft.Page):
         rebuild_navigation(update=False)
         page.update()
         timer_page.set_active(index == TIMER_INDEX)
-        practice_page.set_active(False)
+        practice_page.set_active(index == PRACTICE_INDEX)
 
     def on_resize(e):
         # Reflow the existing timer body for every size change; its keyboard

@@ -32,7 +32,7 @@ def build_home(navigate, data=None):
                 "Create a personal mnemonic dictionary. Add words and aliases, rate your pairs, and find what needs work.",
                 ft.Icons.TABLE_CHART, "Open letter pairs", lambda e: navigate("Letter Pairs"), "02 / ASSOCIATION"),
             activity_card("Practice",
-                "Time full attempts with Blind Timer. Progressive Memo, Delayed Recall, and Letter Pair Drill are planned.",
+                "Time full attempts with Blind Timer, or train real-scramble recall with Progressive Memo. More drills are planned.",
                 ft.Icons.FITNESS_CENTER, "Choose a practice activity", lambda e: navigate("Practice"), "03 / REPETITION"),
             activity_card("Analyze a scramble",
                 "Trace a scramble using your scheme. Inspect memo targets and explore temporary cycle-break choices.",
