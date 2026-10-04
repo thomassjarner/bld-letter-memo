@@ -131,28 +131,31 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.stats_text = ft.Text("", color=ft.Colors.ON_SURFACE)
         self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12, color=ft.Colors.ON_SURFACE)
         self._copy_notice_token = 0
-        self.history = ft.ListView(spacing=6, expand=True, scroll=ft.ScrollMode.AUTO)
-        self.history_panel = ft.Container(
-            content=self.history,
-            expand=True,
-            padding=8,
-            bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=8,
-        )
+        # Keep this ListView mounted and give it an explicit viewport. Flet web
+        # can otherwise let a nested expanding history list grow past the page.
+        self.history = ft.ListView(spacing=0, scroll=ft.ScrollMode.ALWAYS,
+                                   build_controls_on_demand=True)
+        self.history_limit = 50
+        self._history_session = self.state.data.active_practice_session
+        self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.older_solves_button = ft.TextButton("Older solves", on_click=self._load_older_solves)
+        self.metric_values = [ft.Text("—", size=17, weight=ft.FontWeight.W_600,
+                                      color=ft.Colors.ON_SURFACE) for _ in range(6)]
+        self._viewport = (1400, 760)
         self.session_dropdown = ft.Dropdown(
             label="Session",
-            width=150,
+            width=150, height=44, dense=True,
             value=self.state.data.active_practice_session,
             options=[ft.DropdownOption(name, name) for name in self.state.practice_session_names],
             on_select=self._switch_session,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
-        self.previous_scramble_button = ft.OutlinedButton(
-            "Previous", icon=ft.Icons.ARROW_BACK, on_click=self._previous_scramble, disabled=True
+        self.previous_scramble_button = ft.IconButton(
+            ft.Icons.CHEVRON_LEFT, tooltip="Previous scramble",
+            on_click=self._previous_scramble, disabled=True,
         )
-        self.new_scramble_button = ft.OutlinedButton(
-            "Next scramble", icon=ft.Icons.ARROW_FORWARD, on_click=self._new_scramble
+        self.new_scramble_button = ft.IconButton(
+            ft.Icons.CHEVRON_RIGHT, tooltip="Next scramble", on_click=self._new_scramble,
         )
         self.success_button = ft.OutlinedButton(
             "Success", icon=ft.Icons.CHECK_CIRCLE, on_click=lambda e: self._mark_last("ok"), disabled=True
@@ -163,9 +166,12 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.dnf_button = ft.OutlinedButton(
             "DNF", icon=ft.Icons.CANCEL, on_click=lambda e: self._mark_last("dnf"), disabled=True
         )
-        self.memo_button = ft.ElevatedButton(
-            "Take to Scramble Memo", icon=ft.Icons.SHUFFLE, on_click=self._take_last_to_memo, disabled=True
+        self.memo_button = ft.OutlinedButton(
+            "Analyze solve", icon=ft.Icons.SHUFFLE, tooltip="Take saved solve to Scramble Memo",
+            on_click=self._take_last_to_memo, disabled=True,
         )
+        for button in (self.success_button, self.plus2_button, self.dnf_button, self.memo_button):
+            button.style = ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=10, vertical=9))
 
         self._show_menu(update=False)
         self._refresh_stats_and_history(update=False)
@@ -224,72 +230,167 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _show_timer(self, e=None, update=True):
         self.mode = "timer"
-        # Critical layout rule: the Blind Timer itself never scrolls. Its
-        # history list is the only scrollable region, so adding solves cannot
-        # increase the browser/page height.
         self.scroll = None
+        self.spacing = 0
 
-        body = ft.Column(
-            [
-                ft.Row([
-                    ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._back_to_practice),
-                    ft.Text("Blind Timer", size=24, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                    self.session_dropdown,
-                ], wrap=True),
-                ft.Container(
-                    self.scramble_text,
-                    padding=14,
-                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
-                    border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-                    border_radius=8,
-                ),
-                ft.Row(
-                    [self.previous_scramble_button, self.new_scramble_button],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                ),
-                ft.Container(
-                    ft.Column(
-                        [self.timer_text, self.status_text, ft.Text("Hold Space to arm · Release to start · Any key to stop", size=11, color=ft.Colors.ON_SURFACE_VARIANT)],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        spacing=8,
-                    ),
-                    alignment=ft.Alignment.CENTER,
-                    padding=10,
-                    height=154,
-                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
-                    border_radius=10,
-                ),
-                ft.Row([self.success_button, self.plus2_button, self.dnf_button, self.memo_button], wrap=True),
-                ft.Divider(height=8),
-                self.stats_text,
-                ft.Row([
-                    ft.Text("Session history", size=15, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                    ft.TextButton("Reset session", icon=ft.Icons.DELETE_SWEEP, on_click=self._confirm_reset),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                self.copy_notice,
-                self.history_panel,
-            ],
-            expand=True,
-            spacing=7,
-        )
-        # The timer page itself is no longer scrollable; only the solve-history
-        # ListView scrolls. Keep focus on KeyboardListener directly. An invisible
-        # TextField used in earlier builds could take keyboard focus away from the
-        # listener in the web client, making Space appear to do nothing.
+        self.scramble_text.expand = True
+        self._scramble_panel = panel(ft.Row([
+            self.scramble_text,
+            ft.Row([self.previous_scramble_button, self.new_scramble_button], spacing=0, tight=True),
+        ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=12)
+        self._timer_hint = ft.Text("Hold Space to arm · Release to start · Any key to stop",
+                                  size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                                  text_align=ft.TextAlign.CENTER)
+        self._timer_stage = panel(ft.Column([
+            self.timer_text, self.status_text, self._timer_hint, self.copy_notice,
+        ], spacing=8, alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER), padding=16)
+        self._result_row = ft.Row([
+            self.success_button, self.plus2_button, self.dnf_button, self.memo_button,
+        ], spacing=8, wrap=True, alignment=ft.MainAxisAlignment.CENTER)
+        self._stats_panel = panel(ft.Row([
+            ft.Column([
+                ft.Text(label, size=10, color=ft.Colors.ON_SURFACE_VARIANT), value,
+            ], spacing=4, expand=True)
+            for label, value in zip(("Success / total", "Ao5", "Ao12", "Best single", "Best Ao5", "Best Ao12"), self.metric_values)
+        ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=14)
+        self._timer_workspace = ft.Column([
+            self._timer_stage, self._result_row, self._stats_panel,
+        ], spacing=12)
+
+        self._stats_button = ft.IconButton(ft.Icons.INSIGHTS, tooltip="Session statistics",
+                                           on_click=self._show_session_stats, visible=False)
+        self.history_panel = panel(ft.Column([
+            ft.Container(ft.Row([
+                ft.Text("Session history", size=15, weight=ft.FontWeight.W_600,
+                        color=ft.Colors.ON_SURFACE, expand=True),
+                self._stats_button,
+                ft.IconButton(ft.Icons.DELETE_SWEEP_OUTLINED, tooltip="Reset session",
+                              icon_size=18, on_click=self._confirm_reset),
+            ], spacing=2), height=32),
+            self.history,
+            ft.Container(ft.Row([
+                self.history_meta, self.older_solves_button,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=4), height=28),
+        ], spacing=8), padding=12)
+        self._main_region = ft.Column(spacing=0)
+        self._timer_body = ft.Column([
+            ft.Container(ft.Row([
+                ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", icon_size=19,
+                              on_click=self._back_to_practice),
+                ft.Text("Blind Timer", size=23, weight=ft.FontWeight.W_600,
+                        color=ft.Colors.ON_SURFACE, expand=True),
+                self.session_dropdown,
+            ], spacing=8), height=44),
+            self._scramble_panel,
+            self._main_region,
+        ], spacing=12, expand=True)
+        # Reflow updates the existing body. The KeyboardListener is created
+        # once and stays mounted through resizing, theme changes, and history.
         self.keyboard_listener = ft.KeyboardListener(
-            content=body,
-            autofocus=True,
-            on_key_down=self._on_key_down,
-            on_key_repeat=self._on_key_repeat,
-            on_key_up=self._on_key_up,
-            expand=True,
+            content=self._timer_body, autofocus=True,
+            on_key_down=self._on_key_down, on_key_repeat=self._on_key_repeat,
+            on_key_up=self._on_key_up, expand=True,
         )
         self.controls = [self.keyboard_listener]
+        self._timer_layout_wide = None
+        self.set_viewport(*self._viewport)
         self._refresh_stats_and_history(update=False)
         if update:
             self._safe_update()
             self._focus_keyboard_listener()
+
+    def set_viewport(self, width, height):
+        """Bound both panels to available space without rebuilding keyboard input."""
+        width, height = max(280, float(width)), max(300, float(height))
+        self._viewport = (width, height)
+        if self.mode != "timer" or not hasattr(self, "_main_region"):
+            return
+        wide = width >= 1000
+        scramble_height = 72 if wide else (90 if width >= 600 else 104)
+        main_height = max(120, height - 44 - scramble_height - 24)
+        self._scramble_panel.height = scramble_height
+        self._scramble_panel.width = width
+        self._timer_body.width = width
+        self.scramble_text.size = 17 if wide else 14
+        self.session_dropdown.width = 150 if wide else 136
+        self.success_button.content = "Success" if width >= 600 else "OK"
+        self.memo_button.content = "Analyze solve" if width >= 600 else "Analyze"
+        self._stats_panel.visible = wide
+        self._stats_button.visible = not wide
+        if wide:
+            history_width = min(420, max(340, width * 0.29))
+            timer_width = width - history_width - 20
+            history_height = timer_height = main_height
+            self._timer_workspace.expand = True
+            self.history_panel.width = history_width
+            if self._timer_layout_wide is not True:
+                self._timer_workspace.controls = [self._timer_stage, self._result_row, self._stats_panel]
+                self._main_region.controls = [ft.Row([
+                    self._timer_workspace, self.history_panel,
+                ], spacing=20, vertical_alignment=ft.CrossAxisAlignment.STRETCH)]
+        else:
+            timer_width = width
+            history_height = min(220, max(100, main_height * 0.37))
+            history_height = min(history_height, main_height - 72)
+            timer_height = main_height - history_height - 12
+            self._timer_workspace.expand = False
+            self.history_panel.width = width
+            if self._timer_layout_wide is not False:
+                self._timer_workspace.controls = [self._timer_stage, self._result_row]
+                self._main_region.controls = [ft.Column([
+                    self._timer_workspace, self.history_panel,
+                ], spacing=12)]
+        self._timer_layout_wide = wide
+        self._main_region.controls[0].height = main_height
+        self._timer_workspace.width = timer_width
+        self._timer_workspace.height = timer_height
+        self._timer_stage.width = timer_width
+        self._stats_panel.width = timer_width
+        self._result_row.width = timer_width
+        self._stats_panel.height = 76
+        self._result_row.height = 40
+        # Desktop gives the time the full remaining left panel. Compact
+        # screens keep statistics accessible from the history header.
+        self._timer_stage.height = max(24, timer_height - (140 if wide else 52))
+        self._timer_stage.content.controls = [self.timer_text]
+        if self._timer_stage.height >= 64:
+            self._timer_stage.content.controls.append(self.status_text)
+        if self._timer_stage.height >= 128:
+            self._timer_stage.content.controls.append(self._timer_hint)
+        if self._timer_stage.height >= 160:
+            self._timer_stage.content.controls.append(self.copy_notice)
+        self._timer_stage.tooltip = "Hold Space to arm · Release to start · Any key to stop"
+        self.history_panel.height = history_height
+        self.history.height = max(1, history_height - 100)
+        self._main_region.height = main_height
+        self._main_region.width = width
+        self._timer_width = timer_width
+        self._adjust_timer_font()
+
+    def _adjust_timer_font(self):
+        if hasattr(self, "_timer_stage"):
+            glyphs = max(7, len(self.timer_text.value or "0.00"))
+            self.timer_text.size = max(22, min(128, self._timer_stage.height * 0.34,
+                                             (self._timer_width - 32) / (glyphs * 0.62)))
+
+    def _load_older_solves(self, e=None):
+        self.history_limit += 50
+        self._refresh_stats_and_history()
+        self._focus_keyboard_listener()
+
+    def _show_session_stats(self, e=None):
+        dialog = ft.AlertDialog(
+            title=ft.Text("Session statistics", color=ft.Colors.ON_SURFACE),
+            content=ft.Text(self.stats_text.value.replace("    ", "\n"),
+                            color=ft.Colors.ON_SURFACE),
+            actions=[ft.TextButton("Close", on_click=lambda e: self._close_session_stats())],
+        )
+        show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
+
+    def _close_session_stats(self):
+        self.page.pop_dialog()
+        self._focus_keyboard_listener()
 
     def set_active(self, active: bool):
         self.active = bool(active)
@@ -482,6 +583,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
     def _safe_update(self):
+        self._adjust_timer_font()
         if self.page is not None:
             self.update()
 
@@ -587,6 +689,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _refresh_stats_and_history(self, update=True):
         solves = self.state.data.practice_solves
+        if self._history_session != self.state.data.active_practice_session:
+            self._history_session = self.state.data.active_practice_session
+            self.history_limit = 50
         successes = sum(1 for s in solves if not s.dnf)
         ao5 = _wca_average(solves, 5)
         ao12 = _wca_average(solves, 12)
@@ -608,8 +713,17 @@ class PracticePage(ThemeAwarePage, ft.Column):
             f"Best Ao5: {fmt_avg(best_ao5)}    Best Ao12: {fmt_avg(best_ao12)}"
         )
 
+        metric_texts = (
+            f"{successes}/{len(solves)}", fmt_avg(ao5), fmt_avg(ao12),
+            _format_centiseconds(best) if best is not None else "—", fmt_avg(best_ao5), fmt_avg(best_ao12),
+        )
+        for control, value in zip(self.metric_values, metric_texts):
+            control.value = value
+        shown = min(len(solves), self.history_limit)
+        self.history_meta.value = f"{shown} of {len(solves)} solves · newest first"
+        self.older_solves_button.visible = shown < len(solves)
         rows = []
-        for idx in range(len(solves) - 1, max(-1, len(solves) - 30), -1):
+        for idx in range(len(solves) - 1, len(solves) - shown - 1, -1):
             solve = solves[idx]
             effective = _effective_centiseconds(solve)
             if solve.dnf:
@@ -621,25 +735,28 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
             rows.append(
                 ft.Container(
-                    ft.Row([
-                        ft.Text(f"#{idx + 1}", width=50, color=ft.Colors.ON_SURFACE),
-                        ft.Container(
-                            content=ft.Text(result, weight=ft.FontWeight.BOLD, color=result_color),
-                            width=100,
-                            padding=ft.Padding.symmetric(horizontal=4, vertical=6),
-                            tooltip="Click to copy time + scramble",
-                            on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
-                        ),
+                    ft.Column([
+                        ft.Row([
+                            ft.Text(f"#{idx + 1}", width=36, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                            ft.Container(
+                                content=ft.Text(result, size=16, weight=ft.FontWeight.W_600, color=result_color),
+                                expand=True, tooltip="Click to copy time + scramble",
+                                padding=ft.Padding.symmetric(vertical=4),
+                                on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
+                            ),
+                            ft.IconButton(ft.Icons.SHUFFLE, icon_size=17, tooltip="Take to Scramble Memo",
+                                          on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
+                            ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, tooltip="Delete solve",
+                                          on_click=lambda e, i=idx: self._delete_solve(i)),
+                        ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                         ft.GestureDetector(
-                            content=ft.Text(solve.scramble, expand=True, max_lines=2, tooltip="Click to copy scramble", color=ft.Colors.ON_SURFACE),
+                            content=ft.Text(solve.scramble, size=11, max_lines=2,
+                                            color=ft.Colors.ON_SURFACE_VARIANT, tooltip="Click to copy scramble"),
                             on_tap=lambda e, text=solve.scramble: self._copy_text(text, "Scramble copied"),
                         ),
-                        ft.IconButton(ft.Icons.SHUFFLE, tooltip="Take to Scramble Memo", on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
-                        ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip="Delete solve", on_click=lambda e, i=idx: self._delete_solve(i)),
-                    ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                    padding=8,
+                    ], spacing=2),
+                    padding=ft.Padding.symmetric(horizontal=4, vertical=10),
                     border=ft.Border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
-                    border_radius=0,
                 )
             )
         self.history.controls = rows or [ft.Text("No solves yet.", italic=True, color=ft.Colors.ON_SURFACE)]

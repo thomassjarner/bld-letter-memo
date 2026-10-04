@@ -1,3 +1,24 @@
+# BLD Letter Memo Web 2.22.0
+
+A more spacious timer workspace:
+- Previous / Next scramble controls now sit beside the scramble.
+- On wide screens, a large timer sits beside a separately scrollable history panel.
+- Narrow screens stack the same panels, with statistics available from the history header.
+- History has a visible scrollbar and explicit height bounds so it stays inside the app viewport.
+- The newest 50 solves are shown initially. Older solves loads another 50; all saved solves remain reachable.
+- History rows retain time/scramble copying, memo analysis, and deletion actions.
+- Timer text scales with the available space and the result length.
+- The corner brand is now a static, unboxed outline cube with no click behavior.
+- Version 2.22.0 appears in the header and browser-tab title.
+
+32 automated tests pass. The new tests cover viewport bounds, a running timer
+through resize, older history access and actions, penalties after resizing,
+and the noninteractive brand mark. Browser rendering remains unverified here.
+Core, data, persistence, theme-color handling and keyboard/timing methods are
+unchanged. Copy the release contents and commit/push as usual; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.21.2
 
 Explicit control-color update:

@@ -24,7 +24,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_IN
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.21.2"
+    page.title = "BLD Letter Memo · 2.22.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -35,7 +35,6 @@ async def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
     current_index = HOME_INDEX
     popout_open = False
-    last_layout = None
 
     schemes_page = LetterSchemesPage(data=state)
     pairs_page = LetterPairsPage(data=state)
@@ -97,11 +96,10 @@ async def main(page: ft.Page):
 
     def brand(compact=False):
         return ft.Row([
-            ft.Container(ft.Icon(ft.Icons.GRID_VIEW, size=20, color=ft.Colors.ON_PRIMARY),
-                         bgcolor=ft.Colors.PRIMARY, padding=7, border_radius=7),
+            ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE · v2.21.2", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.22.0", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)
@@ -147,14 +145,12 @@ async def main(page: ft.Page):
     )
 
     def rebuild_navigation(update=True):
-        nonlocal last_layout
         width = page.width or 1200
         narrow = width < 1120
         # Small screens get a scrollable top nav; the saved preference is unchanged.
         style = state.data.navigation_style
         if style == "compact_sidebar" and width < 700:
             style = "top_tabs"
-        last_layout = (narrow, style)
         top_nav.visible = style == "top_tabs"
         sidebar_nav.visible = style == "compact_sidebar"
         popout_button.visible = style == "popout"
@@ -181,6 +177,10 @@ async def main(page: ft.Page):
         content_area.top = top_nav.height if style == "top_tabs" else 0
         content_area.padding = ft.Padding.only(left=12 if width < 700 else 20, top=16,
             right=12 if width < 700 else 20, bottom=64 if style == "popout" else 16)
+        horizontal_padding = 24 if width < 700 else 40
+        bottom_padding = 64 if style == "popout" else 16
+        timer_page.set_viewport(width - content_area.left - horizontal_padding,
+                                (page.height or 800) - content_area.top - 16 - bottom_padding)
         for view in pages:
             apply_palette(view, state.data.dark_mode)
         for chrome in (top_nav, sidebar_nav, popout_panel, popout_button):
@@ -208,13 +208,9 @@ async def main(page: ft.Page):
         practice_page.set_active(False)
 
     def on_resize(e):
-        width = page.width or 1200
-        style = state.data.navigation_style
-        if style == "compact_sidebar" and width < 700:
-            style = "top_tabs"
-        # Never reconstruct the timer's KeyboardListener on a resize.
-        if last_layout != (width < 1120, style):
-            rebuild_navigation()
+        # Reflow the existing timer body for every size change; its keyboard
+        # listener and active solve stay intact even within one nav breakpoint.
+        rebuild_navigation()
 
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
     page.on_keyboard_event = lambda e: schemes_page.handle_keyboard_event(e) if content_area.content is schemes_page else None
