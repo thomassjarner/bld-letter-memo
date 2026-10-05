@@ -1,46 +1,40 @@
-# Update to 2.23.0
+# Update to 2.24.0
 
-Copy the contents of `bld-letter-memo-web-2.23.0/` into your existing project
-folder, replacing matching files and including the new files. Place the contents
-directly in your project. The normal GitHub Pages deployment process is unchanged.
+Copy the contents of `bld-letter-memo-web-2.24.0/` into your existing project,
+replacing matching files and including the new files. Place the contents directly
+in the project folder. The GitHub Pages deployment process is unchanged.
 
 Run these commands from Terminal inside your existing project folder:
 
 ```sh
 git add -A &&
-git commit -m "Add Progressive Memo practice with recall scoring and history" &&
+git commit -m "Add optional 2D cube letter scheme editor" &&
 git push
 ```
 
-Wait for GitHub Actions, then reload and confirm **2.23.0** in the header or
+Wait for GitHub Actions, then reload and confirm **2.24.0** in the header or
 browser-tab title. Command+Shift+R can refresh the build on macOS. Keep browser
-storage. Existing browser data is read with the same storage keys; the new
-practice history is an additive data field.
+storage; no manual data migration or import is needed.
 
-## Use Progressive Memo
+## Use the new editor
 
-Open **Practice → Progressive Memo**, choose your letter scheme, then press Start.
-The activity uses your Memo and Exec settings from Letter Schemes. Start shows
-the first memo category for one second; the clock starts with its first letters.
-Space advances ordinary pairs, grouped letter-based twists/flips, then the full
-category review. The next category has the same one-second title and sequence.
-Visual twists/flips are omitted. After the final review, Space starts recall in
-execution order. Type each pair, single final letter or entire orientation group
-and press Space or Enter to confirm. Use Skip for an answer you cannot remember.
+In **Letter Schemes**, open Edges or Corners and choose **Editor → 2D cube**.
+Type letters directly in that category's sticker cells. Other-category letters
+remain visible; change tabs to edit them. The existing buffer dropdown selects
+the exact tracing sticker and locks its entire physical piece.
 
-After the last answer, inspect the green/red comparison tiles, correct solution,
-accuracy and total/memo/recall times. The result and scramble save automatically.
-Select a history row to reopen it; Older attempts loads more saved records.
-Cancel, Back or navigation away discards an unfinished attempt.
+Choose **Face cards** to return to the original layout. Both editors use the
+same scheme data, so changes appear in either view. The chosen editor is saved
+as a browser-wide UI preference. Small screens can scroll the cube horizontally
+and the editor vertically.
 
 ## Preservation and validation
 
-The approved Timer and Letter Pairs pages are unchanged, as are existing tracing,
-scramble generation, scheme models, timer records and AppState methods. New
-modules provide Progressive Memo and the Practice hub. Data version 14 adds
-separate practice history to browser storage and backups. Existing version-13
-backups import with empty Progressive Memo history and their original data.
+The new `ui/components/cube_net.py` component uses canonical sticker IDs and the
+existing letter-entry callbacks. Data version 15 adds an editor preference;
+older data defaults to Face cards. Tracing, scrambling, Timer, Progressive Memo,
+Letter Pairs, history, repositories and storage keys are unchanged.
 
-67 tests pass, including original BLD, Timer, layout and theme checks, plus
-practice sequencing, recall, accuracy, cancellation, focus, history and storage.
+77 tests pass, including the existing 67 checks and new cube geometry, editor
+interchange, buffer, keyboard, responsive layout, theme and backup checks.
 Browser rendering remains unverified here. No live deployment was performed.

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 14
+CURRENT_VERSION = 15
 
 
 @dataclass
@@ -226,6 +226,7 @@ class AppData:
     progressive_memo_history: List[ProgressiveMemoAttempt] = field(default_factory=list)
     dark_mode: bool = False
     navigation_style: str = "top_tabs"  # top_tabs / compact_sidebar / popout
+    letter_scheme_editor: str = "cards"  # cards / cube
 
     def ensure_default_sessions(self) -> None:
         for name in ("Session 1", "Session 2", "Session 3"):
@@ -266,6 +267,7 @@ class AppData:
             "progressive_memo_history": [attempt.to_dict() for attempt in self.progressive_memo_history],
             "dark_mode": bool(self.dark_mode),
             "navigation_style": self.navigation_style,
+            "letter_scheme_editor": self.letter_scheme_editor,
         }
 
     @staticmethod
@@ -359,6 +361,7 @@ class AppData:
                                      if isinstance(d.get("progressive_memo_history", []), list) else [],
             dark_mode=bool(d.get("dark_mode", False)),
             navigation_style=(str(d.get("navigation_style", "top_tabs") or "top_tabs") if str(d.get("navigation_style", "top_tabs") or "top_tabs") in {"top_tabs", "compact_sidebar", "popout"} else "top_tabs"),
+            letter_scheme_editor=d.get("letter_scheme_editor", "cards") if d.get("letter_scheme_editor", "cards") in ("cards", "cube") else "cards",
         )
         data.ensure_default_sessions()
         return data

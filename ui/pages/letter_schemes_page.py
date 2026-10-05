@@ -5,6 +5,7 @@ from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
 from core.tracer import STANDARD_CORNER_PRIORITY, STANDARD_EDGE_PRIORITY
 from ui.components.buffer_picker import build_buffer_picker
 from ui.components.sticker_grid import build_sticker_grid
+from ui.components.cube_net import build_cube_net
 from ui.state import AppState
 from ui.design import page_heading, eyebrow
 
@@ -35,6 +36,16 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         # Edges first is only a UI/data-entry preference. It does not affect
         # memo/execution order.
         self.selected_category = "edges"
+        self._viewport = (1400.0, 760.0)
+        self._layout_wide = True
+        self._cube_editor = None
+        self.editor_dropdown = ft.Dropdown(
+            label="Editor", width=170, height=44, dense=True,
+            value=self.state.data.letter_scheme_editor,
+            options=[ft.DropdownOption("cards", "Face cards"), ft.DropdownOption("cube", "2D cube")],
+            on_select=self._on_editor_change,
+            color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
+        )
         self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=144, dense=True, on_submit=self._create_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.rename_field = ft.TextField(hint_text="Rename active scheme", width=170, dense=True, on_submit=self._rename_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.scheme_list_view = ft.ListView(expand=True, spacing=2, scroll=ft.ScrollMode.AUTO)
@@ -61,7 +72,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
     # ---- layout -------------------------------------------------------------
 
     def _build_layout(self) -> ft.Control:
-        sidebar = ft.Container(
+        self.sidebar = ft.Container(
             width=216,
             padding=12,
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
@@ -82,10 +93,26 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         # static-web layout bug where an expanding ListView nested inside an
         # expanding Container never receives a usable scroll viewport.
         return ft.Row(
-            [sidebar, self.body_scroll],
+            [self.sidebar, self.body_scroll],
             expand=True,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
+
+    def set_viewport(self, width, height):
+        width, height = max(280.0, float(width)), max(300.0, float(height))
+        self._viewport = (width, height)
+        self.width, self.height = width, height
+        wide = width >= 760
+        self.sidebar.width = 216 if wide else width
+        self.sidebar.height = None if wide else 188
+        if wide != self._layout_wide:
+            self.controls[1] = (ft.Row([self.sidebar, self.body_scroll], expand=True,
+                                      vertical_alignment=ft.CrossAxisAlignment.STRETCH) if wide else
+                                ft.Column([self.sidebar, self.body_scroll], expand=True, spacing=12))
+            self._layout_wide = wide
+        self.body_scroll.width = width - 226 if wide else width
+        if self._cube_editor is not None:
+            self._cube_editor.set_width(self.body_scroll.width - 20)
 
     # ---- refresh ------------------------------------------------------------
 
@@ -121,6 +148,8 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
 
     def _refresh_body(self):
         scheme = self.state.active_scheme
+        self._cube_editor = None
+        self.editor_dropdown.value = self.state.data.letter_scheme_editor
         if scheme is None:
             self.body_scroll.controls = [ft.Text("Create a scheme to get started.", italic=True, color=ft.Colors.ON_SURFACE)]
             return
@@ -166,16 +195,24 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         )
 
         self._sticker_fields = {}
-        grid = build_sticker_grid(
-            self.selected_category, cat,
-            lambda sticker, value: self._set_letter(sticker, value),
-            on_field_focus=self._on_sticker_focus,
-            field_registry=self._sticker_fields,
-        )
+        if self.state.data.letter_scheme_editor == "cube":
+            self._cube_editor = build_cube_net(
+                self.selected_category, scheme, self._set_letter,
+                on_field_focus=self._on_sticker_focus, field_registry=self._sticker_fields,
+                width=(self._viewport[0] - 246 if self._layout_wide else self._viewport[0] - 20),
+            )
+            grid = self._cube_editor
+        else:
+            grid = build_sticker_grid(
+                self.selected_category, cat,
+                lambda sticker, value: self._set_letter(sticker, value),
+                on_field_focus=self._on_sticker_focus,
+                field_registry=self._sticker_fields,
+            )
         self._sticker_order = [s for s in CATEGORY_STICKER_ORDER[self.selected_category] if s in self._sticker_fields]
 
         self.body_scroll.controls = common + [
-            ft.Row([buffer_picker]),
+            ft.Row([buffer_picker, self.editor_dropdown], wrap=True, spacing=12),
             ft.Container(content=grid, padding=ft.Padding.only(top=6)),
             self.settings_message,
         ]
@@ -467,6 +504,13 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._focused_sticker = None
         self._refresh_body()
         self.update()
+
+    def _on_editor_change(self, e):
+        self.state.set_letter_scheme_editor(e.control.value)
+        self._focused_sticker = None
+        self._refresh_body()
+        if self.page is not None:
+            self.update()
 
     def _set_buffer(self, buffer_sticker: str):
         scheme = self.state.active_scheme

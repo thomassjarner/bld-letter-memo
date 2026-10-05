@@ -246,6 +246,12 @@ class AppState:
         self.data.navigation_style = style
         self._save(notify=False)
 
+    def set_letter_scheme_editor(self, editor: str) -> None:
+        if editor not in {"cards", "cube"}:
+            return
+        self.data.letter_scheme_editor = editor
+        self._save(notify=False)
+
     # ---- global words ------------------------------------------------------
 
     def set_word(self, pair: str, word: str) -> None:

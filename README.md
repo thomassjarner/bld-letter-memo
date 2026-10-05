@@ -1,3 +1,43 @@
+# BLD Letter Memo Web 2.24.0
+
+A switchable 2D cube editor in **Letter Schemes**.
+
+Choose **Editor → 2D cube** on the Edges or Corners tab. Choose **Face cards**
+to return to the original editor. Both views edit the same saved letters; the
+view choice is remembered in browser data and backups. Existing users and older
+backups default to Face cards.
+
+- The cube unfolds as U above F, L/F/R/B across the middle, and D below F.
+- Every canonical corner and edge sticker appears exactly once in its physical
+  position; Back and Down are mapped with the correct face orientation.
+- The selected category is editable directly on the cube. The other category
+  displays its letters read-only; switch tabs to edit it.
+- Center colors follow the scheme's selected memo orientation.
+- Buffer stickers and every sticker on their physical pieces stay locked.
+  A star identifies the exact tracing buffer; dots mark the rest of that piece.
+- Single-letter autosave, capitalization, auto-advance and Backspace behavior use
+  the existing scheme-entry callbacks. Duplicate-letter warnings remain.
+- Small windows stack the scheme list above the editor and allow horizontal net
+  scrolling. The existing editor body retains its vertical scrollbar.
+- Light/dark labels and editable text use existing theme roles. Face centers have
+  contrasting text against their cube colors.
+
+Data version 15 adds only the editor preference. Existing scheme data, letters,
+buffers, preferences, words, aliases, ratings, timer sessions, Progressive Memo
+history and backups are preserved. Core tracing and scrambling, Timer,
+Progressive Memo, Letter Pairs and the browser-storage backend are unchanged.
+
+77 automated tests pass. New checks cover all 54 face positions, adjoining
+cubies, all 24 color orientations, buffer locking, cross-editor data continuity,
+typing without rebuilding fields, buffer changes, Backspace, resizing, duplicate
+warnings, light/dark contrast and preference/backup compatibility.
+Browser rendering remains unverified in this environment.
+
+Copy the release contents into your existing project, then commit and push as
+usual. The patching process is unchanged; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.23.0
 
 First Progressive Memo release, available from **Practice → Progressive Memo**.
