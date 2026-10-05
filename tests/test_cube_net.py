@@ -10,7 +10,7 @@ import pytest
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER, find_piece_for_sticker
 from data.models import AppData
-from ui.components.cube_net import (COLOR_NAMES, FACE_COLORS, NET_ROWS, STICKER_BORDER,
+from ui.components.cube_net import (COLOR_NAMES, FACE_COLORS, NET_ROWS, MIN_STICKER_SIZE, STICKER_BORDER,
                                    CubeNetEditor, face_stickers, orientation_colors)
 from ui.theme_colors import apply_palette
 from test_navigation import click_nav, mount, no_client_mount, walk
@@ -164,7 +164,7 @@ def test_resizing_keeps_fields_square_and_scrolling_accessible_without_rebuildin
     for width, height in ((1400, 808), (920, 700), (366, 570)):
         view.set_viewport(width, height)
         assert view._cube_editor is editor and view._sticker_fields is fields and view.body_scroll is scroll
-        assert all(cell.width == cell.height and cell.width >= 36 for cell in editor.cell_controls.values())
+        assert all(cell.width == cell.height and cell.width >= MIN_STICKER_SIZE for cell in editor.cell_controls.values())
         assert all(face.width == face.height for face in editor.face_controls.values())
         assert all(field.width == field.height for field in fields.values())
         assert editor.net_scroll.width <= width and scroll.scroll == ft.ScrollMode.ALWAYS
@@ -174,6 +174,41 @@ def test_resizing_keeps_fields_square_and_scrolling_accessible_without_rebuildin
         else:
             assert isinstance(view.controls[1], ft.Row)
     assert repo.data.to_dict() == snapshot
+
+
+def test_height_only_resize_fits_all_six_faces_and_short_windows_keep_a_scroll_viewport():
+    _, repo, view = open_editor()
+    change_editor(view, 'cube')
+    editor, fields, scroll = view._cube_editor, view._sticker_fields, view.body_scroll
+    snapshot = deepcopy(repo.data.to_dict())
+    sizes = []
+    for height in (808, 660, 560):
+        view.set_viewport(1400, height)
+        assert view._cube_editor is editor and view._sticker_fields is fields and view.body_scroll is scroll
+        assert view.controls[0] is view._cube_heading
+        assert view.controls[0].height + scroll.height == height
+        assert view.controls[1].height == scroll.height
+        assert all(not c.wrap for c in scroll.controls[:3] if isinstance(c, ft.Row))
+        # Include the actual fixed toolbar and help rows, padding, item gaps,
+        # and a line for the existing status/error text, not just the net size.
+        toolbar = sum(c.height for c in scroll.controls[:3])
+        help_rows = editor.controls[0].height + editor.controls[2].height + 2 * editor.spacing
+        occupied = toolbar + 20 + 4 * scroll.spacing + help_rows + editor.net_scroll.height + 18
+        assert occupied <= scroll.height + 0.01
+        assert editor.net_scroll.height == editor.net.height
+        assert editor.net_scroll.scroll is None
+        sizes.append(editor.cell_controls['UB'].width)
+    assert sizes[0] > sizes[1] > sizes[2] >= MIN_STICKER_SIZE
+    field = fields[view._sticker_order[0]]
+    field.on_focus(SimpleNamespace(control=field))
+    view.set_viewport(1400, 440)
+    assert view._focused_sticker == view._sticker_order[0]
+    assert editor.cell_controls['UB'].width == MIN_STICKER_SIZE
+    assert scroll.height == 440 - view._cube_heading.height
+    assert scroll.scroll == ft.ScrollMode.ALWAYS
+    assert repo.data.to_dict() == snapshot
+    change_editor(view, 'cards')
+    assert view.controls[0] is view._standard_heading and view.body_scroll.height is None
 
 
 def test_duplicate_letters_and_light_dark_colors_remain_readable():
@@ -188,11 +223,13 @@ def test_duplicate_letters_and_light_dark_colors_remain_readable():
         apply_palette(view, dark)
         for face in 'ULFRBD':
             center = view._cube_editor.cell_controls[face]
-            assert contrast(center.content.color, center.bgcolor) >= 4.5
+            assert center.content is None
             assert COLOR_NAMES[orientation_colors('G', 'R')[face]] in center.tooltip
             for sticker in face_stickers()[face]:
                 cell = view._cube_editor.cell_controls[sticker]
                 assert cell.bgcolor == center.bgcolor
+                if len(sticker) == 1:
+                    continue
                 field = view._sticker_fields.get(sticker)
                 text = field if field is not None else cell.content
                 assert contrast(text.color, cell.bgcolor) >= 4.5
@@ -228,8 +265,10 @@ def test_empty_filled_and_focused_stickers_keep_the_same_square_without_face_cap
                    and f.border == ft.InputBorder.NONE and not f.filled for f in fields.values())
         assert cell.width == field.width + 2 * STICKER_BORDER
     assert repo.data.schemes['gold'].edges.stickers[first] == 'Ø'
-    # The face contains only its nine stickers; its center keeps the U/L/F/R/B/D guide.
+    # Centers are plain color tiles, with no letter or editable field.
     for face, panel in editor.face_controls.items():
+        assert cells[face].content is None and face not in fields
+        assert face in cells[face].tooltip
         assert len(panel.content.controls) == 3
         assert all(isinstance(row, ft.Row) and len(row.controls) == 3 for row in panel.content.controls)
         assert not any(isinstance(c, ft.Text) and c.value == f'{face} · {COLOR_NAMES[orientation_colors("W", "G")[face]]}'

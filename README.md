@@ -1,3 +1,27 @@
+# BLD Letter Memo Web 2.24.2
+
+Plain cube centers and a layout that fits laptop screens more comfortably.
+
+- Center stickers show only their face color. No U/L/F/R/B/D letters appear
+  on them; face information remains available on hover.
+- Cube sizing uses both available width and height. The full net scales down
+  when the window is shorter, with letter sizes adjusting to match.
+- The cube view has a shorter page heading and compact scheme, category and
+  buffer controls. Its body receives an explicit scrolling viewport.
+- Resizing preserves the same input fields, focus, square shapes and values.
+  Very small windows retain readable minimum-size stickers and scrolling.
+- Face cards and Preferences retain their existing layouts and behavior.
+
+79 automated tests pass, including height-only resizing on laptop-sized
+viewports, complete-net bounds, very short windows, plain centers, focus,
+theme contrast, locked buffers and data continuity. Browser rendering remains
+unverified in this environment.
+
+Core logic, data models, persistence, Timer, Progressive Memo and Letter Pairs
+are unchanged. The patching process is unchanged; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.24.1
 
 A cleaner, more realistic **2D cube** letter-scheme editor.

@@ -66,7 +66,14 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._sticker_fields = {}
         self._sticker_order = []
         self._focused_sticker = None
-        self.controls = [page_heading("Letter Schemes", "Map stickers to letters and tune the way you trace a cube.", "01 / Foundation"), self._build_layout()]
+        self._standard_heading = page_heading("Letter Schemes", "Map stickers to letters and tune the way you trace a cube.", "01 / Foundation")
+        self._cube_heading = ft.Container(
+            ft.Text("Letter Schemes", size=22, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+            height=38, padding=ft.Padding.only(bottom=6),
+        )
+        self._buffer_picker = None
+        self._category_tabs = None
+        self.controls = [self._standard_heading, self._build_layout()]
         self.refresh(update=False)
 
     # ---- layout -------------------------------------------------------------
@@ -111,8 +118,31 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                                 ft.Column([self.sidebar, self.body_scroll], expand=True, spacing=12))
             self._layout_wide = wide
         self.body_scroll.width = width - 226 if wide else width
-        if self._cube_editor is not None:
-            self._cube_editor.set_width(self.body_scroll.width - 20)
+        cube = self._cube_editor is not None
+        self.controls[0] = self._cube_heading if cube else self._standard_heading
+        self.body_scroll.spacing = 6 if cube else 8
+        self.rename_field.height = 36 if cube else None
+        self.editor_dropdown.height = 40 if cube else 44
+        self.editor_dropdown.width = min(170, (self.body_scroll.width - 32) / 2) if cube else 170
+        if self._category_tabs is not None:
+            self._category_tabs.height = 40 if cube else None
+            self._category_tabs.content.height = 40 if cube else None
+        if self._buffer_picker is not None:
+            self._buffer_picker.height = 40 if cube else None
+            self._buffer_picker.dense = True if cube else None
+            self._buffer_picker.width = min(230, (self.body_scroll.width - 32) / 2) if cube else 230
+        if cube:
+            workspace_height = height - self._cube_heading.height
+            body_height = max(1, workspace_height - (200 if not wide else 0))
+            self.controls[1].height = workspace_height
+            self.body_scroll.height = body_height
+            # Three compact toolbar rows, ListView padding/gaps, help/legend
+            # and the existing message line all share the viewport with the net.
+            overhead = 36 + 40 + 40 + 20 + 4 * self.body_scroll.spacing + self._cube_editor.extra_height + 18
+            self._cube_editor.set_viewport(self.body_scroll.width - 20, body_height - overhead)
+        else:
+            self.controls[1].height = None
+            self.body_scroll.height = None
 
     # ---- refresh ------------------------------------------------------------
 
@@ -149,9 +179,12 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
     def _refresh_body(self):
         scheme = self.state.active_scheme
         self._cube_editor = None
+        self._buffer_picker = None
+        self._category_tabs = None
         self.editor_dropdown.value = self.state.data.letter_scheme_editor
         if scheme is None:
             self.body_scroll.controls = [ft.Text("Create a scheme to get started.", italic=True, color=ft.Colors.ON_SURFACE)]
+            self.set_viewport(*self._viewport)
             return
 
         tab_index = {"edges": 0, "corners": 1, "preferences": 2}[self.selected_category]
@@ -167,14 +200,21 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                 ]
             ),
         )
+        self._category_tabs = tabs
+        cube_mode = (self.state.data.letter_scheme_editor == "cube" and self.selected_category != "preferences")
 
         common = [
             ft.Row(
                 [
-                    ft.Text(scheme.name, size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                    ft.Text(scheme.name, size=16 if cube_mode else 18, weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.ON_SURFACE, expand=True if cube_mode else None,
+                            max_lines=1 if cube_mode else None,
+                            overflow=ft.TextOverflow.ELLIPSIS if cube_mode else None,
+                            tooltip=scheme.name if cube_mode else None),
                     self.rename_field,
-                    ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme),
-                ], wrap=True
+                    ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme,
+                                  width=36 if cube_mode else None, height=36 if cube_mode else None),
+                ], wrap=not cube_mode, height=36 if cube_mode else None
             ),
             tabs,
         ]
@@ -186,6 +226,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                 self._build_preferences(scheme),
                 self.settings_message,
             ]
+            self.set_viewport(*self._viewport)
             return
 
         cat = scheme.corners if self.selected_category == "corners" else scheme.edges
@@ -193,6 +234,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             self.selected_category, cat.buffer_sticker,
             lambda sticker: self._set_buffer(sticker),
         )
+        self._buffer_picker = buffer_picker
 
         self._sticker_fields = {}
         if self.state.data.letter_scheme_editor == "cube":
@@ -212,10 +254,12 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._sticker_order = [s for s in CATEGORY_STICKER_ORDER[self.selected_category] if s in self._sticker_fields]
 
         self.body_scroll.controls = common + [
-            ft.Row([buffer_picker, self.editor_dropdown], wrap=True, spacing=12),
-            ft.Container(content=grid, padding=ft.Padding.only(top=6)),
+            ft.Row([buffer_picker, self.editor_dropdown], wrap=not cube_mode, spacing=12,
+                   height=40 if cube_mode else None),
+            ft.Container(content=grid, padding=ft.Padding.only(top=0 if cube_mode else 6)),
             self.settings_message,
         ]
+        self.set_viewport(*self._viewport)
 
     def _build_orientation_settings(self, scheme):
         front_options = [c for c in COLOR_LABELS if c not in {scheme.memo_up, OPPOSITE[scheme.memo_up]}]

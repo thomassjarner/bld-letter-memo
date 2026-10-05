@@ -29,6 +29,8 @@ STICKER_GAP = 3
 FACE_PADDING = 4
 NET_GAP = 6
 STICKER_BORDER = 2
+MIN_STICKER_SIZE = 24
+SCROLLBAR_SPACE = 12
 
 
 def orientation_colors(up, front):
@@ -52,7 +54,8 @@ class CubeNetEditor(ft.Column):
     def init(self):
         config = self.data  # Python-only configuration; never sent to Flet.
         category, scheme = config["category"], config["scheme"]
-        self.spacing = 8
+        self.spacing = 6
+        self.extra_height = 16 + 32 + 2 * self.spacing
         self.cell_controls = {}
         self.field_controls = {}
         self.face_controls = {}
@@ -69,7 +72,7 @@ class CubeNetEditor(ft.Column):
             cells = []
             for sticker in positions:
                 if len(sticker) == 1:
-                    content = ft.Text(face, size=19, weight=ft.FontWeight.BOLD, color=fg)
+                    content = None
                     tooltip = f"{face} · {COLOR_NAMES[colors[face]]}"
                     border_color = ft.Colors.TRANSPARENT
                 else:
@@ -142,12 +145,16 @@ class CubeNetEditor(ft.Column):
         if duplicate_groups:
             warning = "Duplicate letters: " + "; ".join(f"{letter}: {', '.join(stickers)}" for letter, stickers in duplicate_groups.items())
         self.controls = [
-            ft.Text("Type on the cube. Letters save immediately; typing advances to the next sticker.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text("Type letters · Auto-saved · Advance automatically", size=11, height=16,
+                    max_lines=1, overflow=ft.TextOverflow.ELLIPSIS,
+                    tooltip="Letters save immediately; typing advances to the next sticker.",
+                    color=ft.Colors.ON_SURFACE_VARIANT),
             self.net_scroll,
-            ft.Text(f"Editing {category} · ★ tracing buffer · ● buffer piece · Other-category stickers are read-only", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text("★ Buffer · ● Same piece · Other letters are read-only", size=10,
+                    height=32, max_lines=2, color=ft.Colors.ON_SURFACE_VARIANT),
             *([ft.Text(warning, size=12, color=ft.Colors.ERROR)] if warning else []),
         ]
-        self.set_width(config.get("width", 760))
+        self.set_viewport(config.get("width", 760), config.get("height"))
 
     def _set_cell_focus(self, sticker, focused):
         # Reserve the same border on every sticker, so highlighting changes
@@ -179,16 +186,29 @@ class CubeNetEditor(ft.Column):
                 cell.update()
 
     def set_width(self, available):
-        # Keep sticker targets usable. Small windows can scroll the full net
-        # horizontally, while the enclosing scheme editor scrolls vertically.
+        self.set_viewport(available, getattr(self, "_available_height", None))
+
+    def set_viewport(self, available, height=None):
+        # Fit both dimensions. If a very small viewport would make entry
+        # targets unusable, retain readable squares and let the page scroll.
         available = max(80.0, float(available))
+        self._available_height = None if height is None else max(0.0, float(height))
         frame = 2 * STICKER_GAP + 2 * FACE_PADDING
-        size = max(36, min(44, (available - 4 * frame - 3 * NET_GAP) / 12))
+        size = min(44, (available - 4 * frame - 3 * NET_GAP) / 12)
+        if self._available_height is not None:
+            minimum_width = 12 * MIN_STICKER_SIZE + 4 * frame + 3 * NET_GAP
+            scrollbar = SCROLLBAR_SPACE if available < minimum_width else 0
+            size = min(size, (self._available_height - 3 * frame - 2 * NET_GAP - scrollbar) / 9)
+        size = max(MIN_STICKER_SIZE, size)
         face_width = 3 * size + frame
         for cell in self.cell_controls.values():
             cell.width = cell.height = size
         for field in self.field_controls.values():
             field.width = field.height = size - 2 * STICKER_BORDER
+            field.text_size = max(13, min(18, size / 2))
+        for cell in self.cell_controls.values():
+            if isinstance(cell.content, ft.Text):
+                cell.content.size = max(13, min(18, size / 2))
         for face in self.face_controls.values():
             face.width = face.height = face_width
         for blank in self.blank_controls:
@@ -196,12 +216,14 @@ class CubeNetEditor(ft.Column):
         self.net.width = 4 * face_width + 3 * NET_GAP
         self.net.height = 3 * face_width + 2 * NET_GAP
         self.net_scroll.width = available
-        self.net_scroll.scroll = ft.ScrollMode.ALWAYS if self.net.width > available else None
-        self.net_scroll.alignment = ft.MainAxisAlignment.START if self.net.width > available else ft.MainAxisAlignment.CENTER
+        overflow = self.net.width > available
+        self.net_scroll.height = self.net.height + (SCROLLBAR_SPACE if overflow else 0)
+        self.net_scroll.scroll = ft.ScrollMode.ALWAYS if overflow else None
+        self.net_scroll.alignment = ft.MainAxisAlignment.START if overflow else ft.MainAxisAlignment.CENTER
         self.width = available
 
 
-def build_cube_net(category, scheme, on_letter_change, on_field_focus=None, field_registry=None, width=760):
+def build_cube_net(category, scheme, on_letter_change, on_field_focus=None, field_registry=None, width=760, height=None):
     return CubeNetEditor(data={"category": category, "scheme": scheme,
                                "on_letter_change": on_letter_change, "on_field_focus": on_field_focus,
-                               "field_registry": field_registry, "width": width})
+                               "field_registry": field_registry, "width": width, "height": height})
