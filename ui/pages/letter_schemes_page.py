@@ -5,7 +5,7 @@ from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
 from core.tracer import STANDARD_CORNER_PRIORITY, STANDARD_EDGE_PRIORITY
 from ui.components.buffer_picker import build_buffer_picker
 from ui.components.sticker_grid import build_sticker_grid
-from ui.components.cube_net import build_cube_net
+from ui.components.cube_net import CUBE_STICKER_ORDER, build_cube_net
 from ui.state import AppState
 from ui.design import page_heading, eyebrow
 
@@ -36,9 +36,11 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         # Edges first is only a UI/data-entry preference. It does not affect
         # memo/execution order.
         self.selected_category = "edges"
+        self._last_letter_category = "edges"
         self._viewport = (1400.0, 760.0)
         self._layout_wide = True
         self._cube_editor = None
+        self._cards_editor = None
         self.editor_dropdown = ft.Dropdown(
             label="Editor", width=170, height=44, dense=True,
             value=self.state.data.letter_scheme_editor,
@@ -67,11 +69,12 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._sticker_order = []
         self._focused_sticker = None
         self._standard_heading = page_heading("Letter Schemes", "Map stickers to letters and tune the way you trace a cube.", "01 / Foundation")
-        self._cube_heading = ft.Container(
+        self._editor_heading = ft.Container(
             ft.Text("Letter Schemes", size=22, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
             height=38, padding=ft.Padding.only(bottom=6),
         )
-        self._buffer_picker = None
+        self._buffer_pickers = {}
+        self._buffer_toolbar = None
         self._category_tabs = None
         self.controls = [self._standard_heading, self._build_layout()]
         self.refresh(update=False)
@@ -118,28 +121,35 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                                 ft.Column([self.sidebar, self.body_scroll], expand=True, spacing=12))
             self._layout_wide = wide
         self.body_scroll.width = width - 226 if wide else width
-        cube = self._cube_editor is not None
-        self.controls[0] = self._cube_heading if cube else self._standard_heading
-        self.body_scroll.spacing = 6 if cube else 8
-        self.rename_field.height = 36 if cube else None
-        self.editor_dropdown.height = 40 if cube else 44
-        self.editor_dropdown.width = min(170, (self.body_scroll.width - 32) / 2) if cube else 170
+        compact = self._category_tabs is not None
+        self.controls[0] = self._editor_heading if compact else self._standard_heading
+        self.body_scroll.spacing = 6 if compact else 8
+        self.rename_field.height = 36 if compact else None
+        self.editor_dropdown.height = 40 if compact else 44
         if self._category_tabs is not None:
-            self._category_tabs.height = 40 if cube else None
-            self._category_tabs.content.height = 40 if cube else None
-        if self._buffer_picker is not None:
-            self._buffer_picker.height = 40 if cube else None
-            self._buffer_picker.dense = True if cube else None
-            self._buffer_picker.width = min(230, (self.body_scroll.width - 32) / 2) if cube else 230
-        if cube:
-            workspace_height = height - self._cube_heading.height
+            self._category_tabs.height = self._category_tabs.content.height = 40
+        if self._buffer_toolbar is not None:
+            inner_width = self.body_scroll.width - 20
+            count = len(self._buffer_pickers) + 1
+            wrap = count == 3 and inner_width < 312
+            slots = 2 if wrap else count
+            slot_width = (inner_width - 12 * (slots - 1)) / slots
+            self.editor_dropdown.width = min(170, slot_width)
+            self._buffer_toolbar.wrap, self._buffer_toolbar.height = wrap, 84 if wrap else 40
+            for picker in self._buffer_pickers.values():
+                picker.height, picker.dense = 40, True
+                picker.width = min(230, slot_width)
+        if compact:
+            workspace_height = height - self._editor_heading.height
             body_height = max(1, workspace_height - (200 if not wide else 0))
             self.controls[1].height = workspace_height
             self.body_scroll.height = body_height
             # Three compact toolbar rows, ListView padding/gaps, help/legend
             # and the existing message line all share the viewport with the net.
-            overhead = 36 + 40 + 40 + 20 + 4 * self.body_scroll.spacing + self._cube_editor.extra_height + 18
-            self._cube_editor.set_viewport(self.body_scroll.width - 20, body_height - overhead)
+            editor = self._cube_editor if self._cube_editor is not None else self._cards_editor
+            if editor is not None:
+                overhead = 36 + 40 + self._buffer_toolbar.height + 20 + 4 * self.body_scroll.spacing + editor.extra_height + 18
+                editor.set_viewport(self.body_scroll.width - 20, body_height - overhead)
         else:
             self.controls[1].height = None
             self.body_scroll.height = None
@@ -179,7 +189,9 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
     def _refresh_body(self):
         scheme = self.state.active_scheme
         self._cube_editor = None
-        self._buffer_picker = None
+        self._cards_editor = None
+        self._buffer_pickers = {}
+        self._buffer_toolbar = None
         self._category_tabs = None
         self.editor_dropdown.value = self.state.data.letter_scheme_editor
         if scheme is None:
@@ -187,13 +199,14 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             self.set_viewport(*self._viewport)
             return
 
-        tab_index = {"edges": 0, "corners": 1, "preferences": 2}[self.selected_category]
+        cube_mode = self.state.data.letter_scheme_editor == "cube"
+        tab_index = int(self.selected_category == "preferences") if cube_mode else {"edges": 0, "corners": 1, "preferences": 2}[self.selected_category]
         tabs = ft.Tabs(
-            length=3,
+            length=2 if cube_mode else 3,
             selected_index=tab_index,
             on_change=self._on_tab_change,
             content=ft.TabBar(
-                tabs=[
+                tabs=[ft.Tab(label="All stickers"), ft.Tab(label="Preferences")] if cube_mode else [
                     ft.Tab(label="Edges"),
                     ft.Tab(label="Corners"),
                     ft.Tab(label="Preferences"),
@@ -201,20 +214,17 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             ),
         )
         self._category_tabs = tabs
-        cube_mode = (self.state.data.letter_scheme_editor == "cube" and self.selected_category != "preferences")
 
         common = [
             ft.Row(
                 [
-                    ft.Text(scheme.name, size=16 if cube_mode else 18, weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.ON_SURFACE, expand=True if cube_mode else None,
-                            max_lines=1 if cube_mode else None,
-                            overflow=ft.TextOverflow.ELLIPSIS if cube_mode else None,
-                            tooltip=scheme.name if cube_mode else None),
+                    ft.Text(scheme.name, size=16, weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.ON_SURFACE, expand=True,
+                            max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, tooltip=scheme.name),
                     self.rename_field,
                     ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme,
-                                  width=36 if cube_mode else None, height=36 if cube_mode else None),
-                ], wrap=not cube_mode, height=36 if cube_mode else None
+                                  width=36, height=36),
+                ], height=36
             ),
             tabs,
         ]
@@ -229,34 +239,38 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             self.set_viewport(*self._viewport)
             return
 
-        cat = scheme.corners if self.selected_category == "corners" else scheme.edges
-        buffer_picker = build_buffer_picker(
-            self.selected_category, cat.buffer_sticker,
-            lambda sticker: self._set_buffer(sticker),
-        )
-        self._buffer_picker = buffer_picker
+        categories = ("edges", "corners") if cube_mode else (self.selected_category,)
+        for category in categories:
+            picker = build_buffer_picker(category, getattr(scheme, category).buffer_sticker,
+                                         lambda sticker, c=category: self._set_buffer(sticker, c))
+            picker.label = "Edge buffer" if category == "edges" else "Corner buffer"
+            picker.tooltip = f"Choose the exact {category[:-1]} tracing buffer sticker"
+            self._buffer_pickers[category] = picker
+        self._buffer_toolbar = ft.Row([*self._buffer_pickers.values(), self.editor_dropdown], spacing=12, run_spacing=4)
 
         self._sticker_fields = {}
         if self.state.data.letter_scheme_editor == "cube":
             self._cube_editor = build_cube_net(
-                self.selected_category, scheme, self._set_letter,
+                "both", scheme, self._set_letter,
                 on_field_focus=self._on_sticker_focus, field_registry=self._sticker_fields,
                 width=(self._viewport[0] - 246 if self._layout_wide else self._viewport[0] - 20),
             )
             grid = self._cube_editor
         else:
-            grid = build_sticker_grid(
-                self.selected_category, cat,
-                lambda sticker, value: self._set_letter(sticker, value),
+            self._cards_editor = build_sticker_grid(
+                self.selected_category, getattr(scheme, self.selected_category), self._set_letter,
                 on_field_focus=self._on_sticker_focus,
                 field_registry=self._sticker_fields,
+                scheme=scheme,
+                width=(self._viewport[0] - 246 if self._layout_wide else self._viewport[0] - 20),
             )
-        self._sticker_order = [s for s in CATEGORY_STICKER_ORDER[self.selected_category] if s in self._sticker_fields]
+            grid = self._cards_editor
+        order = CUBE_STICKER_ORDER if cube_mode else CATEGORY_STICKER_ORDER[self.selected_category]
+        self._sticker_order = [s for s in order if s in self._sticker_fields]
 
         self.body_scroll.controls = common + [
-            ft.Row([buffer_picker, self.editor_dropdown], wrap=not cube_mode, spacing=12,
-                   height=40 if cube_mode else None),
-            ft.Container(content=grid, padding=ft.Padding.only(top=0 if cube_mode else 6)),
+            self._buffer_toolbar,
+            ft.Container(content=grid),
             self.settings_message,
         ]
         self.set_viewport(*self._viewport)
@@ -519,6 +533,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             return
         self.state.create_scheme(name)
         self.selected_category = "edges"
+        self._last_letter_category = "edges"
         self.new_scheme_field.value = ""
         self.refresh()
 
@@ -544,7 +559,12 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self.refresh()
 
     def _on_tab_change(self, e):
-        self.selected_category = {0: "edges", 1: "corners", 2: "preferences"}.get(e.control.selected_index, "edges")
+        if self.state.data.letter_scheme_editor == "cube":
+            self.selected_category = "preferences" if e.control.selected_index == 1 else self._last_letter_category
+        else:
+            self.selected_category = {0: "edges", 1: "corners", 2: "preferences"}.get(e.control.selected_index, "edges")
+            if self.selected_category != "preferences":
+                self._last_letter_category = self.selected_category
         self._focused_sticker = None
         self._refresh_body()
         self.update()
@@ -556,26 +576,35 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         if self.page is not None:
             self.update()
 
-    def _set_buffer(self, buffer_sticker: str):
+    def _set_buffer(self, buffer_sticker: str, category=None):
         scheme = self.state.active_scheme
         if scheme is None:
             return
-        self.state.set_buffer(scheme, self.selected_category, buffer_sticker)
+        category = category or self._category_for_sticker(buffer_sticker)
+        if category not in CATEGORY_STICKER_ORDER or buffer_sticker not in CATEGORY_STICKER_ORDER[category]:
+            return
+        self.state.set_buffer(scheme, category, buffer_sticker)
+        self._focused_sticker = None
         self._refresh_body()
         self.update()
 
+    @staticmethod
+    def _category_for_sticker(sticker):
+        return next((category for category, order in CATEGORY_STICKER_ORDER.items() if sticker in order), None)
+
     def _set_letter(self, sticker: str, value: str):
         scheme = self.state.active_scheme
-        if scheme is None or self.selected_category not in {"corners", "edges"}:
+        field = self._sticker_fields.get(sticker)
+        category = self._category_for_sticker(sticker)
+        if scheme is None or field is None or category is None:
             return
         value = (value or "").upper()
-        field = self._sticker_fields.get(sticker)
         if field is not None and field.value != value:
             field.value = value
             if field.page is not None:
                 field.update()
         # Do not rebuild the grid on every keypress; that would steal focus.
-        self.state.set_sticker_letter(scheme, self.selected_category, sticker, value)
+        self.state.set_sticker_letter(scheme, category, sticker, value)
         if value.strip():
             self._focus_adjacent_sticker(sticker, +1)
 
@@ -625,7 +654,10 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         scheme = self.state.active_scheme
         if scheme is None:
             return
-        self.state.set_sticker_letter(scheme, self.selected_category, prev_sticker, "")
+        category = self._category_for_sticker(prev_sticker)
+        if category is None:
+            return
+        self.state.set_sticker_letter(scheme, category, prev_sticker, "")
         prev.value = ""
         if prev.page is not None:
             prev.update()

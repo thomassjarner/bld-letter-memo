@@ -1,3 +1,37 @@
+# BLD Letter Memo Web 2.25.0
+
+A consistent compact workspace for **Face cards** and **2D cube**.
+
+- Face cards use the same fixed colored square inputs, contrast, focus outline
+  and buffer symbols as the cube. Sticker IDs sit above the inputs, avoiding
+  floating labels. Six cards reflow into three, two or one column as needed.
+- Both views use the compact heading, scheme controls and bounded scrolling
+  workspace. Face cards size themselves to the available width and height.
+- The 2D cube shows an **All stickers** tab with every non-buffer edge and
+  corner editable at once. Centers stay blank; buffer pieces remain locked.
+- Both edge and corner buffer selectors appear together on the cube. Each
+  changes its own category and leaves the other category's buffer untouched.
+- Cube auto-advance follows the visible sticker positions face by face,
+  skipping centers and locked stickers. Backspace can move between categories
+  and clears the letter in the correct category.
+- Face cards retain the Edges/Corners tabs and canonical category entry order.
+  The last card category is remembered when switching views or visiting
+  Preferences. Both views edit the same letters and saved editor preference.
+- Duplicate warnings stay separate for edges and corners, so matching letters
+  across the two schemes are allowed.
+
+83 automated tests pass, including mixed-category typing and Backspace,
+independent buffer selectors, cube/card interchange, responsive cards, square
+geometry, contrast, category-scoped duplicates and backup round trips.
+Browser rendering remains unverified in this environment.
+
+Core logic, models, AppState, persistence, Timer, Progressive Memo, Letter Pairs,
+history, dependencies and deployment are unchanged. Data version remains 15;
+no migration is needed. Copy all release contents, including the new shared
+tile component, into your existing project; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.24.2
 
 Plain cube centers and a layout that fits laptop screens more comfortably.

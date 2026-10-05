@@ -1,43 +1,49 @@
-# Update to 2.24.2
+# Update to 2.25.0
 
-Copy the contents of `bld-letter-memo-web-2.24.2/` into your existing project,
-replacing matching files and including the new files. Place the contents directly
-in the project folder. The GitHub Pages deployment process is unchanged.
+Copy the contents of `bld-letter-memo-web-2.25.0/` into your existing project,
+replacing matching files and including the new `ui/components/sticker_tiles.py`.
+Place the contents directly in the project folder. Patching and GitHub Pages
+deployment are unchanged.
 
-Run these commands from Terminal inside your existing project folder:
+Run these commands separately from Terminal inside your project folder:
 
 ```bash
 git add -A
-git commit -m "Remove center letters and fit cube to screen"
+git commit -m "Unify scheme editors and edit edges and corners together"
 git push
 ```
 
-Run the commands separately. If Git says "nothing to commit", still run
-`git push` to publish any commit already waiting locally.
+If Git says "nothing to commit", still run `git push` to publish any local
+commit already waiting. Wait for GitHub Actions, then reload and confirm
+**2.25.0** in the header or browser-tab title. Command+Shift+R can refresh the
+build on macOS. Keep browser storage; no import or migration is needed.
 
-Wait for GitHub Actions, then reload and confirm **2.24.2** in the header or
-browser-tab title. Command+Shift+R can refresh the build on macOS. Keep browser
-storage; no manual data migration or import is needed.
+## Use the editors
 
-## Cube appearance
+Choose **Editor → Face cards** for the Edges/Corners tabs. The six compact
+cards now use colored square inputs and reflow to fit the available width.
+Sticker names remain visible above the cells.
 
-In **Letter Schemes → Edges/Corners → Editor → 2D cube**, center pieces now
-show only their color. The net sizes itself using available height as well as
-width. A shorter heading and compact controls leave more room for the cube.
-Letter size adjusts with the stickers, and editing retains its square shape.
+Choose **Editor → 2D cube** for **All stickers**. Edit edges and corners on
+one cube, with separate buffer selectors for each category. Centers have no
+letters. Stars mark the exact tracing buffers; dots mark their other stickers.
+Typing advances across the visible face positions; Backspace also works when
+moving between edge and corner fields.
 
-The physical net, memo orientation colors, locked buffers, duplicate warnings,
-and Face cards option remain. Both editors still
-share the same saved letters, capitalization, autosave, auto-advance and
-Backspace behavior. Very small screens retain readable minimum-size stickers
-and horizontal/vertical scrolling. Hover over a center to see its face name.
+Both views share the compact controls, saved letters, autosave, capitalization,
+fixed square geometry, light/dark contrast and a bounded scrolling workspace.
+The last Face cards category is restored when returning to that editor.
+Duplicate warnings are independent for edges and corners.
 
 ## Preservation and validation
 
-Only the cube presentation, scheme-page layout, tests, release labels and documentation change.
-All core logic, data models, state and persistence, Timer, Progressive Memo,
-Letter Pairs, history, backups, dependencies and deployment workflow are unchanged.
+The shared `ui/components/sticker_tiles.py` keeps tile appearance and buffer
+locking consistent. Presentation callbacks route each sticker to its existing
+category in AppState; core logic, data models, state, storage keys, repositories,
+Timer, Progressive Memo, Letter Pairs, history, backups, dependencies and
+deployment workflow remain unchanged. Data version remains 15.
 
-79 automated tests pass, including height-only resizing, full-net bounds,
-small-window scrolling, plain centers, focus, contrast, buffers and editor interchange.
-Browser rendering remains unverified here. No live deployment was performed.
+83 automated tests pass, covering combined editing, Backspace across category
+boundaries, both buffers, responsive cards, contrast, duplicates, switching
+views and backup round trips. Browser rendering remains unverified here.
+No live deployment was performed.

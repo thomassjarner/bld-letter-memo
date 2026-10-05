@@ -10,8 +10,9 @@ import pytest
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER, find_piece_for_sticker
 from data.models import AppData
-from ui.components.cube_net import (COLOR_NAMES, FACE_COLORS, NET_ROWS, MIN_STICKER_SIZE, STICKER_BORDER,
+from ui.components.cube_net import (COLOR_NAMES, CUBE_STICKER_ORDER, FACE_COLORS, NET_ROWS, MIN_STICKER_SIZE, STICKER_BORDER,
                                    CubeNetEditor, face_stickers, orientation_colors)
+from ui.components.sticker_grid import FaceCardsEditor, MIN_CARD_STICKER_SIZE
 from ui.theme_colors import apply_palette
 from test_navigation import click_nav, mount, no_client_mount, walk
 from test_progressive_memo import letter_scheme
@@ -76,23 +77,26 @@ def test_net_face_colors_follow_all_24_memo_orientations():
 
 
 @pytest.mark.parametrize('category', ['corners', 'edges'])
-def test_only_selected_category_is_editable_and_all_buffer_stickers_are_locked(category):
+def test_cube_edits_both_categories_and_locks_each_buffer_from_either_prior_tab(category):
     _, repo, view = open_editor()
     view.selected_category = category
     change_editor(view, 'cube')
     editor = view._cube_editor
-    cat = getattr(repo.data.schemes['gold'], category)
-    locked = CATEGORY_PIECES[category][cat.buffer_piece]
-    assert set(view._sticker_fields) == set(CATEGORY_STICKER_ORDER[category]) - locked
+    scheme = repo.data.schemes['gold']
+    locked = set().union(*(CATEGORY_PIECES[c][getattr(scheme, c).buffer_piece] for c in ('edges', 'corners')))
+    assert set(view._sticker_fields) == set(CUBE_STICKER_ORDER) - locked
     for sticker, cell in editor.cell_controls.items():
         assert isinstance(cell.content, ft.Semantics) == (sticker in view._sticker_fields)
         if sticker in view._sticker_fields:
             assert cell.content.content is view._sticker_fields[sticker]
-    assert 'Buffer sticker' in editor.cell_controls[cat.buffer_sticker].tooltip
-    assert [s for s in CATEGORY_STICKER_ORDER[category] if s not in locked] == view._sticker_order
+    for cat in (scheme.edges, scheme.corners):
+        assert 'Buffer sticker' in editor.cell_controls[cat.buffer_sticker].tooltip
+    assert [s for s in CUBE_STICKER_ORDER if s not in locked] == view._sticker_order
     # Imported schemes need not contain literal BUFFER markers to stay locked.
-    for sticker in locked:
-        cat.stickers[sticker] = 'Z'
+    for category in ('edges', 'corners'):
+        cat = getattr(scheme, category)
+        for sticker in CATEGORY_PIECES[category][cat.buffer_piece]:
+            cat.stickers[sticker] = 'Z'
     view._refresh_body()
     assert not locked.intersection(view._sticker_fields)
 
@@ -146,14 +150,21 @@ def test_buffer_switch_and_backspace_use_existing_scheme_editing_behavior():
 
 def test_preferences_and_categories_keep_the_chosen_editor():
     _, _, view = open_editor()
-    change_editor(view, 'cube')
     with patch.object(type(view), 'update'):
-        view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=2)))
+        view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=1)))
+    assert view.selected_category == 'corners'
+    change_editor(view, 'cube')
+    assert [tab.label for tab in view._category_tabs.content.tabs] == ['All stickers', 'Preferences']
+    with patch.object(type(view), 'update'):
+        view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=1)))
         assert view.selected_category == 'preferences' and not view._sticker_fields
         assert view.editor_dropdown not in list(walk(view.body_scroll))
-        view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=1)))
+        view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=0)))
     assert view.selected_category == 'corners' and view._cube_editor is not None
     assert view.editor_dropdown.value == 'cube'
+    change_editor(view, 'cards')
+    assert view.selected_category == 'corners'
+    assert [tab.label for tab in view._category_tabs.content.tabs] == ['Edges', 'Corners', 'Preferences']
 
 
 def test_resizing_keeps_fields_square_and_scrolling_accessible_without_rebuilding():
@@ -185,7 +196,7 @@ def test_height_only_resize_fits_all_six_faces_and_short_windows_keep_a_scroll_v
     for height in (808, 660, 560):
         view.set_viewport(1400, height)
         assert view._cube_editor is editor and view._sticker_fields is fields and view.body_scroll is scroll
-        assert view.controls[0] is view._cube_heading
+        assert view.controls[0] is view._editor_heading
         assert view.controls[0].height + scroll.height == height
         assert view.controls[1].height == scroll.height
         assert all(not c.wrap for c in scroll.controls[:3] if isinstance(c, ft.Row))
@@ -204,20 +215,22 @@ def test_height_only_resize_fits_all_six_faces_and_short_windows_keep_a_scroll_v
     view.set_viewport(1400, 440)
     assert view._focused_sticker == view._sticker_order[0]
     assert editor.cell_controls['UB'].width == MIN_STICKER_SIZE
-    assert scroll.height == 440 - view._cube_heading.height
+    assert scroll.height == 440 - view._editor_heading.height
     assert scroll.scroll == ft.ScrollMode.ALWAYS
     assert repo.data.to_dict() == snapshot
     change_editor(view, 'cards')
-    assert view.controls[0] is view._standard_heading and view.body_scroll.height is None
+    assert view.controls[0] is view._editor_heading and view.body_scroll.height == 440 - view._editor_heading.height
 
 
 def test_duplicate_letters_and_light_dark_colors_remain_readable():
     _, repo, view = open_editor()
     scheme = repo.data.schemes['gold']
     scheme.edges.stickers.update({'UB': 'Z', 'UF': 'Z'})
+    scheme.corners.stickers.update({'UBR': 'Y', 'UFR': 'Y'})
     scheme.memo_up, scheme.memo_front = 'G', 'R'
     change_editor(view, 'cube')
-    assert any(isinstance(c, ft.Text) and (c.value or '').startswith('Duplicate letters: Z:') for c in walk(view._cube_editor))
+    warning = next(c.value for c in walk(view._cube_editor) if isinstance(c, ft.Text) and (c.value or '').startswith('Duplicate letters'))
+    assert 'Edges: Z:' in warning and 'Corners: Y:' in warning
     for dark in (True, False, True):
         repo.data.dark_mode = dark
         apply_palette(view, dark)
@@ -294,3 +307,132 @@ def test_editor_choice_persists_in_backups_and_old_data_defaults_to_face_cards()
         save.assert_not_called()
     for invalid in ('invalid', None, [], {}):
         assert AppData.from_dict({'letter_scheme_editor': invalid}).letter_scheme_editor == 'cards'
+
+
+def test_combined_cube_saves_each_category_and_backspace_crosses_category_boundaries():
+    _, repo, view = open_editor()
+    change_editor(view, 'cube')
+    scheme, editor, fields = repo.data.schemes['gold'], view._cube_editor, view._sticker_fields
+    snapshot = deepcopy(repo.data.to_dict())
+    assert not any(isinstance(c, ft.Text) and (c.value or '').startswith('Duplicate letters') for c in walk(editor))
+    assert {'UB', 'UBR', 'UL'} <= fields.keys()
+    for sticker, value, category in (('UB', 'ø', 'edges'), ('UBR', 'å', 'corners')):
+        field = fields[sticker]
+        field.value = value
+        field.on_change(SimpleNamespace(control=field))
+        assert getattr(scheme, category).stickers[sticker] == value.upper()
+        assert field.value == value.upper()
+        assert view._focused_sticker == view._sticker_order[view._sticker_order.index(sticker) + 1]
+        assert view._cube_editor is editor and view._sticker_fields is fields
+    assert view.selected_category == 'edges'
+    edges = deepcopy(scheme.edges.to_dict())
+    fields['UL'].value = ''
+    fields['UL'].on_focus(SimpleNamespace(control=fields['UL']))
+    view.handle_keyboard_event(SimpleNamespace(key='Backspace'))
+    assert 'UBR' not in scheme.corners.stickers
+    assert fields['UBR'].value == '' and view._focused_sticker == 'UBR'
+    assert scheme.edges.to_dict() == edges
+    for sticker in ('DF', 'FD', 'UBL', 'LUB', 'BUL', 'U', 'unknown'):
+        saved = deepcopy(repo.data.to_dict())
+        view._set_letter(sticker, 'Q')
+        assert repo.data.to_dict() == saved
+    fields['UBR'].value = 'æ'
+    fields['UBR'].on_change(SimpleNamespace(control=fields['UBR']))
+    change_editor(view, 'cards')
+    assert view._sticker_fields['UB'].value == 'Ø'
+    with patch.object(type(view), 'update'):
+        view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=1)))
+    assert view._sticker_fields['UBR'].value == 'Æ'
+    change_editor(view, 'cube')
+    assert view._sticker_fields['UB'].value == 'Ø' and view._sticker_fields['UBR'].value == 'Æ'
+    loaded = AppData.from_dict(json.loads(json.dumps(repo.data.to_dict())))
+    assert loaded.schemes['gold'].to_dict() == scheme.to_dict()
+    for key, value in snapshot.items():
+        if key != 'schemes':
+            assert loaded.to_dict()[key] == value
+
+
+def test_cube_has_independent_edge_and_corner_buffer_selectors():
+    _, repo, view = open_editor()
+    change_editor(view, 'cube')
+    scheme = repo.data.schemes['gold']
+    assert set(view._buffer_pickers) == {'edges', 'corners'}
+    before_corners = deepcopy(scheme.corners.to_dict())
+    with patch.object(type(view), 'update'):
+        picker = view._buffer_pickers['edges']
+        picker.value = 'UR'
+        picker.on_select(SimpleNamespace(control=picker))
+    assert scheme.corners.to_dict() == before_corners
+    assert not {'UR', 'RU'}.intersection(view._sticker_fields)
+    assert {'DF', 'FD'} <= view._sticker_fields.keys()
+    before_edges = deepcopy(scheme.edges.to_dict())
+    with patch.object(type(view), 'update'):
+        picker = view._buffer_pickers['corners']
+        picker.value = 'UFR'
+        picker.on_select(SimpleNamespace(control=picker))
+    assert scheme.edges.to_dict() == before_edges
+    assert not {'UFR', 'RUF', 'FUR'}.intersection(view._sticker_fields)
+    assert {'UBL', 'LUB', 'BUL'} <= view._sticker_fields.keys()
+    assert view._buffer_pickers['edges'].value == 'UR'
+    assert view._buffer_pickers['corners'].value == 'UFR'
+    assert len(view._sticker_fields) == 43
+    fields = view._sticker_fields
+    for width in (1400, 366, 280):
+        view.set_viewport(width, 650)
+        assert view._sticker_fields is fields
+        if view._buffer_toolbar.wrap:
+            assert view._buffer_toolbar.height == 84
+        else:
+            assert sum(c.width for c in view._buffer_toolbar.controls) + 24 <= view.body_scroll.width - 20 + 0.01
+
+
+@pytest.mark.parametrize('category', ['edges', 'corners'])
+def test_face_cards_share_colored_square_inputs_and_responsive_compact_workspace(category):
+    _, repo, view = open_editor()
+    if category == 'corners':
+        with patch.object(type(view), 'update'):
+            view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=1)))
+    editor, fields, scroll = view._cards_editor, view._sticker_fields, view.body_scroll
+    grid_children = editor.card_grid.controls
+    scheme = repo.data.schemes['gold']
+    assert isinstance(editor, FaceCardsEditor)
+    locked = CATEGORY_PIECES[category][getattr(scheme, category).buffer_piece]
+    assert set(fields) == set(CATEGORY_STICKER_ORDER[category]) - locked
+    assert set(view._buffer_pickers) == {category}
+    snapshot = deepcopy(repo.data.to_dict())
+    for width, height in ((1400, 660), (920, 560), (366, 570), (280, 480)):
+        view.set_viewport(width, height)
+        assert view._cards_editor is editor and view._sticker_fields is fields and view.body_scroll is scroll
+        assert view.controls[0] is view._editor_heading
+        assert scroll.height > 0 and scroll.scroll == ft.ScrollMode.ALWAYS
+        assert all(c.width == c.height and c.width >= MIN_CARD_STICKER_SIZE for c in editor.cell_controls.values())
+        assert all(f.width == f.height for f in fields.values())
+        assert editor.card_grid.controls is grid_children and len(grid_children) == 6
+        assert all(card.width <= editor.card_grid.width for card in editor.face_controls.values())
+        if width >= 760:
+            occupied = sum(c.height for c in scroll.controls[:3]) + 20 + 4 * scroll.spacing + editor.extra_height + editor.card_grid.height + 18
+            assert occupied <= scroll.height + 0.01
+    assert repo.data.to_dict() == snapshot
+    first, second = view._sticker_order[:2]
+    field, cell = fields[first], editor.cell_controls[first]
+    geometry = (cell.width, cell.height)
+    field.on_focus(SimpleNamespace(control=field))
+    field.value = 'ø'
+    field.on_change(SimpleNamespace(control=field))
+    field.on_blur(SimpleNamespace(control=field))
+    assert getattr(scheme, category).stickers[first] == 'Ø'
+    assert (cell.width, cell.height) == geometry and cell.content.content is field
+    fields[second].value = ''
+    view._on_sticker_focus(second)
+    view.handle_keyboard_event(SimpleNamespace(key='Backspace'))
+    assert first not in getattr(scheme, category).stickers
+    assert fields[first].value == '' and view._focused_sticker == first
+    for dark in (True, False, True):
+        apply_palette(view, dark)
+        for cell in editor.cell_controls.values():
+            text = cell.content.content if isinstance(cell.content, ft.Semantics) else cell.content
+            assert contrast(text.color, cell.bgcolor) >= 4.5
+    change_editor(view, 'cube')
+    assert {len(s) for s in view._sticker_fields} == {2, 3}
+    change_editor(view, 'cards')
+    assert set(view._sticker_fields) == set(CATEGORY_STICKER_ORDER[category]) - locked
