@@ -1,3 +1,28 @@
+# BLD Letter Memo Web 2.24.1
+
+A cleaner, more realistic **2D cube** letter-scheme editor.
+
+- Every sticker uses its face color, with contrasting letters and a dark cube frame.
+- Stickers and faces keep their square dimensions while empty, filled or focused.
+  A fixed outer square owns the shape; the centered input has no floating label
+  or form border. Focus changes only the outer outline color.
+- Face captions such as "U · White" are removed. Centers retain U/L/F/R/B/D;
+  sticker names are available through tooltips and accessible field labels.
+- The net is shorter, with smaller gaps between faces. Its physical arrangement,
+  memo orientation colors and horizontal/vertical scrolling are preserved.
+- The selected category, locked buffer pieces, duplicate warnings, autosave,
+  auto-advance, capitalization and Backspace retain their existing behavior.
+
+78 automated tests pass, including focus/blur, empty/filled square geometry,
+all-sticker light/dark contrast, buffer locking and editor interchange.
+Browser rendering remains unverified in this environment.
+
+Core logic, data models, persistence, Timer, Progressive Memo and Letter Pairs
+are unchanged. No data migration is needed. Copy the release contents into your
+existing project and commit/push; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.24.0
 
 A switchable 2D cube editor in **Letter Schemes**.
@@ -763,4 +788,3 @@ built against Flet 0.24) and `page.run_task`/`asyncio` for all delayed/timed
 behavior. Also fixed, found only by testing: `ft.Dropdown`'s `on_change` →
 `on_select`, and `ft.padding`/`ft.border`/`ft.alignment` module functions →
 `ft.Padding`/`ft.Border`/`ft.Alignment` classmethods.
-

@@ -1,40 +1,42 @@
-# Update to 2.24.0
+# Update to 2.24.1
 
-Copy the contents of `bld-letter-memo-web-2.24.0/` into your existing project,
+Copy the contents of `bld-letter-memo-web-2.24.1/` into your existing project,
 replacing matching files and including the new files. Place the contents directly
 in the project folder. The GitHub Pages deployment process is unchanged.
 
 Run these commands from Terminal inside your existing project folder:
 
-```sh
-git add -A &&
-git commit -m "Add optional 2D cube letter scheme editor" &&
+```bash
+git add -A
+git commit -m "Polish 2D cube letter scheme editor"
 git push
 ```
 
-Wait for GitHub Actions, then reload and confirm **2.24.0** in the header or
+Run the commands separately. If Git says "nothing to commit", still run
+`git push` to publish any commit already waiting locally.
+
+Wait for GitHub Actions, then reload and confirm **2.24.1** in the header or
 browser-tab title. Command+Shift+R can refresh the build on macOS. Keep browser
 storage; no manual data migration or import is needed.
 
-## Use the new editor
+## Cube appearance
 
-In **Letter Schemes**, open Edges or Corners and choose **Editor → 2D cube**.
-Type letters directly in that category's sticker cells. Other-category letters
-remain visible; change tabs to edit them. The existing buffer dropdown selects
-the exact tracing sticker and locks its entire physical piece.
+In **Letter Schemes → Edges/Corners → Editor → 2D cube**, every sticker now
+uses its face color and a stable square shape. The form-style floating labels
+and the six face captions are removed. Hover over a sticker to see its ID.
+The letter stays centered during editing; focus changes only its outline.
 
-Choose **Face cards** to return to the original layout. Both editors use the
-same scheme data, so changes appear in either view. The chosen editor is saved
-as a browser-wide UI preference. Small screens can scroll the cube horizontally
-and the editor vertically.
+The U/L/F/R/B/D center guides, physical net, memo orientation colors, locked
+buffers, duplicate warnings, and Face cards option remain. Both editors still
+share the same saved letters, capitalization, autosave, auto-advance and
+Backspace behavior. Small screens retain horizontal and vertical scrolling.
 
 ## Preservation and validation
 
-The new `ui/components/cube_net.py` component uses canonical sticker IDs and the
-existing letter-entry callbacks. Data version 15 adds an editor preference;
-older data defaults to Face cards. Tracing, scrambling, Timer, Progressive Memo,
-Letter Pairs, history, repositories and storage keys are unchanged.
+Only the cube presentation, its tests, release labels and documentation change.
+All core logic, data models, state and persistence, Timer, Progressive Memo,
+Letter Pairs, history, backups, dependencies and deployment workflow are unchanged.
 
-77 tests pass, including the existing 67 checks and new cube geometry, editor
-interchange, buffer, keyboard, responsive layout, theme and backup checks.
+78 automated tests pass, including editing focus/blur without changing square
+geometry, all-sticker contrast in both themes, buffers and editor interchange.
 Browser rendering remains unverified here. No live deployment was performed.

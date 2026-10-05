@@ -24,6 +24,11 @@ FACE_COLORS = {
     "G": ("#217B61", "#FFFFFF"), "B": ("#2468B3", "#FFFFFF"),
     "R": ("#BD4548", "#FFFFFF"), "O": ("#F4A25B", "#38200D"),
 }
+FRAME_COLOR = "#101615"
+STICKER_GAP = 3
+FACE_PADDING = 4
+NET_GAP = 6
+STICKER_BORDER = 2
 
 
 def orientation_colors(up, front):
@@ -49,61 +54,77 @@ class CubeNetEditor(ft.Column):
         category, scheme = config["category"], config["scheme"]
         self.spacing = 8
         self.cell_controls = {}
+        self.field_controls = {}
         self.face_controls = {}
         self.blank_controls = []
+        self._focused_cell = None
+        self._resting_borders = {}
+        self._focus_colors = {}
         cat = getattr(scheme, category)
         duplicate_groups = find_duplicate_letters(cat, category)
         duplicated = {sticker for stickers in duplicate_groups.values() for sticker in stickers}
         colors = orientation_colors(scheme.memo_up, scheme.memo_front)
         for face, positions in face_stickers().items():
+            bg, fg = FACE_COLORS[colors[face]]
             cells = []
             for sticker in positions:
                 if len(sticker) == 1:
-                    bg, fg = FACE_COLORS[colors[face]]
-                    cell = ft.Container(ft.Text(face, size=19, weight=ft.FontWeight.BOLD, color=fg),
-                                        bgcolor=bg, border_radius=5, alignment=ft.Alignment.CENTER,
-                                        tooltip=f"{face} · {COLOR_NAMES[colors[face]]}")
+                    content = ft.Text(face, size=19, weight=ft.FontWeight.BOLD, color=fg)
+                    tooltip = f"{face} · {COLOR_NAMES[colors[face]]}"
+                    border_color = ft.Colors.TRANSPARENT
                 else:
                     sticker_category = "corners" if len(sticker) == 3 else "edges"
                     sticker_scheme = getattr(scheme, sticker_category)
                     value = sticker_scheme.stickers.get(sticker, "")
                     locked = value == "BUFFER" or sticker in buffer_stickers(sticker_category, sticker_scheme)
                     if sticker_category == category and not locked:
-                        cell = ft.TextField(
-                            value=value, label=sticker, tooltip=f"{category.title()} · {sticker}",
-                            max_length=1, counter="", dense=True,
+                        # The colored square owns the shape. The input has no
+                        # floating label, fill or border to resize on focus.
+                        field = ft.TextField(
+                            value=value, tooltip=f"{category.title()} · {sticker}",
+                            max_length=1, counter="", dense=True, collapsed=True,
+                            fit_parent_size=True, autocorrect=False,
                             capitalization=ft.TextCapitalization.CHARACTERS,
-                            text_align=ft.TextAlign.CENTER, text_size=18,
-                            content_padding=ft.Padding.symmetric(horizontal=4, vertical=4),
-                            border_radius=5, filled=True, bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
-                            border_color=ft.Colors.ERROR if sticker in duplicated else ft.Colors.OUTLINE,
-                            color=ft.Colors.ON_SURFACE,
-                            label_style=ft.TextStyle(size=9, color=ft.Colors.ON_SURFACE_VARIANT),
+                            text_align=ft.TextAlign.CENTER,
+                            text_vertical_align=ft.VerticalAlignment.CENTER,
+                            text_size=18, text_style=ft.TextStyle(weight=ft.FontWeight.W_600),
+                            content_padding=0, border=ft.InputBorder.NONE,
+                            border_width=0, focused_border_width=0, filled=False,
+                            bgcolor=bg, focused_bgcolor=bg,
+                            color=fg, focused_color=fg, cursor_color=fg,
+                            selection_color=ft.Colors.with_opacity(0.25, fg),
                             on_change=lambda e, s=sticker: config["on_letter_change"](s, e.control.value),
-                            on_focus=(lambda e, s=sticker: config["on_field_focus"](s)) if config.get("on_field_focus") else None,
+                            on_focus=lambda e, s=sticker: self._set_cell_focus(s, True),
+                            on_blur=lambda e, s=sticker: self._set_cell_focus(s, False),
                         )
+                        self.field_controls[sticker] = field
                         if config.get("field_registry") is not None:
-                            config["field_registry"][sticker] = cell
+                            config["field_registry"][sticker] = field
+                        content = ft.Semantics(content=field, label=f"{category.title()} sticker {sticker}")
+                        tooltip = field.tooltip
+                        border_color = ft.Colors.ERROR if sticker in duplicated else ft.Colors.TRANSPARENT
+                        if sticker in duplicated:
+                            tooltip += f" · Duplicate letter {value}"
+                        self._resting_borders[sticker] = border_color
+                        self._focus_colors[sticker] = fg
                     else:
                         exact_buffer = sticker == (sticker_scheme.buffer_sticker or sticker_scheme.buffer_piece)
                         symbol = ("★" if exact_buffer else "●") if locked else value or "·"
-                        cell = ft.Container(ft.Column([
-                            ft.Text(sticker, size=8, color=ft.Colors.ON_SURFACE_VARIANT),
-                            ft.Text(symbol, size=16, weight=ft.FontWeight.W_600,
-                                    color=ft.Colors.PRIMARY if locked else ft.Colors.ON_SURFACE_VARIANT),
-                        ], spacing=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            alignment=ft.MainAxisAlignment.CENTER),
-                            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH, border_radius=5,
-                            alignment=ft.Alignment.CENTER,
-                            tooltip=f"{sticker} · {'Buffer sticker' if exact_buffer else 'Buffer piece'}" if locked else f"{sticker} · Switch to {sticker_category.title()} to edit")
+                        content = ft.Text(symbol, size=18,
+                                          weight=ft.FontWeight.BOLD if locked else ft.FontWeight.W_500,
+                                          color=fg)
+                        tooltip = (f"{sticker} · {'Buffer sticker' if exact_buffer else 'Buffer piece'}" if locked
+                                   else f"{sticker} · Switch to {sticker_category.title()} to edit")
+                        border_color = ft.Colors.TRANSPARENT
+                cell = ft.Container(content, bgcolor=bg, border_radius=4,
+                                    border=ft.Border.all(STICKER_BORDER, border_color),
+                                    alignment=ft.Alignment.CENTER, padding=0, tooltip=tooltip)
                 self.cell_controls[sticker] = cell
                 cells.append(cell)
             self.face_controls[face] = ft.Container(ft.Column([
-                ft.Text(f"{face} · {COLOR_NAMES[colors[face]]}", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                *[ft.Row(cells[i:i + 3], spacing=3, tight=True) for i in (0, 3, 6)],
-            ], spacing=3, tight=True), padding=5,
-                border=ft.Border.all(1, FACE_COLORS[colors[face]][0]), border_radius=7,
-                bgcolor=ft.Colors.SURFACE_CONTAINER_LOW)
+                ft.Row(cells[i:i + 3], spacing=STICKER_GAP, tight=True) for i in (0, 3, 6)
+            ], spacing=STICKER_GAP, tight=True), padding=FACE_PADDING,
+                border_radius=7, bgcolor=FRAME_COLOR)
         rows = []
         for row in NET_ROWS:
             row_controls = []
@@ -114,8 +135,8 @@ class CubeNetEditor(ft.Column):
                     row_controls.append(blank)
                 else:
                     row_controls.append(self.face_controls[face])
-            rows.append(ft.Row(row_controls, spacing=10, tight=True))
-        self.net = ft.Column(rows, spacing=10, tight=True)
+            rows.append(ft.Row(row_controls, spacing=NET_GAP, tight=True))
+        self.net = ft.Column(rows, spacing=NET_GAP, tight=True)
         self.net_scroll = ft.Row([self.net], scroll=ft.ScrollMode.AUTO)
         warning = ""
         if duplicate_groups:
@@ -128,19 +149,52 @@ class CubeNetEditor(ft.Column):
         ]
         self.set_width(config.get("width", 760))
 
+    def _set_cell_focus(self, sticker, focused):
+        # Reserve the same border on every sticker, so highlighting changes
+        # only its color and never moves the text or neighboring cells.
+        changed = []
+        if focused:
+            previous = self._focused_cell
+            if previous is not None and previous != sticker:
+                self.cell_controls[previous].border = ft.Border.all(STICKER_BORDER, self._resting_borders[previous])
+                changed.append(previous)
+            self._focused_cell = sticker
+            color = self._focus_colors[sticker]
+            if self.data.get("on_field_focus"):
+                self.data["on_field_focus"](sticker)
+        else:
+            if self._focused_cell == sticker:
+                self._focused_cell = None
+            color = self._resting_borders[sticker]
+        self.cell_controls[sticker].border = ft.Border.all(STICKER_BORDER, color)
+        changed.append(sticker)
+        for key in changed:
+            cell = self.cell_controls[key]
+            # Detached controls have no page during construction and tests.
+            try:
+                mounted = cell.page is not None
+            except RuntimeError:
+                mounted = False
+            if mounted:
+                cell.update()
+
     def set_width(self, available):
         # Keep sticker targets usable. Small windows can scroll the full net
         # horizontally, while the enclosing scheme editor scrolls vertically.
         available = max(80.0, float(available))
-        size = max(36, min(44, (available - 94) / 12))
-        face_width = 3 * size + 16
+        frame = 2 * STICKER_GAP + 2 * FACE_PADDING
+        size = max(36, min(44, (available - 4 * frame - 3 * NET_GAP) / 12))
+        face_width = 3 * size + frame
         for cell in self.cell_controls.values():
             cell.width = cell.height = size
+        for field in self.field_controls.values():
+            field.width = field.height = size - 2 * STICKER_BORDER
         for face in self.face_controls.values():
-            face.width = face_width
+            face.width = face.height = face_width
         for blank in self.blank_controls:
-            blank.width = face_width
-        self.net.width = 4 * face_width + 30
+            blank.width = blank.height = face_width
+        self.net.width = 4 * face_width + 3 * NET_GAP
+        self.net.height = 3 * face_width + 2 * NET_GAP
         self.net_scroll.width = available
         self.net_scroll.scroll = ft.ScrollMode.ALWAYS if self.net.width > available else None
         self.net_scroll.alignment = ft.MainAxisAlignment.START if self.net.width > available else ft.MainAxisAlignment.CENTER

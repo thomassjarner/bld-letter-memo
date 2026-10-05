@@ -10,8 +10,8 @@ import pytest
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER, find_piece_for_sticker
 from data.models import AppData
-from ui.components.cube_net import (COLOR_NAMES, FACE_COLORS, NET_ROWS, CubeNetEditor,
-                                     face_stickers, orientation_colors)
+from ui.components.cube_net import (COLOR_NAMES, FACE_COLORS, NET_ROWS, STICKER_BORDER,
+                                   CubeNetEditor, face_stickers, orientation_colors)
 from ui.theme_colors import apply_palette
 from test_navigation import click_nav, mount, no_client_mount, walk
 from test_progressive_memo import letter_scheme
@@ -85,7 +85,9 @@ def test_only_selected_category_is_editable_and_all_buffer_stickers_are_locked(c
     locked = CATEGORY_PIECES[category][cat.buffer_piece]
     assert set(view._sticker_fields) == set(CATEGORY_STICKER_ORDER[category]) - locked
     for sticker, cell in editor.cell_controls.items():
-        assert isinstance(cell, ft.TextField) == (sticker in view._sticker_fields)
+        assert isinstance(cell.content, ft.Semantics) == (sticker in view._sticker_fields)
+        if sticker in view._sticker_fields:
+            assert cell.content.content is view._sticker_fields[sticker]
     assert 'Buffer sticker' in editor.cell_controls[cat.buffer_sticker].tooltip
     assert [s for s in CATEGORY_STICKER_ORDER[category] if s not in locked] == view._sticker_order
     # Imported schemes need not contain literal BUFFER markers to stay locked.
@@ -163,6 +165,8 @@ def test_resizing_keeps_fields_square_and_scrolling_accessible_without_rebuildin
         view.set_viewport(width, height)
         assert view._cube_editor is editor and view._sticker_fields is fields and view.body_scroll is scroll
         assert all(cell.width == cell.height and cell.width >= 36 for cell in editor.cell_controls.values())
+        assert all(face.width == face.height for face in editor.face_controls.values())
+        assert all(field.width == field.height for field in fields.values())
         assert editor.net_scroll.width <= width and scroll.scroll == ft.ScrollMode.ALWAYS
         if width < 760:
             assert isinstance(view.controls[1], ft.Column)
@@ -179,18 +183,57 @@ def test_duplicate_letters_and_light_dark_colors_remain_readable():
     scheme.memo_up, scheme.memo_front = 'G', 'R'
     change_editor(view, 'cube')
     assert any(isinstance(c, ft.Text) and (c.value or '').startswith('Duplicate letters: Z:') for c in walk(view._cube_editor))
-    for dark, expected in ((True, '#F0F4F3'), (False, '#182B25'), (True, '#F0F4F3')):
+    for dark in (True, False, True):
         repo.data.dark_mode = dark
         apply_palette(view, dark)
-        for field in view._sticker_fields.values():
-            assert field.color == expected and contrast(field.color, field.bgcolor) >= 4.5
-            assert contrast(field.label_style.color, field.bgcolor) >= 4.5
         for face in 'ULFRBD':
             center = view._cube_editor.cell_controls[face]
             assert contrast(center.content.color, center.bgcolor) >= 4.5
             assert COLOR_NAMES[orientation_colors('G', 'R')[face]] in center.tooltip
+            for sticker in face_stickers()[face]:
+                cell = view._cube_editor.cell_controls[sticker]
+                assert cell.bgcolor == center.bgcolor
+                field = view._sticker_fields.get(sticker)
+                text = field if field is not None else cell.content
+                assert contrast(text.color, cell.bgcolor) >= 4.5
+                if field is not None:
+                    assert field.color == field.focused_color == field.cursor_color
+                    assert field.focused_bgcolor == cell.bgcolor
     for bg, fg in FACE_COLORS.values():
         assert contrast(fg, bg) >= 4.5
+
+
+def test_empty_filled_and_focused_stickers_keep_the_same_square_without_face_captions():
+    _, repo, view = open_editor()
+    change_editor(view, 'cube')
+    editor, fields = view._cube_editor, view._sticker_fields
+    first, second = view._sticker_order[:2]
+    cells = dict(editor.cell_controls)
+    geometry = {key: (cell.width, cell.height) for key, cell in cells.items()}
+    for sticker, value in ((first, ''), (first, 'ø'), (second, '')):
+        field, cell = fields[sticker], cells[sticker]
+        field.on_focus(SimpleNamespace(control=field))
+        assert view._focused_sticker == sticker
+        assert cell.border.top.width == STICKER_BORDER
+        assert cell.border.top.color == field.color
+        field.value = value
+        field.on_change(SimpleNamespace(control=field))
+        field.on_blur(SimpleNamespace(control=field))
+        assert cell.border.top.width == STICKER_BORDER
+        assert cell.border.top.color == ft.Colors.TRANSPARENT
+        assert view._cube_editor is editor and view._sticker_fields is fields
+        assert editor.cell_controls == cells
+        assert {key: (tile.width, tile.height) for key, tile in cells.items()} == geometry
+        assert all(f.label is None and f.collapsed and f.fit_parent_size
+                   and f.border == ft.InputBorder.NONE and not f.filled for f in fields.values())
+        assert cell.width == field.width + 2 * STICKER_BORDER
+    assert repo.data.schemes['gold'].edges.stickers[first] == 'Ø'
+    # The face contains only its nine stickers; its center keeps the U/L/F/R/B/D guide.
+    for face, panel in editor.face_controls.items():
+        assert len(panel.content.controls) == 3
+        assert all(isinstance(row, ft.Row) and len(row.controls) == 3 for row in panel.content.controls)
+        assert not any(isinstance(c, ft.Text) and c.value == f'{face} · {COLOR_NAMES[orientation_colors("W", "G")[face]]}'
+                       for c in walk(panel))
 
 
 def test_editor_choice_persists_in_backups_and_old_data_defaults_to_face_cards():
