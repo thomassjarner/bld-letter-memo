@@ -14,6 +14,9 @@ from data.models import LetterScheme
 
 Vec = Tuple[int, int, int]
 Key = Tuple[Vec, Vec]
+# Legacy strings choose a piece using its saved preference. A pair chooses
+# an exact (physical piece, target sticker) for this trace only.
+CycleBreakOverride = str | Tuple[str, str]
 VEC = {"R":(1,0,0),"L":(-1,0,0),"U":(0,1,0),"D":(0,-1,0),"F":(0,0,1),"B":(0,0,-1)}
 FACE_COLORS = {"U":"W","D":"Y","F":"G","B":"B","R":"R","L":"O"}
 COLOR_FACE = {v:k for k,v in FACE_COLORS.items()}
@@ -265,13 +268,15 @@ def _trace_category(
     pieces,
     standard_priority,
     standard_stickers,
-    cycle_break_overrides: Optional[Dict[int, str]] = None,
+    cycle_break_overrides: Optional[Dict[int, CycleBreakOverride]] = None,
 ):
     """Trace one category and return targets plus cycle-break metadata.
 
     ``cycle_break_overrides`` is intentionally ephemeral. Keys are 0-based
-    cycle-break occurrences and values are physical piece names. An override
-    is accepted only if that piece is genuinely available at that exact break.
+    cycle-break occurrences. Values are physical piece names (using the saved
+    preferred sticker) or (piece, sticker) pairs selecting an exact target.
+    An override is accepted only if that piece is genuinely available at that
+    exact break and an explicit sticker belongs to that piece.
     This lets Scramble Memo reproduce a one-off human choice without changing
     the scheme's saved priority list.
     """
@@ -326,7 +331,14 @@ def _trace_category(
         if not remaining: break
 
         recommended_piece=remaining[0]
-        requested_piece=overrides.get(break_index)
+        requested=overrides.get(break_index)
+        requested_piece=requested if isinstance(requested, str) else None
+        requested_sticker=None
+        if isinstance(requested, tuple) and len(requested) == 2:
+            candidate_piece, candidate_sticker=requested
+            if (isinstance(candidate_piece, str) and isinstance(candidate_sticker, str)
+                    and candidate_piece in remaining and candidate_sticker in pieces[candidate_piece]):
+                requested_piece, requested_sticker=candidate_piece, candidate_sticker
         piece=requested_piece if requested_piece in remaining else recommended_piece
 
         option_pairs=[]
@@ -336,7 +348,7 @@ def _trace_category(
                 option_sticker=option_piece
             option_pairs.append((option_piece, option_sticker))
 
-        start=preferred.get(piece,piece)
+        start=requested_sticker if requested_sticker is not None else preferred.get(piece,piece)
         if start not in pieces[piece]: start=piece
         cycle_id = next_cycle_id
         next_cycle_id += 1
@@ -352,7 +364,7 @@ def _trace_category(
         ))
         break_index += 1
 
-        # A cycle break shoots to the configured sticker, so that sticker is
+        # A cycle break shoots to the chosen sticker, so that sticker is
         # itself a memo target. The cycle closes when tracing reaches the SAME
         # PHYSICAL PIECE again -- it does not have to return to the exact same
         # sticker/letter. Crucially, that closing hit IS a memo target.
@@ -410,8 +422,8 @@ class ScrambleTracer:
         self,
         scramble: str,
         scheme: LetterScheme,
-        corner_cycle_break_overrides: Optional[Dict[int, str]] = None,
-        edge_cycle_break_overrides: Optional[Dict[int, str]] = None,
+        corner_cycle_break_overrides: Optional[Dict[int, CycleBreakOverride]] = None,
+        edge_cycle_break_overrides: Optional[Dict[int, CycleBreakOverride]] = None,
     ) -> TraceResult:
         state=simulate(scramble, scheme.memo_up, scheme.memo_front, scheme.scramble_from_own_orientation)
 

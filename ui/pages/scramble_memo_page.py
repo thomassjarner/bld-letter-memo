@@ -1,7 +1,8 @@
 import flet as ft
 from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
-from core.tracer import ScrambleTracer, ScrambleError
+from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
+from core.tracer import CycleBreakOverride, ScrambleTracer, ScrambleError
 from ui.design import page_heading, panel, eyebrow
 
 
@@ -44,8 +45,8 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         self.last_scheme_signature = None
         # Temporary, scramble-only cycle-break choices. They are never saved to
         # the letter scheme and therefore never alter the user's priority list.
-        self.corner_break_overrides: dict[int, str] = {}
-        self.edge_break_overrides: dict[int, str] = {}
+        self.corner_break_overrides: dict[int, CycleBreakOverride] = {}
+        self.edge_break_overrides: dict[int, CycleBreakOverride] = {}
         self.last_trace_input_key = None
         self.toggle_button = ft.OutlinedButton("Show words", icon=ft.Icons.TRANSLATE, on_click=self._toggle_words)
         self.reset_breaks_button = ft.OutlinedButton(
@@ -70,7 +71,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
             ], spacing=12)),
             panel(ft.Column([
                 eyebrow("Memo output"),
-                ft.Text("Click an underlined cycle-break target to try another valid break for this scramble. Your saved priorities stay unchanged.",
+                ft.Text("Click an underlined cycle-break target to choose another piece or sticker for this scramble. Your saved preferences stay unchanged.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.result_area,
             ], spacing=12)),
@@ -204,13 +205,19 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
 
     def _open_cycle_break_picker(self, category: str, break_info):
         """Open a temporary cycle-break chooser sorted by saved priority."""
+        scheme = self.state.active_scheme
+        if scheme is None:
+            return
+        cat = getattr(scheme, category)
         overrides = self.corner_break_overrides if category == "corners" else self.edge_break_overrides
+        recommended_choice = next((option for option in break_info.options
+                                   if option[0] == break_info.recommended_piece), None)
 
-        def choose(piece: str | None):
-            if piece is None or piece == break_info.recommended_piece:
+        def choose(choice: tuple[str, str] | None):
+            if choice is None or choice == recommended_choice:
                 overrides.pop(break_info.break_index, None)
             else:
-                overrides[break_info.break_index] = piece
+                overrides[break_info.break_index] = choice
             if self.page is not None:
                 self.page.pop_dialog()
             scheme = self.state.active_scheme
@@ -220,17 +227,29 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
                 self.update()
 
         option_controls = []
-        for piece, sticker in break_info.options:
+        for piece, preferred in break_info.options:
             recommended = piece == break_info.recommended_piece
-            selected = piece == break_info.chosen_piece
-            suffix = " · priority" if recommended else ""
-            option_controls.append(
-                ft.ListTile(
-                    title=ft.Text(f"{sticker}  ({piece}){suffix}", color=ft.Colors.ON_SURFACE),
-                    leading=ft.Icon(ft.Icons.CHECK_CIRCLE if selected else ft.Icons.RADIO_BUTTON_UNCHECKED),
-                    on_click=lambda e, p=piece: choose(p),
-                )
-            )
+            stickers = [preferred] + [s for s in CATEGORY_STICKER_ORDER[category]
+                                     if s in CATEGORY_PIECES[category][piece] and s != preferred]
+            buttons = []
+            for sticker in stickers:
+                selected = (piece, sticker) == (break_info.chosen_piece, break_info.chosen_sticker)
+                letter = cat.stickers.get(sticker, "")
+                if not letter or letter == "BUFFER":
+                    letter = "?"
+                suffix = " · preferred" if sticker == preferred else ""
+                button = ft.FilledButton if selected else ft.OutlinedButton
+                buttons.append(button(
+                    f"{letter} · {sticker}{suffix}",
+                    icon=ft.Icons.CHECK if selected else None,
+                    tooltip=f"Use {sticker} on {piece}",
+                    on_click=lambda e, p=piece, s=sticker: choose((p, s)),
+                ))
+            option_controls.append(ft.Column([
+                ft.Text(f"{piece}" + (" · priority piece" if recommended else ""),
+                        size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                ft.Row(buttons, spacing=6, run_spacing=6, wrap=True),
+            ], spacing=4))
         option_controls.append(ft.Divider())
         option_controls.append(
             ft.TextButton(
@@ -244,14 +263,15 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
             content=ft.Column(
                 [
                     ft.Text(
-                        "Choose any valid unsolved piece for this cycle break. "
-                        "The list follows your saved priority order; this choice only affects this scramble.",
+                        "Choose any sticker on an available piece. Preferred marks your saved sticker. "
+                        "Pieces follow your priority order; this choice only affects this scramble.",
                         size=12,
                         color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     *option_controls,
                 ],
                 tight=True,
+                width=460,
                 scroll=ft.ScrollMode.AUTO,
             ),
         )

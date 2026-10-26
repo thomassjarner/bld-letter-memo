@@ -1,3 +1,28 @@
+# BLD Letter Memo Web 2.25.3
+
+Scramble Memo's temporary cycle-break picker offers every sticker on each
+available piece: two choices per edge and three per corner. The choices show
+your scheme letter and sticker ID, mark the saved preferred sticker, and
+highlight the exact current selection. Pieces keep their saved priority order.
+
+Click an underlined cycle-break target, then a sticker to retrace the memo
+from that exact target. A different sticker on the highest-priority piece
+is also a valid temporary override. Reset to priority restores the saved
+choice. Changing the scramble or scheme clears temporary selections.
+
+Existing piece-only overrides keep their preferred-sticker behavior. Invalid
+or unavailable exact targets fall back to the recommendation. Saved schemes,
+preferences, data formats, browser persistence and all other features are
+preserved; data version remains 15 and no migration is needed.
+
+113 automated tests pass. New regressions cover every available sticker in
+both categories, custom preferred stickers, rotated/parity/own-orientation
+tracing, invalid targets, both theme modes, picker clicks, reset behavior and
+unchanged saved data. Browser rendering remains unverified in this environment.
+The patching process is unchanged; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.25.2
 
 The 2D cube now enters corners and edges together, clockwise around each face.
