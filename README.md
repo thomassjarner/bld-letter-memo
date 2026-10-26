@@ -1,3 +1,22 @@
+# BLD Letter Memo Web 2.25.2
+
+The 2D cube now enters corners and edges together, clockwise around each face.
+Start at a face's top-left corner, continue around its perimeter, then move
+to the next face in U / L / F / R / B / D order. Locked buffer stickers and
+centers are skipped. Clicking any editable sticker continues from there;
+Backspace follows the same path in reverse. Letters still save immediately
+to their own edge or corner scheme. The entry hint describes this order.
+
+Face cards retain their category-specific entry order. Existing letters,
+buffers, data formats and all other training features are preserved.
+
+100 automated tests pass, including typing through all six faces with default
+and changed buffers, both prior Face cards tabs, mixed-category saves and
+Backspace. Browser rendering remains unverified in this environment.
+The patching process is unchanged; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.25.1
 
 Fixes for first-time setup, clockwise cube entry and Progressive Memo flip recall.

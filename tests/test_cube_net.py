@@ -325,19 +325,20 @@ def test_combined_cube_saves_each_category_and_backspace_crosses_category_bounda
         assert view._focused_sticker == view._sticker_order[view._sticker_order.index(sticker) + 1]
         assert view._cube_editor is editor and view._sticker_fields is fields
     assert view.selected_category == 'edges'
-    last_edge = next(s for s in reversed(view._sticker_order) if len(s) == 2)
-    first_corner = next(s for s in view._sticker_order if len(s) == 3)
-    fields[last_edge].value = 'Z'
-    fields[last_edge].on_change(SimpleNamespace(control=fields[last_edge]))
-    assert view._focused_sticker == first_corner
-    fields[first_corner].value = ''
-    fields[first_corner].on_change(SimpleNamespace(control=fields[first_corner]))
+    edge, corner = 'UB', 'UBR'
+    fields[edge].value = 'Z'
+    fields[edge].on_change(SimpleNamespace(control=fields[edge]))
+    assert view._focused_sticker == corner
+    fields[corner].value = ''
+    fields[corner].on_change(SimpleNamespace(control=fields[corner]))
     corners = deepcopy(scheme.corners.to_dict())
-    fields[first_corner].on_focus(SimpleNamespace(control=fields[first_corner]))
+    fields[corner].on_focus(SimpleNamespace(control=fields[corner]))
     view.handle_keyboard_event(SimpleNamespace(key='Backspace'))
-    assert last_edge not in scheme.edges.stickers
-    assert fields[last_edge].value == '' and view._focused_sticker == last_edge
+    assert edge not in scheme.edges.stickers
+    assert fields[edge].value == '' and view._focused_sticker == edge
     assert scheme.corners.to_dict() == corners
+    fields[edge].value = 'ø'
+    fields[edge].on_change(SimpleNamespace(control=fields[edge]))
     for sticker in ('DF', 'FD', 'UBL', 'LUB', 'BUL', 'U', 'unknown'):
         saved = deepcopy(repo.data.to_dict())
         view._set_letter(sticker, 'Q')
@@ -445,23 +446,49 @@ def test_face_cards_share_colored_square_inputs_and_responsive_compact_workspace
 
 
 @pytest.mark.parametrize('category', ['edges', 'corners'])
-def test_cube_typing_uses_the_same_clockwise_category_order_as_face_cards(category):
-    _, _, view = open_editor()
+@pytest.mark.parametrize('buffers', [('DF', 'UBL'), ('UR', 'UFR')])
+def test_cube_typing_mixes_corners_and_edges_clockwise_on_each_face(category, buffers):
+    _, repo, view = open_editor()
+    scheme = repo.data.schemes['gold']
+    scheme.corners.stickers.update({'UBR': 'A', 'UFR': 'B'})
     if category == 'corners':
         with patch.object(type(view), 'update'):
             view._on_tab_change(SimpleNamespace(control=SimpleNamespace(selected_index=1)))
     card_order = list(view._sticker_order)
     change_editor(view, 'cube')
+    if buffers != ('DF', 'UBL'):
+        with patch.object(type(view), 'update'):
+            for cat, buffer in zip(('edges', 'corners'), buffers):
+                view._set_buffer(buffer, cat)
     fields, editor = view._sticker_fields, view._cube_editor
-    expected = [s for s in CATEGORY_STICKER_ORDER[category] if s in fields]
-    assert expected == card_order
-    assert [s for s in view._sticker_order if view._category_for_sticker(s) == category] == card_order
-    for index, sticker in enumerate(expected[:-1]):
+    # Start at the upper-left corner of each face and walk its perimeter.
+    # This literal sequence also checks the back/down faces and face changes.
+    clockwise = [
+        'UBL', 'UB', 'UBR', 'UR', 'UFR', 'UF', 'UFL', 'UL',
+        'LUB', 'LU', 'LUF', 'LF', 'LDF', 'LD', 'LDB', 'LB',
+        'FUL', 'FU', 'FUR', 'FR', 'FDR', 'FD', 'FDL', 'FL',
+        'RUF', 'RU', 'RUB', 'RB', 'RDB', 'RD', 'RDF', 'RF',
+        'BUR', 'BU', 'BUL', 'BL', 'BDL', 'BD', 'BDR', 'BR',
+        'DFL', 'DF', 'DFR', 'DR', 'DBR', 'DB', 'DBL', 'DL',
+    ]
+    expected = [s for s in clockwise if s in fields]
+    assert view._sticker_order == expected
+    if buffers == ('DF', 'UBL'):
+        # The screenshot has two L stickers on the front face.
+        assert ''.join(getattr(scheme, view._category_for_sticker(s)).stickers[s]
+                       for s in expected) == 'AABBCDDEFFGGHHIIJJKLLMMNNOOPPQQRSSTTUVVWWXX'
+        assert [s for s in expected if view._category_for_sticker(s) == category] == card_order
+    for index, sticker in enumerate(expected):
         field = fields[sticker]
         field.on_focus(SimpleNamespace(control=field))
-        field.value = chr(65 + index)
+        field.value = chr(65 + index % 26)
         field.on_change(SimpleNamespace(control=field))
-        assert view._focused_sticker == expected[index + 1]
+        assert getattr(scheme, view._category_for_sticker(sticker)).stickers[sticker] == field.value
+        assert view._focused_sticker == expected[min(index + 1, len(expected) - 1)]
         assert view._sticker_fields is fields and view._cube_editor is editor
+    # Switching back still uses the chosen category's original Face cards order.
+    change_editor(view, 'cards')
+    assert view._sticker_order == [s for s in CATEGORY_STICKER_ORDER[category]
+                                   if s in view._sticker_fields]
     # The input sequence changes, while the physical cube positions stay put.
     assert editor.face_controls['U'].content.controls[0].controls[1] is editor.cell_controls['UB']

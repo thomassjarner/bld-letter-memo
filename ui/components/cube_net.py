@@ -1,7 +1,7 @@
 """Editable 3×3 cube net backed by the existing canonical sticker IDs."""
 import flet as ft
 
-from core.cube_definitions import CATEGORY_STICKER_ORDER, face_groups
+from core.cube_definitions import face_groups
 from ui.components.sticker_tiles import STICKER_BORDER, StickerTiles, buffer_stickers
 
 
@@ -15,10 +15,10 @@ def face_stickers():
 
 
 NET_ROWS = ((None, "U", None, None), ("L", "F", "R", "B"), (None, "D", None, None))
-# Match Face cards: complete each category clockwise, face by face, before
-# moving to the next category. The physical positions remain the same.
-CUBE_STICKER_ORDER = tuple(sticker for category in ("edges", "corners")
-                           for sticker in CATEGORY_STICKER_ORDER[category])
+# Walk each face clockwise from its top-left corner, mixing corners and edges.
+# Faces retain the canonical U/L/F/R/B/D order; centers are never included.
+CUBE_STICKER_ORDER = tuple(positions[index] for positions in face_stickers().values()
+                           for index in (0, 1, 2, 5, 8, 7, 6, 3))
 COLOR_NAMES = {"W": "White", "Y": "Yellow", "G": "Green", "B": "Blue", "R": "Red", "O": "Orange"}
 OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 COLOR_VECTORS = {"W": (0, 1, 0), "Y": (0, -1, 0), "G": (0, 0, 1),
@@ -84,9 +84,10 @@ class CubeNetEditor(ft.Column):
         self.net_scroll = ft.Row([self.net], scroll=ft.ScrollMode.AUTO)
         warning = self.tiles.warning()
         self.controls = [
-            ft.Text("Type letters · Auto-saved · Advance automatically", size=11, height=16,
+            ft.Text("Type clockwise · Auto-saved · Advance automatically", size=11, height=16,
                     max_lines=1, overflow=ft.TextOverflow.ELLIPSIS,
-                    tooltip="Letters save immediately; typing advances to the next sticker.",
+                    tooltip="Type clockwise around each face, alternating corners and edges. "
+                            "Face order: U → L → F → R → B → D. Centers and buffer pieces are skipped.",
                     color=ft.Colors.ON_SURFACE_VARIANT),
             self.net_scroll,
             ft.Text("Editing edges + corners · ★ Buffer · ● Same piece", size=10,

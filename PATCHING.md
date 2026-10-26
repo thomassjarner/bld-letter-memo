@@ -1,7 +1,7 @@
-# Update to 2.25.1
+# Update to 2.25.2
 
-Copy the contents of `bld-letter-memo-web-2.25.1/` into your existing project,
-replacing matching files and including the new test file. Place the contents
+Copy the contents of `bld-letter-memo-web-2.25.2/` into your existing project,
+replacing matching files. Place the contents
 directly in the project folder. Patching and GitHub Pages deployment are
 unchanged.
 
@@ -9,37 +9,37 @@ Run these commands separately from Terminal inside your project folder:
 
 ```bash
 git add -A
-git commit -m "Fix scheme creation, cube entry order and flip recall"
+git commit -m "Enter cube corners and edges together clockwise"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` to publish any local
-commit already waiting. Wait for GitHub Actions, reload, and confirm **2.25.1**
+commit already waiting. Wait for GitHub Actions, reload, and confirm **2.25.2**
 in the header or browser-tab title. Command+Shift+R can refresh the build on
 macOS. Keep browser storage; no import, reset or migration is needed.
 
 ## What changes
 
-- A fresh browser opens a first-scheme form with a name field and Create button
-  in the main Letter Schemes area. Enter also creates and opens the scheme.
-  Sidebar creation likewise opens the newly created scheme immediately.
-- The 2D cube uses the same clockwise category sequence as Face cards, skipping
-  locked buffer stickers and centers. Both edges and corners remain editable.
-- Progressive Memo groups letter-based flips on screen during memo, then
-  recalls one flip pair per answer. JP / VO are two separate confirmations,
-  instead of one JPVO answer. Results label the flips individually.
+- The 2D cube auto-advances clockwise around each face's perimeter, starting
+  at its top-left corner and mixing corners and edges as you type.
+- Faces follow U / L / F / R / B / D order. Centers and all stickers on locked
+  buffer pieces are skipped automatically, including after changing buffers.
+- Clicking a sticker resumes that same path from the chosen position.
+  Backspace moves backwards along it and clears the correct category.
+- The entry hint explains the clockwise order. Face cards keep their existing
+  category-specific order. Both editors continue to use the same saved data.
 
-Older grouped flip history is displayed as stored. Corner twist recall, visual
-flip preferences, actual tracing and preferred/temporary cycle breaks are
-preserved. Models, AppState, browser storage keys/repositories, backup format,
-Timer, Letter Pairs, ratings, aliases and other saved histories are unchanged.
+Existing letter assignments are preserved. Models, AppState, browser storage,
+backup format, tracing, preferred/temporary cycle breaks, Progressive Memo,
+Timer, Letter Pairs, ratings, aliases and histories are unchanged. First-scheme
+creation and one-flip-at-a-time recall from 2.25.1 are retained.
 Data version remains 15; dependencies and deployment workflow are unchanged.
 
 ## Validation
 
-98 automated tests pass. New regression cases cover creation from clean data
-in all navigation styles on wide/narrow screens, Enter submission, stale active
-schemes, opening new schemes, clockwise entry in each category, real two-flip
-scrambles, execution order, separate Space confirmations, scoring, persistence
-and old grouped history. Browser rendering remains unverified here; no live
-deployment was performed.
+100 automated tests pass. Updated regression cases type through all six faces
+with default and changed buffers, starting from either Face cards category.
+They check the clockwise mixed sequence, category-specific saves, backwards
+entry, unchanged cube geometry and Face cards order. Existing tracing,
+persistence, theme, layout and practice tests also pass. Browser rendering
+remains unverified here; no live deployment was performed.
