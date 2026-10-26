@@ -1,3 +1,47 @@
+# BLD Letter Memo Web 2.26.0
+
+The Timer's three sessions now offer full-cube and focused training:
+
+- Session 1 keeps normal full-cube scrambles.
+- **edges only** (formerly Session 2) randomizes edges while leaving every
+  corner solved, including corner orientation.
+- **corners only** (formerly Session 3) randomizes corners. Without 3-style,
+  edges remain solved and corner permutation is even. With 3-style enabled,
+  every draw has a 50% chance of odd corner parity. Those cases physically
+  swap the configured edge buffer and parity helper; all other edges remain
+  solved. The existing 3-style memo swap then removes that pair from edge memo.
+
+Focused scrambles follow the active scheme's memo orientation and
+scramble-from-own-orientation setting. Changing relevant settings regenerates
+the focused scramble stack. Running solves cannot change sessions. Next,
+previous, automatic advance, penalties, history, statistics and analysis keep
+using the selected session. Invalid parity settings produce a useful message
+and cannot time a stale or empty scramble.
+
+Existing session IDs and histories are preserved under the new display names.
+Models, storage keys, backups, rating data, BLD tracing, cycle-break settings
+and other practice modes are preserved. Data version remains 15.
+
+The web runtime uses the bundled MIT-licensed min2phase solver for uniformly
+sampled legal restricted states. The 192 web-runtime checks all produced
+scrambles of at most 21 moves. Generation needs no external service or new
+Python dependency. Native Python can use Node when present; without a JS
+runtime, a longer construction-based fallback still preserves the category
+and parity constraints. These are training scrambles, not official WCA output.
+See THIRD_PARTY_NOTICES.md for the bundled source's license.
+
+145 automated tests pass. An additional 192 generation checks passed in the
+Flet web Python runtime across all 24 memo orientations, both orientation
+modes and both 3-style settings. Tests cover all 132 buffer/helper edge pairs,
+sample legality, parity distribution, session switching, history, backup
+round trips, invalid settings and retained Timer layout. Browser visuals
+remain unverified; no live deployment was performed.
+
+The patching process is unchanged. Copy all release contents, including the
+new core/vendor folder; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.25.3
 
 Scramble Memo's temporary cycle-break picker offers every sticker on each

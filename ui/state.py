@@ -386,6 +386,15 @@ class AppState:
         self.data.ensure_default_sessions()
         return ["Session 1", "Session 2", "Session 3"]
 
+    @property
+    def practice_session_labels(self) -> dict[str, str]:
+        # Stable storage IDs keep existing histories and backups compatible.
+        return {"Session 1": "Session 1", "Session 2": "edges only", "Session 3": "corners only"}
+
+    @staticmethod
+    def practice_session_category(name: str) -> str:
+        return {"Session 2": "edges", "Session 3": "corners"}.get(name, "all")
+
     def switch_practice_session(self, name: str) -> None:
         self.data.ensure_default_sessions()
         if name not in self.data.practice_sessions:

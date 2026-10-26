@@ -1,10 +1,9 @@
 """Scramble generation for practice.
 
-The current desktop build has no cube-solving dependency bundled, so this
-module produces long competition-style random-move scrambles while avoiding
-same-face / same-axis redundancies.  It is deliberately isolated behind one
-class so a true uniform random-state generator can replace it without changing
-the Practice UI or saved solve format.
+The normal session retains its competition-style random-move scrambles,
+avoiding same-face / same-axis redundancies. Focused sessions delegate to
+constrained state generation and the bundled solver, while preserving the
+same Practice API and saved solve format.
 """
 from __future__ import annotations
 
@@ -19,7 +18,10 @@ class ScrambleGenerator:
     def __init__(self, rng: random.Random | None = None):
         self.rng = rng or random.SystemRandom()
 
-    def generate(self, length: int = 22, add_bld_orientation: bool = True) -> str:
+    def generate(self, length: int = 22, add_bld_orientation: bool = True, *, category: str = "all", scheme=None) -> str:
+        if category != "all":
+            from core.focused_scrambles import generate_focused
+            return generate_focused(category, self.rng, scheme)
         moves: list[str] = []
         last_face = None
         last_axis = None

@@ -113,7 +113,13 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.mode = "menu"
         self.active = False
 
-        self.current_scramble = self.generator.generate()
+        self._scramble_context_key = None
+        self._scramble_error = ""
+        try:
+            self.current_scramble = self._generate_scramble()
+        except ValueError as ex:
+            self.current_scramble = ""
+            self._scramble_error = str(ex)
         self.scramble_stack = [self.current_scramble]
         self.scramble_index = 0
 
@@ -127,7 +133,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
         self.scramble_text = ft.Text(self.current_scramble, size=17, selectable=True, font_family="monospace", color=ft.Colors.ON_SURFACE)
         self.timer_text = ft.Text("0.00", size=68, weight=ft.FontWeight.W_500, font_family="monospace", color=ft.Colors.ON_SURFACE)
-        self.status_text = ft.Text("", size=14, color=ft.Colors.ON_SURFACE)
+        self.status_text = ft.Text(self._scramble_error, size=14, color=ft.Colors.ON_SURFACE)
         self.stats_text = ft.Text("", color=ft.Colors.ON_SURFACE)
         self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12, color=ft.Colors.ON_SURFACE)
         self._copy_notice_token = 0
@@ -146,8 +152,11 @@ class PracticePage(ThemeAwarePage, ft.Column):
             label="Session",
             width=150, height=44, dense=True,
             value=self.state.data.active_practice_session,
-            options=[ft.DropdownOption(name, name) for name in self.state.practice_session_names],
+            options=[ft.DropdownOption(name, self.state.practice_session_labels[name])
+                     for name in self.state.practice_session_names],
             on_select=self._switch_session,
+            tooltip="Session 1: full cube. Edges only: corners solved. Corners only: edges solved; "
+                    "with 3-style, 50% of cases swap your buffer and helper edges for parity.",
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
         self.previous_scramble_button = ft.IconButton(
@@ -401,6 +410,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def refresh(self, update: bool = True):
         self.session_dropdown.value = self.state.data.active_practice_session
+        if not self.running:
+            self._sync_scramble_context()
         self._refresh_stats_and_history(update=False)
         if update and self.page is not None:
             self.update()
@@ -412,13 +423,16 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self._safe_update()
             return
         name = e.control.value
+        try:
+            scramble = self._generate_scramble(name)
+        except ValueError as ex:
+            e.control.value = self.state.data.active_practice_session
+            self.status_text.value = str(ex)
+            self._safe_update()
+            return
         self.state.switch_practice_session(name)
         self.last_solve_index = None
-        self.current_scramble = self.generator.generate()
-        self.scramble_stack = [self.current_scramble]
-        self.scramble_index = 0
-        self.scramble_text.value = self.current_scramble
-        self.previous_scramble_button.disabled = True
+        self._replace_scrambles(scramble)
         self.timer_text.value = "0.00"
         self.timer_text.color = ft.Colors.ON_SURFACE
         self.status_text.value = ""
@@ -429,6 +443,52 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._refresh_stats_and_history(update=False)
         self._safe_update()
         self._focus_keyboard_listener()
+
+    def _scramble_context(self, session=None):
+        session = session or self.state.data.active_practice_session
+        category = self.state.practice_session_category(session)
+        scheme = self.state.active_scheme
+        if category == "all" or scheme is None:
+            return (session,)
+        return (session, scheme.memo_up, scheme.memo_front, scheme.scramble_from_own_orientation,
+                scheme.three_style_enabled, scheme.edges.buffer_sticker, scheme.edges.buffer_piece,
+                scheme.edge_parity_partner)
+
+    def _generate_scramble(self, session=None):
+        session = session or self.state.data.active_practice_session
+        category = self.state.practice_session_category(session)
+        scramble = (self.generator.generate() if category == "all" else
+                    self.generator.generate(category=category, scheme=self.state.active_scheme))
+        self._scramble_context_key = self._scramble_context(session)
+        self._scramble_error = ""
+        return scramble
+
+    def _replace_scrambles(self, scramble):
+        self.current_scramble = scramble
+        self.scramble_stack = [scramble]
+        self.scramble_index = 0
+        self.scramble_text.value = scramble
+        self.previous_scramble_button.disabled = True
+
+    def _sync_scramble_context(self):
+        if self._scramble_context_key == self._scramble_context() and not self._scramble_error:
+            return True
+        if self._scramble_context_key and self._scramble_context_key[0] != self.state.data.active_practice_session:
+            # Import/restore may change sessions without the dropdown handler.
+            self.last_solve_index = None
+            for button in (self.memo_button, self.success_button, self.plus2_button, self.dnf_button):
+                button.disabled = True
+            self.timer_text.value = "0.00"
+            self.timer_text.color = ft.Colors.ON_SURFACE
+        try:
+            scramble = self._generate_scramble()
+        except ValueError as ex:
+            self._scramble_error = str(ex)
+            self.status_text.value = self._scramble_error
+            return False
+        self._replace_scrambles(scramble)
+        self.status_text.value = ""
+        return True
 
     # ---- keyboard/timer --------------------------------------------------
 
@@ -481,6 +541,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 return
 
         if e.key in self.SPACE_KEYS and not self.holding_space:
+            if not self._sync_scramble_context():
+                self._safe_update()
+                return
             self.holding_space = True
             self.armed = False
             self.status_text.value = ""
@@ -532,6 +595,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 self._safe_update()
 
     def _start_timer(self, now: float):
+        if self._scramble_error or not self.current_scramble:
+            return
         self.running = True
         self.started_at = now
         self.last_display_second = -1
@@ -573,10 +638,13 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._focus_keyboard_listener()
 
     def _advance_to_fresh_scramble_preserving_result(self):
+        if self._scramble_context_key != self._scramble_context():
+            self._sync_scramble_context()
+            return
         if self.scramble_index < len(self.scramble_stack) - 1:
             self.scramble_index += 1
         else:
-            self.scramble_stack.append(self.generator.generate())
+            self.scramble_stack.append(self._generate_scramble())
             self.scramble_index += 1
         self.current_scramble = self.scramble_stack[self.scramble_index]
         self.scramble_text.value = self.current_scramble
@@ -628,10 +696,13 @@ class PracticePage(ThemeAwarePage, ft.Column):
     def _new_scramble(self, e=None):
         if self.running:
             return
+        if not self._sync_scramble_context():
+            self._safe_update()
+            return
         if self.scramble_index < len(self.scramble_stack) - 1:
             self.scramble_index += 1
         else:
-            self.scramble_stack.append(self.generator.generate())
+            self.scramble_stack.append(self._generate_scramble())
             self.scramble_index += 1
         self._show_scramble_at_index()
         self._safe_update()
@@ -639,6 +710,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _previous_scramble(self, e=None):
         if self.running or self.scramble_index <= 0:
+            return
+        if not self._sync_scramble_context() or self.scramble_index <= 0:
+            self._safe_update()
             return
         self.scramble_index -= 1
         self._show_scramble_at_index()
