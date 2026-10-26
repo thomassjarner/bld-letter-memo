@@ -165,6 +165,31 @@ def test_accuracy_counts_both_missing_and_extra_letters_in_a_shifted_answer():
     assert score_recall([ProgressiveRecall('corners', 'orientation', 'ABC', 'BCA')]) == (2, 4)
 
 
+@pytest.mark.parametrize('execution', ['CE', 'EC'])
+def test_real_flip_pairs_stay_grouped_in_memo_and_are_recalled_one_flip_at_a_time(execution):
+    scheme = letter_scheme()
+    scheme.edges.orientation_memo = 'trace'
+    scheme.execution_order = execution
+    plan = build_plan(GOLD_TESTS[0]['scramble'], scheme)
+    edge = next(c for c in plan.categories if c.category == 'edges')
+    assert edge.orientation_pairs == ('JP', 'VO')  # Two real flipped pieces.
+    memo = [p for p in edge.prompts if p.kind == 'orientation']
+    assert len(memo) == 1 and memo[0].letters == 'JPVO' and memo[0].label == 'All flips'
+    recall = [p for p in plan.recall_prompts if p.category == 'edges' and p.kind == 'orientation']
+    assert [p.letters for p in recall] == ['JP', 'VO']
+    assert [p.label for p in recall] == ['Flip 1 / 2', 'Flip 2 / 2']
+    assert plan.recall_prompts[0].category[0].upper() == execution[0]
+
+
+def test_flip_recall_does_not_split_grouped_corner_twists_or_add_visual_flips():
+    corners = CategoryMemo('corners', ('AB',), ('CD', 'EF'))
+    assert [p.letters for p in corners.recall_prompts] == ['AB', 'CDEF']
+    scheme = letter_scheme()
+    scheme.edges.orientation_memo = 'visual'
+    plan = build_plan(GOLD_TESTS[0]['scramble'], scheme)
+    assert not [p for p in plan.recall_prompts if p.category == 'edges' and p.kind == 'orientation']
+
+
 def open_mode():
     page, repo = mount()
     scheme = letter_scheme()
@@ -381,3 +406,54 @@ def test_shared_preferences_save_reload_and_backup_include_progressive_history()
         assert backup.progressive_memo_history[0].scramble == 'R U'
 
     asyncio.run(check())
+
+
+def test_flip_pairs_confirm_separately_with_space_and_preserve_legacy_history():
+    _, repo, _, mode = open_mode()
+    scheme = repo.data.schemes['gold']
+    scheme.edges.orientation_memo = 'trace'
+    scheme_snapshot = deepcopy(scheme.to_dict())
+    timer_snapshot = deepcopy(repo.data.practice_sessions)
+    mode.current_scramble = GOLD_TESTS[0]['scramble']
+    now = [100.0]
+    with patch('ui.pages.progressive_memo_page.time.monotonic', side_effect=lambda: now[0]):
+        mode._start()
+        memo_to_recall(mode, now)
+        prompts = mode.run.plan.recall_prompts
+        flip_indices = [i for i, p in enumerate(prompts) if p.category == 'edges' and p.kind == 'orientation']
+        assert len(flip_indices) == 2
+        for index, prompt in enumerate(prompts):
+            now[0] += 1
+            mode.recall_field.value = prompt.letters.lower()
+            mode._input_changed(SimpleNamespace(control=mode.recall_field))
+            mode.recall_field.value += ' '
+            mode._input_changed(SimpleNamespace(control=mode.recall_field))
+            assert mode.run.recall_index == index + 1
+            if index == flip_indices[0]:
+                assert mode.phase == 'recall' and mode.run.prompt.letters == 'VO'
+                assert mode.recall_field.value == '' and not repo.data.progressive_memo_history
+                assert any(isinstance(c, ft.Text) and c.value == "Type this flip's letter pair."
+                           for c in walk(mode.stage_scroll))
+    attempt = repo.data.progressive_memo_history[0]
+    flips = [r for r in attempt.recall if r.category == 'edges' and r.kind == 'orientation']
+    assert [r.expected for r in flips] == ['JP', 'VO']
+    assert [r.entered for r in flips] == ['JP', 'VO']
+    assert attempt.accuracy == 100 and attempt.recall_centiseconds == len(prompts) * 100
+    assert attempt.scramble == GOLD_TESTS[0]['scramble'] and attempt.scheme_snapshot == scheme_snapshot
+    assert len(repo.data.progressive_memo_history) == 1 and repo.data.practice_sessions == timer_snapshot
+    assert scheme.to_dict() == scheme_snapshot
+    labels = [c.value for c in walk(mode.stage_scroll) if isinstance(c, ft.Text)]
+    assert 'Flip 1' in labels and 'Flip 2' in labels
+    restored = AppData.from_dict(json.loads(json.dumps(repo.data.to_dict())))
+    assert restored.progressive_memo_history[0].to_dict() == attempt.to_dict()
+
+    # Older attempts keep their grouped answers and remain readable as stored.
+    legacy = ProgressiveMemoAttempt.from_dict(attempt.to_dict())
+    merged = ProgressiveRecall('edges', 'orientation', 'JPVO', 'JPVO')
+    legacy.recall = [r for r in legacy.recall if not (r.category == 'edges' and r.kind == 'orientation')]
+    legacy.recall.append(merged)
+    before = deepcopy(legacy.to_dict())
+    mode.result = legacy
+    mode._render_result()
+    assert any(isinstance(c, ft.Text) and c.value == 'All flips' for c in walk(mode.stage_scroll))
+    assert legacy.to_dict() == before

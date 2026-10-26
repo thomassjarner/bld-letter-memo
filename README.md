@@ -1,3 +1,38 @@
+# BLD Letter Memo Web 2.25.1
+
+Fixes for first-time setup, clockwise cube entry and Progressive Memo flip recall.
+
+- An empty browser now has a visible scheme-name field and Create button in
+  the main Letter Schemes area. Creation works by button or Enter, saves the
+  scheme and opens it immediately. Existing users' newly created schemes also
+  open immediately, including when an old active selection is empty or stale.
+- The scheme sidebar and list have explicit height bounds. Its name field and
+  plus button fit within the sidebar; first-time setup uses the full main area.
+- Cube entry uses exactly the Face cards category order: clockwise around
+  each face, edges across all six faces, then corners across all six faces.
+  Clicking a corner keeps entry moving through corners. Buffers and centers
+  are skipped. Both categories remain editable on the same cube, and its
+  physical net, blank centers, colors and size behavior are preserved.
+- Progressive Memo still shows all letter-based flips together during memo.
+  Recall now asks for one flip's letter pair per answer: for example JP, then
+  VO, rather than JPVO together. Space/Enter confirms each answer separately.
+- Results identify Flip 1, Flip 2, etc. Older saved grouped flip answers remain
+  readable and are never rewritten. Grouped corner twists and visual flips
+  retain their previous behavior.
+
+98 automated tests pass, including clean-data setup across navigation styles,
+button/Enter creation, stale selections, cross-category keyboard behavior,
+clockwise entry, real two-flip scrambles, Space confirmation, saved results,
+legacy history and backup round trips. A live browser rendering check could
+not be completed in this environment.
+
+Data version remains 15. Models, AppState, browser storage, imports/exports,
+ratings, aliases, timer sessions/history, scramble generation and BLD tracing,
+cycle-break preferences and overrides, Timer, and Letter Pairs are unchanged.
+Copy all release contents into your existing project; see PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.25.0
 
 A consistent compact workspace for **Face cards** and **2D cube**.

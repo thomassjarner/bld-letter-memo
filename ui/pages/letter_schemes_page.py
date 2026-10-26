@@ -39,6 +39,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._last_letter_category = "edges"
         self._viewport = (1400.0, 760.0)
         self._layout_wide = True
+        self._layout_key = None
         self._cube_editor = None
         self._cards_editor = None
         self.editor_dropdown = ft.Dropdown(
@@ -49,6 +50,13 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
         )
         self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=144, dense=True, on_submit=self._create_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
+        self.new_scheme_field.height = 36
+        self.first_scheme_field = ft.TextField(
+            label="Scheme name", hint_text="e.g. My BLD scheme", width=260, height=44, dense=True,
+            on_submit=self._create_first_scheme, color=ft.Colors.ON_SURFACE,
+            label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
+            hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
+        )
         self.rename_field = ft.TextField(hint_text="Rename active scheme", width=170, dense=True, on_submit=self._rename_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.scheme_list_view = ft.ListView(expand=True, spacing=2, scroll=ft.ScrollMode.AUTO)
         # Keep one scrollable body control mounted for the lifetime of the
@@ -91,11 +99,13 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             content=ft.Column(
                 [
                     eyebrow("Your schemes"),
-                    ft.Row([self.new_scheme_field, ft.IconButton(ft.Icons.ADD, on_click=self._create_scheme, tooltip="Create scheme")]),
+                    ft.Row([self.new_scheme_field, ft.IconButton(ft.Icons.ADD, width=36, height=36,
+                                                               icon_size=18, on_click=self._create_scheme,
+                                                               tooltip="Create scheme")], spacing=6),
                     ft.Divider(),
                     self.scheme_list_view,
                 ],
-                expand=True,
+                spacing=6,
                 alignment=ft.MainAxisAlignment.START,
             ),
         )
@@ -113,16 +123,24 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._viewport = (width, height)
         self.width, self.height = width, height
         wide = width >= 760
+        show_sidebar = bool(self.state.scheme_names)
+        workspace_height = height - self._editor_heading.height
+        self.sidebar.visible = show_sidebar
         self.sidebar.width = 216 if wide else width
-        self.sidebar.height = None if wide else 188
-        if wide != self._layout_wide:
-            self.controls[1] = (ft.Row([self.sidebar, self.body_scroll], expand=True,
+        self.sidebar.height = workspace_height if wide else 188
+        self.sidebar.content.height = max(1, self.sidebar.height - 26)
+        layout_key = (wide, show_sidebar)
+        if layout_key != self._layout_key:
+            children = [self.sidebar, self.body_scroll] if show_sidebar else [self.body_scroll]
+            self.controls[1] = (ft.Row(children, expand=True,
                                       vertical_alignment=ft.CrossAxisAlignment.STRETCH) if wide else
-                                ft.Column([self.sidebar, self.body_scroll], expand=True, spacing=12))
-            self._layout_wide = wide
-        self.body_scroll.width = width - 226 if wide else width
+                                ft.Column(children, expand=True, spacing=12))
+            self._layout_key = layout_key
+        self._layout_wide = wide
+        self.body_scroll.width = width - 226 if wide and show_sidebar else width
+        self.first_scheme_field.width = min(260, self.body_scroll.width - 56)
         compact = self._category_tabs is not None
-        self.controls[0] = self._editor_heading if compact else self._standard_heading
+        self.controls[0] = self._editor_heading
         self.body_scroll.spacing = 6 if compact else 8
         self.rename_field.height = 36 if compact else None
         self.editor_dropdown.height = 40 if compact else 44
@@ -139,20 +157,14 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             for picker in self._buffer_pickers.values():
                 picker.height, picker.dense = 40, True
                 picker.width = min(230, slot_width)
-        if compact:
-            workspace_height = height - self._editor_heading.height
-            body_height = max(1, workspace_height - (200 if not wide else 0))
-            self.controls[1].height = workspace_height
-            self.body_scroll.height = body_height
-            # Three compact toolbar rows, ListView padding/gaps, help/legend
-            # and the existing message line all share the viewport with the net.
-            editor = self._cube_editor if self._cube_editor is not None else self._cards_editor
-            if editor is not None:
-                overhead = 36 + 40 + self._buffer_toolbar.height + 20 + 4 * self.body_scroll.spacing + editor.extra_height + 18
-                editor.set_viewport(self.body_scroll.width - 20, body_height - overhead)
-        else:
-            self.controls[1].height = None
-            self.body_scroll.height = None
+        body_height = max(1, workspace_height - (200 if not wide and show_sidebar else 0))
+        self.controls[1].height = workspace_height
+        self.body_scroll.height = body_height
+        # Both empty setup and existing editors need a real, bounded viewport.
+        editor = self._cube_editor if self._cube_editor is not None else self._cards_editor
+        if editor is not None:
+            overhead = 36 + 40 + self._buffer_toolbar.height + 20 + 4 * self.body_scroll.spacing + editor.extra_height + 18
+            editor.set_viewport(self.body_scroll.width - 20, body_height - overhead)
 
     # ---- refresh ------------------------------------------------------------
 
@@ -195,7 +207,21 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._category_tabs = None
         self.editor_dropdown.value = self.state.data.letter_scheme_editor
         if scheme is None:
-            self.body_scroll.controls = [ft.Text("Create a scheme to get started.", italic=True, color=ft.Colors.ON_SURFACE)]
+            self._sticker_fields, self._sticker_order = {}, []
+            self._focused_sticker = None
+            self.body_scroll.controls = [ft.Container(
+                ft.Column([
+                    ft.Text("Create your first letter scheme" if not self.state.scheme_names else "Choose or create a letter scheme",
+                            size=19, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    ft.Text("Name your scheme, then choose your buffers and assign letters.", size=12,
+                            color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Row([self.first_scheme_field,
+                            ft.FilledButton("Create scheme", height=44, tooltip="Create letter scheme",
+                                            on_click=self._create_first_scheme)], wrap=True, spacing=8, run_spacing=8),
+                ], spacing=12, tight=True), padding=16, border_radius=10,
+                bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+                border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+            )]
             self.set_viewport(*self._viewport)
             return
 
@@ -528,13 +554,22 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
     # ---- event handlers -----------------------------------------------------
 
     def _create_scheme(self, e):
-        name = self.new_scheme_field.value.strip()
+        self._create_named_scheme(self.new_scheme_field)
+
+    def _create_first_scheme(self, e):
+        self._create_named_scheme(self.first_scheme_field)
+
+    def _create_named_scheme(self, field):
+        name = (field.value or "").strip()
         if not name:
             return
-        self.state.create_scheme(name)
+        scheme = self.state.create_scheme(name)
+        if self.state.data.active_scheme != scheme.name:
+            self.state.switch_scheme(scheme.name)
         self.selected_category = "edges"
         self._last_letter_category = "edges"
-        self.new_scheme_field.value = ""
+        self._focused_sticker = None
+        field.value = ""
         self.refresh()
 
     def _rename_scheme(self, e):

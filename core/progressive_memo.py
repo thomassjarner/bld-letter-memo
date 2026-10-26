@@ -28,6 +28,8 @@ class MemoPrompt:
     @property
     def label(self) -> str:
         if self.kind == "orientation":
+            if self.category == "edges" and self.count:
+                return f"Flip {self.index + 1} / {self.count}"
             return "All twists" if self.category == "corners" else "All flips"
         return f"Pair {self.index + 1} / {self.count}"
 
@@ -44,6 +46,15 @@ class CategoryMemo:
                          for i, pair in enumerate(self.ordinary_pairs))
         orientation = (MemoPrompt(self.category, "orientation", "".join(self.orientation_pairs)),) if self.orientation_pairs else ()
         return ordinary + orientation
+
+    @property
+    def recall_prompts(self) -> tuple[MemoPrompt, ...]:
+        if self.category != "edges":
+            return self.prompts
+        ordinary = tuple(prompt for prompt in self.prompts if prompt.kind == "pair")
+        flips = tuple(MemoPrompt(self.category, "orientation", pair, index, len(self.orientation_pairs))
+                      for index, pair in enumerate(self.orientation_pairs))
+        return ordinary + flips
 
 
 @dataclass(frozen=True)
@@ -86,7 +97,7 @@ def build_plan(scramble: str, scheme: LetterScheme,
     execution_order = snapshot.execution_order or "EC"
     if memo_order not in {"CE", "EC"} or execution_order not in {"CE", "EC"}:
         raise ScrambleError("Set valid CE / EC memo and execution orders in Letter Schemes.")
-    recall = tuple(prompt for letter in execution_order for prompt in categories[letter].prompts)
+    recall = tuple(prompt for letter in execution_order for prompt in categories[letter].recall_prompts)
     if not recall:
         raise ScrambleError("This scramble has no letter targets to recall. Try a new scramble.")
     return ProgressivePlan(scramble, snapshot.name, snapshot.to_dict(), memo_order, execution_order,

@@ -1,7 +1,7 @@
 """Editable 3×3 cube net backed by the existing canonical sticker IDs."""
 import flet as ft
 
-from core.cube_definitions import face_groups
+from core.cube_definitions import CATEGORY_STICKER_ORDER, face_groups
 from ui.components.sticker_tiles import STICKER_BORDER, StickerTiles, buffer_stickers
 
 
@@ -15,7 +15,10 @@ def face_stickers():
 
 
 NET_ROWS = ((None, "U", None, None), ("L", "F", "R", "B"), (None, "D", None, None))
-CUBE_STICKER_ORDER = tuple(sticker for face in face_stickers().values() for sticker in face if len(sticker) > 1)
+# Match Face cards: complete each category clockwise, face by face, before
+# moving to the next category. The physical positions remain the same.
+CUBE_STICKER_ORDER = tuple(sticker for category in ("edges", "corners")
+                           for sticker in CATEGORY_STICKER_ORDER[category])
 COLOR_NAMES = {"W": "White", "Y": "Yellow", "G": "Green", "B": "Blue", "R": "Red", "O": "Orange"}
 OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 COLOR_VECTORS = {"W": (0, 1, 0), "Y": (0, -1, 0), "G": (0, 0, 1),

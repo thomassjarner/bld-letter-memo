@@ -221,11 +221,13 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             self._center(controls, 260)
         elif self.phase == "recall":
             prompt = self.run.prompt
+            instruction = ("Type this flip's letter pair." if prompt.category == "edges"
+                           else "Type all twist letters together.") if prompt.kind == "orientation" else "Type the letter pair (or the single final letter)."
             self._center([
                 ft.Text(f"Recall {prompt.category.title()} · {prompt.label}", size=20, weight=ft.FontWeight.W_600),
                 ft.Text(f"Answer {self.run.recall_index + 1} / {len(self.run.plan.recall_prompts)}", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.recall_field,
-                ft.Text("Type all twist/flip letters together." if prompt.kind == "orientation" else "Type the letter pair (or the single final letter).", size=12),
+                ft.Text(instruction, size=12),
                 ft.Text("Space or Enter → confirm. Use Skip if you cannot recall it.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Row([ft.FilledButton("Confirm", on_click=self._next),
                         ft.TextButton("Skip", on_click=lambda e: self._submit_recall(""))],
@@ -419,10 +421,13 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             controls.append(ft.Text(category.title(), size=17, weight=ft.FontWeight.W_600))
             if not items:
                 controls.append(ft.Text("No letter targets", size=12))
-            pair_index = 0
+            pair_index, flip_index = 0, 0
             for item in items:
                 pair_index += item.kind == "pair"
                 label = ("All twists" if category == "corners" else "All flips") if item.kind == "orientation" else f"Pair {pair_index}"
+                if category == "edges" and item.kind == "orientation" and len(normalize_letters(item.expected)) <= 2:
+                    flip_index += 1
+                    label = f"Flip {flip_index}"
                 controls.append(ft.Row([
                     ft.Text(label, size=12, width=72),
                     ft.Row([self._result_letter(*letter) for letter in align_letters(item.expected, item.entered)],
