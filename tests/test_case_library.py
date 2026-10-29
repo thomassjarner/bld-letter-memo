@@ -238,7 +238,7 @@ def test_projection_stays_in_bounds_and_keeps_centers_blank_in_both_views():
     assert state == before
 
 
-@pytest.mark.parametrize('move', ['R', 'Rw', 'M', 'x', "F'", 'U2'])
+@pytest.mark.parametrize('move', ['R', 'Rw', 'Fw', "Fw'", 'M', 'x', "F'", 'U2'])
 def test_animated_turn_ends_at_the_exact_next_cube_geometry(move):
     state = algorithm_states(parse_algorithm("R U' L' U"))[-1]
     def signature(tiles):

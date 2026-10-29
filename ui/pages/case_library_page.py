@@ -4,6 +4,7 @@ import random
 import flet as ft
 
 from core.algorithms import changed_stickers, inverse_state, normalized_state, parse_algorithm
+from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms
 from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, corner_cases, identify_case
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
@@ -54,6 +55,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.first_target = dropdown(label='First target sticker', value='all', height=44, dense=True,
             options=[ft.DropdownOption('all', 'Any first target')] + [ft.DropdownOption(s) for s in TARGETS],
             on_select=lambda e: self._filter_changed())
+        self.second_target = dropdown(label='Second target sticker (optional)', value='all', height=44, dense=True,
+            options=[ft.DropdownOption('all', 'Any second target')] + [ft.DropdownOption(s) for s in TARGETS],
+            on_select=lambda e: self._filter_changed())
         self.status_filter = dropdown(label='Learning status', value='all', height=44, dense=True,
             options=[ft.DropdownOption('all', 'Any status')] +
                     [ft.DropdownOption(s, s.title()) for s in ('new', 'learning', 'learned')],
@@ -66,9 +70,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                                       height=42, dense=True, on_select=self._choose_scheme)
         self.error = ft.Text('', color=ft.Colors.ERROR, size=12)
         self.notice = ft.Text('', color=ft.Colors.PRIMARY, size=12)
-        self.algorithm_field = field(label='Algorithm', multiline=True, min_lines=2, max_lines=5,
+        self.algorithm_field = field(label='Algorithm · edit or paste your own', multiline=True, min_lines=2, max_lines=5,
+            hint_text="Supports Fw, Fw', f, [A,B] and setup:[A,B].",
             value='', text_size=14, on_submit=lambda e: self._preview_editor())
-        self.name_field = field(label='Algorithm name', value='My alg', height=42, dense=True)
+        self.name_field = field(label='Algorithm name (optional)', value='My alg', height=42, dense=True)
         self.explorer_field = field(label='Algorithm or commutator', value=BASE_ALG, multiline=True,
             min_lines=2, max_lines=5, on_submit=lambda e: self._analyze())
         self.explorer_effect = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
@@ -121,6 +126,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 ft.Text('Learn how commutators work, then build your own case collection. '
                         'This library uses UFR as its corner buffer and your selected scheme for letter labels.',
                         size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(QUALITY_NOTICE, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=6),
             ft.ResponsiveRow(cards, spacing=12, run_spacing=12),
             panel(ft.Column([
@@ -145,7 +151,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def _open_subset(self, subset):
         self.search.value = ''
         self.subset.value = subset
-        self.first_target.value = self.status_filter.value = 'all'
+        self.first_target.value = self.second_target.value = self.status_filter.value = 'all'
         self.favorites.value = False
         self.limit = 50
         self.mode = 'library'
@@ -180,6 +186,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             record = self.record(case.id)
             if self.subset.value != 'all' and case.subset != self.subset.value: continue
             if self.first_target.value != 'all' and case.first != self.first_target.value: continue
+            if self.second_target.value != 'all' and case.second != self.second_target.value: continue
             if self.status_filter.value != 'all' and record.status != self.status_filter.value: continue
             if self.favorites.value and not record.favorite: continue
             text = f'{case.id} {case.first} {case.second} {self._label(case)} {case_letters(case, self.scheme)}'.casefold()
@@ -230,7 +237,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def _variant(self):
         case, record = self.cases[self.selected_case], self.record()
         algorithm = next((a for a in record.algorithms if a.id == self.selected_algorithm), None)
-        return (algorithm.name, algorithm.alg) if algorithm else ('Generated starter', case.starter)
+        if algorithm is None:
+            builtins = builtin_algorithms(case.id)
+            algorithm = next((a for a in builtins if a.id == self.selected_algorithm), builtins[0])
+        return algorithm.name, algorithm.alg
 
     def _load_viewer(self, source, initial, targets=(), identity=None):
         key = (source, identity)
@@ -244,7 +254,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def _render_library(self):
         self._render_list()
         case, record = self.cases[self.selected_case], self.record()
-        if not any(a.id == self.selected_algorithm for a in record.algorithms):
+        builtins = builtin_algorithms(case.id)
+        personal = next((a for a in record.algorithms if a.id == self.selected_algorithm), None)
+        if personal is None and not any(a.id == self.selected_algorithm for a in builtins):
             self.selected_algorithm = ''
         name, source = self._variant()
         editor_key = (case.id, self.selected_algorithm, source)
@@ -261,14 +273,17 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self.error.value = str(ex) + ' Showing the verified starter.'
             self._load_viewer(case.starter, initial, (case.first, case.second), case.id)
         if changed_variant:
-            self.algorithm_field.value, self.name_field.value = source, name if self.selected_algorithm else 'My alg'
+            self.algorithm_field.value, self.name_field.value = source, name if personal else 'My alg'
             self._editor_key = editor_key
         self.viewer.scheme = self.scheme
         self.viewer.dark_mode = self.state.data.dark_mode
         self.viewer._redraw(update=False)
         self.algorithm_field.visible = not self.hidden
         self.viewer.move_text.visible = not self.hidden
-        options = [ft.DropdownOption('', 'Generated starter' + (' · preferred' if not record.preferred_algorithm else ''))]
+        recommended = builtins[0]
+        recommendation = {'supplied': 'Supplied algorithm', 'one_move': 'One-move setup', 'generated': 'Generated fallback'}[recommended.origin]
+        options = [ft.DropdownOption('', f'Recommended built-in · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
+        options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in builtins]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in record.algorithms]
         valid_ids = {o.key for o in options}
         self.selected_algorithm = self.selected_algorithm if self.selected_algorithm in valid_ids else ''
@@ -281,6 +296,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             options=[ft.DropdownOption(s, s.title()) for s in ('new', 'learning', 'learned')],
             on_select=lambda e, key=case.id: self._set_record(key, status=e.control.value))
         missing = '?' in case_letters(case, self.scheme)
+        selected_builtin = next((a for a in builtins if a.id == self.selected_algorithm), recommended)
+        provenance = 'Your saved algorithm' if personal else (
+            f'One-move setup {selected_builtin.setup} of {selected_builtin.position}' if selected_builtin.origin == 'one_move' else
+            f'Supplied algorithm · {selected_builtin.position}' if selected_builtin.origin == 'supplied' else 'Generated fallback')
         self.detail_controls = [
             ft.Row([ft.Text(self._label(case), size=24, weight=ft.FontWeight.W_600, expand=True, color=ft.Colors.ON_SURFACE),
                     ft.IconButton(ft.Icons.STAR if record.favorite else ft.Icons.STAR_BORDER, tooltip='Favorite case',
@@ -288,23 +307,26 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             ft.Text(f'UFR buffer · targets {case.first}, {case.second} · subset {case.subset}', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             *([ft.Text('Some target letters are unassigned in this scheme; sticker IDs identify the case.',
                        size=11, color=ft.Colors.ON_SURFACE_VARIANT)] if missing else []),
+            ft.Text(QUALITY_NOTICE, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ft.Row([ft.OutlinedButton('Random matching case', icon=ft.Icons.SHUFFLE, on_click=self._random_case),
                     ft.TextButton('Reveal algorithm' if self.hidden else 'Hide algorithm', on_click=self._hide)], wrap=True),
-            self.viewer,
-            ft.Text('The case starts scrambled; executing the alg restores it. Outlined stickers mark UFR and the two targets.',
-                    size=11, color=ft.Colors.ON_SURFACE_VARIANT),
             self.variant_picker,
-            ft.Text('Generated starters are verified conjugated commutators, not an optimized or fingertrick-rated alg sheet.',
-                    size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(provenance, size=11, color=ft.Colors.PRIMARY),
             self.algorithm_field,
-            ft.Row([ft.FilledButton('Preview alg', on_click=lambda e: self._preview_editor()),
-                    ft.TextButton('Use as preferred', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm))], wrap=True),
             self.name_field,
-            ft.Row([ft.OutlinedButton('Save as new alternative', on_click=lambda e: self._save_algorithm(False)),
-                    ft.TextButton('Update selected', disabled=not bool(self.selected_algorithm), on_click=lambda e: self._save_algorithm(True)),
-                    ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip='Delete selected alternative', disabled=not bool(self.selected_algorithm),
+            ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
+                                   on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
+                    ft.OutlinedButton('Preview alg', on_click=lambda e: self._preview_editor()),
+                    ft.TextButton('Use selected alg', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm))], wrap=True),
+            self.error, self.notice,
+            ft.Row([ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
+                    ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip='Delete selected personal alternative', disabled=not bool(personal),
                                   on_click=self._delete_algorithm)], wrap=True),
-            self.error, self.notice, status, self.notes_field,
+            self.viewer,
+            ft.Text('The case starts scrambled; executing the alg restores it. Outlined stickers mark UFR and the two targets. '
+                    "Wide turns such as Fw / Fw' (or f / f') work in the editor and player.",
+                    size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            status, self.notes_field,
         ]
         self._layout()
 
@@ -330,11 +352,12 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._update()
 
     def _save_algorithm(self, update):
+        self.notice.value = ''
         try:
             self.selected_algorithm = self.state.save_case_algorithm(self.selected_case,
                 self.name_field.value or '', self.algorithm_field.value or '',
                 self.selected_algorithm if update else None)
-            self.error.value, self.notice.value = '', 'Algorithm saved.'
+            self.error.value, self.notice.value = '', 'Algorithm saved and set as preferred.'
             self._render_library()
         except ValueError as ex:
             self.error.value = str(ex)
@@ -405,7 +428,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.viewer.move_text.visible = True
         self.detail_controls = [
             ft.Text('Algorithm Explorer', size=20, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-            ft.Text('Start solved and inspect an alg’s final effect. Supports face/wide/slice turns, rotations, groups, [A, B] and [setup: alg].',
+            ft.Text("Start solved and inspect an alg’s final effect. Supports wide turns such as Fw / Fw' (or f / f'), "
+                    'face/slice turns, rotations, groups, [A, B], [setup: alg] and setup:[A,B].',
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             self.explorer_field, ft.FilledButton('Analyze & load', on_click=self._analyze), self.error,
             self.explorer_effect, self.viewer,
@@ -501,8 +525,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         sidebar_width = 294
         detail_width = width - sidebar_width - 14 if wide else width
         self.viewer.set_viewport(max(180, detail_width - 28), min(350, max(220, height * .40)))
-        self.case_list.height = max(80, available - 316) if wide else 200
-        sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.status_filter,
+        self.case_list.height = max(80, available - 366) if wide else 200
+        sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.second_target, self.status_filter,
             self.favorites, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
         if wide:
             self.body.controls = [ft.Row([

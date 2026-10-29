@@ -136,6 +136,15 @@ class _Parser:
                 if self.index < len(self.text) and self.text[self.index] == "'":
                     node = ('inverse', node)
                     self.index += 1
+            elif char == ':' and children:
+                # Also accept setup:[A,B], the common shorthand used by the
+                # supplied alg sheet. Colons belonging to [setup: alg] are
+                # already consumed by that group's separator handling.
+                left = children[0] if len(children) == 1 else ('seq', tuple(children))
+                right = self.sequence(stops, depth + 1)
+                if not _expand(left) or not _expand(right):
+                    raise ValueError('Both parts of a setup must contain moves.')
+                return ('conj', (left, right))
             elif char in 'URFDLBurfdlbMESxyz':
                 move = char.upper() + 'w' if char in 'urfdlb' else char
                 if self.index < len(self.text) and self.text[self.index] == 'w':

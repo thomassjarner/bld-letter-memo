@@ -400,12 +400,15 @@ class AppState:
         if status is not None and status not in ('new', 'learning', 'learned'):
             raise ValueError('Choose New, Learning or Learned.')
         current = self.data.corner_case_library.get(key)
-        if preferred and (current is None or not any(a.id == preferred for a in current.algorithms)):
-            raise ValueError('Choose an existing algorithm.')
         if preferred:
             from core.algorithms import parse_algorithm
+            from core.corner_algorithms import builtin_algorithms
             from core.corner_cases import identify_case
-            algorithm = next(a for a in current.algorithms if a.id == preferred)
+            algorithm = next((a for a in current.algorithms if a.id == preferred), None) if current else None
+            if algorithm is None:
+                algorithm = next((a for a in builtin_algorithms(key) if a.id == preferred), None)
+            if algorithm is None:
+                raise ValueError('Choose an existing algorithm.')
             if identify_case(parse_algorithm(algorithm.alg)) != key:
                 raise ValueError('This algorithm solves another case. Correct it before making it preferred.')
         record = self.data.corner_case_library.setdefault(key, CornerCaseRecord())

@@ -1,51 +1,57 @@
-# Update to 2.28.0
+# Update to 2.29.0
 
-Copy the contents of `bld-letter-memo-web-2.28.0/` into your existing project,
-replacing matching files and including all new files/folders. Put the contents
-directly in `~/Desktop/letterpairscheme-helper-web/`, rather than placing the
-release folder inside it. Patching and GitHub Pages deployment are unchanged.
+Copy the contents of `bld-letter-memo-web-2.29.0/` into your existing project,
+replacing matching files and including all new files/folders. In particular,
+include `core/corner_algorithm_seeds.py` and `core/corner_algorithms.py`.
+Put the contents directly in `~/Desktop/letterpairscheme-helper-web/`, rather
+than placing the release folder inside it. Patching and deployment are unchanged.
 
-Run these commands in Terminal:
+Run in Terminal:
 
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Improve Method Library navigation and smooth cube playback"
+git commit -m "Add supplied commutators and second-target search"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, reload, and confirm **2.28.0** in the header or tab title.
+Wait for GitHub Actions, reload, and confirm **2.29.0** in the header or tab title.
 Command+Shift+R can refresh the build on macOS. No new package installation,
 manual data migration, import or storage reset is required.
 
 ## What changed
 
-- Open **Method Library** directly from Home or the main navigation tabs.
-  It is now separate from Practice, with the same saved case collection.
-- The overview offers **Commutator Lesson**, **Case Library** and **Algorithm
-  Explorer** routes, direct U/U, U/D, D/U and D/D subset shortcuts, and a summary
-  of your progress, favorites and saved algorithms. The selected section is
-  highlighted, and Overview stays available from every section.
-- 3D turns target **60 animation frames per second**, with eased motion and
-  more frequent camera updates. Fast / Normal / Slow support up to 18 / 36 /
-  72 frames per move. A timed schedule skips overdue frames on slower devices;
-  actual frame rate depends on the browser and hardware. Only the canvas is
-  republished during a turn, and the surrounding controls update at boundaries.
-- Main navigation and the library adapt to narrow screens with scrolling and
-  a stacked label-scheme picker. Timer remains a main tab and a Practice route.
+- **Method Library → Case Library** has an optional **Second target sticker**
+  filter. Both targets can be selected independently; together they identify
+  an ordered case. Subset, status, favorite and text filters still apply.
+- The 38 supplied algorithms were verified. The 34 UFR algorithms are included
+  directly; the four UFL algorithms contribute valid UFR setup variants.
+  Supplied algorithms and their distinct one-move outer/wide setup variants
+  provide 765 alternatives covering 251 UFR cases. Remaining cases have a
+  generated fallback. Direct supplied algorithms take priority, then shorter
+  setup variants. Your saved preferred algorithms stay selected.
+- **Fw / Fw' / Fw2** and **f / f' / f2** work in the editor, viewer and setup
+  choices. The supplied **setup:[A,B]** shorthand can be pasted directly.
+- The editor is above the cube. Paste an alg and choose **Save & use my alg**
+  to validate, save and make it preferred in one action. **Save changes & use**
+  edits a selected personal alg; **Save as another alternative** keeps both.
+  **Use selected alg** can also remember a built-in alternative. The overview
+  and case editor explicitly state that built-ins may not be optimal.
 
-Data version remains 16. Existing schemes, letter pairs/ratings/aliases,
-tracing, cycle-break overrides, timer sessions/history, Progressive Memo
-history, case alternatives/preferences/progress/notes/favorites, browser
-persistence and backups retain their behavior. Import still replaces current
-data as described in Settings. Dependencies and deployment are unchanged.
+Data version remains 16. Personal algorithms/preferences/progress/notes/favorites,
+schemes, pairs/ratings/aliases, tracer behavior, temporary cycle-break overrides,
+focused scrambles, Timer sessions/history, Progressive Memo, browser persistence
+and import/export retain their behavior. No data is reset or automatically
+replaced by the built-in collection. Dependencies, navigation, smooth playback
+and the deployment workflow are preserved.
 
 ## Validation
 
-250 automated tests pass, retaining all previous checks and adding Method
-Library routes, overview/subset navigation, scroll bounds, frame scheduling,
-slow rendering, seeking/cancellation, canvas-only updates and playback restart.
-The Flet web Python runtime checked routes and all sections at three viewport
-sizes, preserved data, and increased interpolated turn frames. Actual browser
-client rendering remains unverified here; no live deployment was performed.
+268 automated tests pass, including all previous checks. New checks cover all
+38 supplied cycles and commutators, every valid one-move setup, 765 UFR
+alternatives against the original tracer, wide-turn playback geometry, second
+target filtering, replacement saves, preference preservation, backup reloads,
+and bounded setup shorthand. The Flet web Python runtime independently checked
+the collection, replacement flow, backups, navigation and smooth playback.
+Live browser client rendering remains unverified here; no deployment was performed.

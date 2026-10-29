@@ -1,3 +1,64 @@
+# BLD Letter Memo Web 2.29.0
+
+Method Library now has an optional **Second target sticker** filter. Use either
+target alone, or combine both to find one ordered case. Existing subset,
+status, favorite and text filters still apply. Subset shortcuts clear both
+target filters.
+
+## Supplied algorithms and wide setups
+
+All 38 supplied algorithms and their commutator forms were checked against
+their stated sticker cycles. The 34 UFR algorithms are included directly.
+The four UFL algorithms contribute valid UFR cases through one-move setups.
+Every distinct one-move setup using U/R/F/D/L/B or Uw/Rw/Fw/Dw/Lw/Bw, including
+prime and double turns, is considered. Setups that leave the same case or
+produce a non-UFR cycle are omitted. Equivalent expanded sequences are deduplicated.
+
+The collection contains **765 supplied/setup alternatives across 251 of the
+378 UFR cases**: 34 direct submissions and 731 setup variants, including 366
+wide-turn variants. Direct submissions take priority, then shorter supplied
+setup variants; remaining cases retain a generated fallback. Algorithm origin
+and setup are displayed. Built-ins may not be optimal in this version; the
+notice is visible in the overview and case editor. No fingertrick-optimality
+claim is made.
+
+The editor and player accept wide moves such as **Fw / Fw' / Fw2** and their
+lowercase forms **f / f' / f2**. The wide-move engine already existed; this
+release exposes it in the collection and setup choices. The supplied shorthand
+**setup:[A,B]** can now be pasted directly, including f:[U2,R' D' R], as well
+as the existing [setup: [A,B]] notation. Expansion and nesting remain bounded.
+
+## Replace an algorithm
+
+The editable algorithm field and save controls are placed above the viewer.
+Paste a replacement, optionally name it, and press **Save & use my alg**.
+The exact ordered case is validated, the alg is saved as your personal
+alternative, and it becomes preferred immediately. When editing a personal
+alternative, **Save changes & use** updates it in place. **Save as another
+alternative** keeps the previous version too. Preview remains available.
+
+Saved personal preferences stay selected over new built-ins. You can also
+choose a built-in setup and press **Use selected alg** to keep it preferred.
+Built-ins are not copied into your personal collection automatically. Existing
+alternatives, notes, favorites and learning progress are preserved, and backups
+include personal alternatives and chosen preferences.
+
+Data version stays 16. Storage keys, import/export behavior, schemes, letter
+pairs/ratings/aliases, BLD tracing, temporary cycle breaks, focused scrambles,
+Timer, Progressive Memo, navigation and smooth cube playback are preserved.
+No new dependencies or deployment changes are required.
+
+**268 automated tests pass.** Every supplied/setup alternative was also verified
+by the original tracer in the Flet web Python runtime. Runtime checks covered
+all 38 pasted commutators, both target filters, replacement saves, preferences,
+backups, navigation and continued smooth playback. Live browser client
+rendering remains unverified here; no deployment was performed.
+
+Patching is unchanged: copy all release contents and commit/push as described
+in PATCHING.md. Include the new core files containing the supplied algorithms.
+
+---
+
 # BLD Letter Memo Web 2.28.0
 
 **Method Library** now has its own main navigation tab and a card on Home.

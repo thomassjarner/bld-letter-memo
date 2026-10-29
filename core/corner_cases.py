@@ -30,7 +30,11 @@ def subset_for(first, second):
 
 def identify_case(algorithm):
     """Identify the ordered memo targets solved by a pure UFR three-cycle."""
-    net = normalized_state(algorithm)
+    return identify_case_state(normalized_state(algorithm))
+
+
+def identify_case_state(net):
+    """Identify a case from an effect already normalized to the original frame."""
     initial = inverse_state(net)
     if any(_at(net, s) != s for s in EDGE_STICKER_ORDER):
         raise ValueError('This algorithm also changes edges. A UFR corner case must restore all edges.')
