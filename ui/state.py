@@ -8,7 +8,7 @@ can refresh when something they don't own changes.
 from typing import Callable, List, Optional
 
 from core.cube_definitions import CATEGORY_PIECES
-from data.models import AppData, CategoryScheme, LetterScheme
+from data.models import AppData, CaseAlgorithm, CornerCaseRecord, CategoryScheme, LetterScheme
 from data.repository import AppDataRepository
 
 BUFFER_MARKER = "BUFFER"
@@ -369,6 +369,59 @@ class AppState:
     @property
     def has_outdated_pair_ratings(self) -> bool:
         return any(self.pair_rating_needs_update(pair) for pair in self.data.pair_ratings)
+
+    # ---- UFR corner case library ----------------------------------------
+
+    def save_case_algorithm(self, key, name, source, algorithm_id=None):
+        from uuid import uuid4
+        from core.algorithms import parse_algorithm
+        from core.corner_cases import corner_cases, identify_case
+        if key not in corner_cases() or identify_case(parse_algorithm(source)) != key:
+            raise ValueError('This algorithm solves a different case. Check target order and UFR buffer.')
+        current = self.data.corner_case_library.get(key)
+        existing = next((a for a in current.algorithms if a.id == algorithm_id), None) if current else None
+        if algorithm_id and existing is None:
+            raise ValueError('The algorithm no longer exists. Save it as a new alternative.')
+        record = self.data.corner_case_library.setdefault(key, CornerCaseRecord())
+        if existing:
+            existing.name, existing.alg = name.strip() or 'Personal alg', source.strip()
+            algorithm = existing
+        else:
+            algorithm = CaseAlgorithm(str(uuid4()), name.strip() or 'Personal alg', source.strip())
+            record.algorithms.append(algorithm)
+        record.preferred_algorithm = algorithm.id
+        self._save(notify=False)
+        return algorithm.id
+
+    def update_corner_case(self, key, *, status=None, notes=None, favorite=None, preferred=None):
+        from core.corner_cases import corner_cases
+        if key not in corner_cases():
+            raise ValueError('Unknown UFR corner case.')
+        if status is not None and status not in ('new', 'learning', 'learned'):
+            raise ValueError('Choose New, Learning or Learned.')
+        current = self.data.corner_case_library.get(key)
+        if preferred and (current is None or not any(a.id == preferred for a in current.algorithms)):
+            raise ValueError('Choose an existing algorithm.')
+        if preferred:
+            from core.algorithms import parse_algorithm
+            from core.corner_cases import identify_case
+            algorithm = next(a for a in current.algorithms if a.id == preferred)
+            if identify_case(parse_algorithm(algorithm.alg)) != key:
+                raise ValueError('This algorithm solves another case. Correct it before making it preferred.')
+        record = self.data.corner_case_library.setdefault(key, CornerCaseRecord())
+        for name, value in (('status', status), ('notes', notes), ('favorite', favorite), ('preferred_algorithm', preferred)):
+            if value is not None:
+                setattr(record, name, value)
+        self._save(notify=False)
+
+    def delete_case_algorithm(self, key, algorithm_id):
+        record = self.data.corner_case_library.get(key)
+        if record is None or not any(a.id == algorithm_id for a in record.algorithms):
+            return
+        record.algorithms = [a for a in record.algorithms if a.id != algorithm_id]
+        if record.preferred_algorithm == algorithm_id:
+            record.preferred_algorithm = ''
+        self._save(notify=False)
 
     # ---- progressive memo ------------------------------------------------
 

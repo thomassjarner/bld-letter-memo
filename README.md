@@ -1,3 +1,69 @@
+# BLD Letter Memo Web 2.27.0
+
+Open **Practice → Learn** for a UFR corner case library, algorithm explorer,
+and an introductory commutator lesson. Main navigation and the approved Timer
+layout remain unchanged.
+
+## Case Library
+
+- UFR is always the learning library's corner buffer. The catalog contains
+  378 ordered target-sticker pairs on different non-buffer corners.
+- Subsets use the target pieces' layers in memo order: U/U (54), U/D (108),
+  D/U (108), D/D (108). Filter further by first target, learning status,
+  favorites, sticker IDs, or your letter labels. Lists scroll and paginate.
+- Every case has a verified generated starter commutator. These are working
+  conjugated examples, not an optimized or fingertrick-rated alg sheet.
+- Save multiple named personal alternatives, choose a preferred alg, keep
+  notes and favorites, and mark cases New, Learning or Learned. Save/update
+  verifies the exact ordered case and checks that edges and other corners
+  are restored. Imported invalid algs are retained for correction and shown
+  with an explanation; the verified starter remains available.
+- Case identity uses permanent sticker IDs. Your selected letter scheme is
+  used only for labels and colors; existing tracing buffers and the active
+  global scheme are not changed. Unassigned letters fall back to sticker IDs.
+- Random matching case hides the alg and resets the case for practice.
+  Notes save when leaving their field; alg edits use Save as new/Update selected.
+
+## Visualization and learning
+
+- Native Flet Canvas provides a rotatable animated 3D cube and a 2D net,
+  play/pause, first/last and single-move stepping, playback speeds, optional
+  letters, and a focus toggle that dims pieces restored by the final effect.
+- Case playback starts from the case pattern and executes the selected alg.
+  The explorer starts solved and reports the final affected corners/edges,
+  including orientation. A pure UFR case can be opened directly in the library.
+- A/B and their undo sequences share colors; setup/undo setup are grouped.
+  The current move is highlighted, and stage buttons play individual sections.
+- The explorer supports face turns, wide/lowercase turns, M/E/S slices,
+  x/y/z rotations, repeated/inverted groups, [A, B] and [setup: alg] notation.
+  Parsing is bounded to 600 expanded moves, 8,000 input characters and limited
+  nesting. The existing scramble tracer/parser is unchanged.
+- The first lesson walks through [R, U' L' U], showing all four commutator
+  stages. Further method curricula can build on the same viewer/library.
+
+## Data and verification
+
+Data version is now 16. The migration adds an empty case library to old data;
+all existing schemes, pairs, ratings, aliases, timer sessions and histories,
+Progressive Memo history, preferences and browser storage keys are preserved.
+Backups include case alternatives, preferences, notes and learning progress.
+Import retains its existing replace-all behavior and explicitly names the library.
+
+233 automated tests pass. New checks cover all 378 starters against the existing
+tracer, notation equivalences and expansion limits, case validation, storage,
+old-backup migration, labels/buffers, filters, drafts, note blur, themes,
+responsive scroll bounds, exact animated-turn endpoints and cancellation.
+The Flet web Python runtime also verified all 378 cases, notation, backup
+round-trips, and Learn control construction at desktop/mobile widths. Projected
+cube frames were inspected. Live browser/client rendering remains unverified;
+no deployment was performed.
+
+No new packages, external visualization service, SDK upgrade or deployment
+change is needed. Copy all release contents; the patching process is unchanged.
+See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.26.0
 
 The Timer's three sessions now offer full-cube and focused training:

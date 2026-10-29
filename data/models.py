@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-CURRENT_VERSION = 15
+CURRENT_VERSION = 16
 
 
 @dataclass
@@ -202,6 +202,54 @@ class ProgressiveMemoAttempt:
 
 
 @dataclass
+class CaseAlgorithm:
+    id: str
+    name: str
+    alg: str
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "alg": self.alg}
+
+    @staticmethod
+    def from_dict(d):
+        return CaseAlgorithm(str(d.get("id", "")), str(d.get("name", "Personal alg")), str(d.get("alg", "")))
+
+
+@dataclass
+class CornerCaseRecord:
+    algorithms: List[CaseAlgorithm] = field(default_factory=list)
+    preferred_algorithm: str = ""
+    status: str = "new"
+    notes: str = ""
+    favorite: bool = False
+
+    def to_dict(self):
+        return {"algorithms": [a.to_dict() for a in self.algorithms],
+                "preferred_algorithm": self.preferred_algorithm, "status": self.status,
+                "notes": self.notes, "favorite": self.favorite}
+
+    @staticmethod
+    def from_dict(d):
+        raw = d.get("algorithms", [])
+        algorithms, seen = [], set()
+        for i, item in enumerate(raw if isinstance(raw, list) else []):
+            if not isinstance(item, dict):
+                continue
+            algorithm = CaseAlgorithm.from_dict(item)
+            if not algorithm.id or algorithm.id in seen:
+                algorithm.id = f"imported-{i}"
+                while algorithm.id in seen:
+                    algorithm.id += '-'
+            seen.add(algorithm.id)
+            algorithms.append(algorithm)
+        status = d.get("status", "new")
+        return CornerCaseRecord(algorithms=algorithms,
+            preferred_algorithm=str(d.get("preferred_algorithm", "")),
+            status=status if status in ("new", "learning", "learned") else "new",
+            notes=str(d.get("notes", "")), favorite=bool(d.get("favorite", False)))
+
+
+@dataclass
 class AppData:
     version: int = CURRENT_VERSION
     active_scheme: Optional[str] = None
@@ -224,6 +272,7 @@ class AppData:
     )
     active_practice_session: str = "Session 1"
     progressive_memo_history: List[ProgressiveMemoAttempt] = field(default_factory=list)
+    corner_case_library: Dict[str, CornerCaseRecord] = field(default_factory=dict)
     dark_mode: bool = False
     navigation_style: str = "top_tabs"  # top_tabs / compact_sidebar / popout
     letter_scheme_editor: str = "cards"  # cards / cube
@@ -265,6 +314,7 @@ class AppData:
             },
             "active_practice_session": self.active_practice_session,
             "progressive_memo_history": [attempt.to_dict() for attempt in self.progressive_memo_history],
+            "corner_case_library": {key: record.to_dict() for key, record in self.corner_case_library.items()},
             "dark_mode": bool(self.dark_mode),
             "navigation_style": self.navigation_style,
             "letter_scheme_editor": self.letter_scheme_editor,
@@ -359,6 +409,10 @@ class AppData:
             progressive_memo_history=[ProgressiveMemoAttempt.from_dict(item)
                                       for item in d.get("progressive_memo_history", []) if isinstance(item, dict)]
                                      if isinstance(d.get("progressive_memo_history", []), list) else [],
+            corner_case_library={str(key): CornerCaseRecord.from_dict(value)
+                                 for key, value in (d.get("corner_case_library", {})
+                                 if isinstance(d.get("corner_case_library", {}), dict) else {}).items()
+                                 if isinstance(value, dict)},
             dark_mode=bool(d.get("dark_mode", False)),
             navigation_style=(str(d.get("navigation_style", "top_tabs") or "top_tabs") if str(d.get("navigation_style", "top_tabs") or "top_tabs") in {"top_tabs", "compact_sidebar", "popout"} else "top_tabs"),
             letter_scheme_editor=d.get("letter_scheme_editor", "cards") if d.get("letter_scheme_editor", "cards") in ("cards", "cube") else "cards",
