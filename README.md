@@ -1,3 +1,39 @@
+# BLD Letter Memo Web 2.28.0
+
+**Method Library** now has its own main navigation tab and a card on Home.
+It opens on an overview with clear routes to the Commutator Lesson, Case
+Library and Algorithm Explorer, plus direct shortcuts to all four UFR subsets.
+Selected section buttons show where you are, and the overview summarizes
+learning progress, favorites and saved algorithms. Practice contains the
+training activities; the library is a separate destination.
+
+The 3D cube now targets 60 animation frames per second instead of eight frames
+per move. That allows up to 18 / 36 / 72 interpolated frames at Fast / Normal /
+Slow speed. Turns ease in and out. Rendering uses a clock-based schedule and
+skips overdue frames to keep playback responsive on slower devices. Only the
+cube canvas updates between move boundaries; move captions and other controls
+are reused. Camera dragging also accepts more frequent updates. Actual frame
+rate depends on the device and browser. Playback, stepping, pause, stage
+controls and exact cube states are preserved.
+
+All existing case alternatives, preferences, progress, notes and favorites
+remain available. Data version stays 16, browser storage keys and import/export
+are unchanged. BLD logic, letter schemes/pairs/ratings/aliases, cycle-break
+behavior, focused scrambles, Timer and Progressive Memo code are unchanged.
+
+250 automated tests pass. Navigation, overview actions, subset shortcuts,
+responsive scrolling, themes, animation cadence, slow-render scheduling,
+seeking/cancellation and restarting playback are covered. The Flet web Python
+runtime also checked the new routes, sections and shortcuts at three viewport
+sizes, unchanged data, and increased interpolated turn frames. Actual browser
+client rendering remains unverified here; no deployment was performed.
+
+Patching is unchanged: copy all extracted release contents into your existing
+project, then commit and push. No new dependencies or deployment changes are
+required. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.27.0
 
 Open **Practice → Learn** for a UFR corner case library, algorithm explorer,

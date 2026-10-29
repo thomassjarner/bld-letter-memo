@@ -16,7 +16,7 @@ def test_actual_screen_text_and_inputs_switch_both_directions():
         toggle(page, dark)
         expected = '#F0F4F3' if dark else '#182B25'
         surface = '#17201C' if dark else '#FAFCFA'
-        for label in ('Home', 'Letter Schemes', 'Letter Pairs', 'Scramble Memo', 'Practice', 'Timer', 'Settings'):
+        for label in ('Home', 'Letter Schemes', 'Letter Pairs', 'Scramble Memo', 'Method Library', 'Practice', 'Timer', 'Settings'):
             view = click_nav(page, label)
             view.before_update()
             texts = [c for c in walk(view) if isinstance(c, ft.Text)]

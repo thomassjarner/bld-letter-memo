@@ -1,6 +1,7 @@
 """Portable 3D/2D algorithm playback using Flet's native Canvas."""
 import asyncio
 import math
+import time
 
 import flet as ft
 import flet.canvas as cv
@@ -9,6 +10,8 @@ from core.algorithms import algorithm_states, changed_stickers, normalized_state
 from core.tracer import _orient, _solved
 from ui.components.cube_projection import project_cube
 from ui.theme_colors import apply_palette
+
+TARGET_FPS = 60
 
 
 @ft.control
@@ -25,6 +28,7 @@ class AlgorithmCube(ft.Column):
         self.yaw, self.pitch = -.62, .45
         self.playing = False
         self._token = 0
+        self._caption_key = None
         self._moving, self._fraction = None, 0
         self._viewport = (460, 300)
         self.mode_picker = ft.Dropdown(value='3D', width=94, height=36, dense=True,
@@ -35,7 +39,7 @@ class AlgorithmCube(ft.Column):
         self.focus_switch = ft.Switch(label='Focus case', value=True, on_change=lambda e: self._redraw())
         self.canvas = cv.Canvas(width=460, height=300)
         self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT)
-        self.canvas.content = ft.GestureDetector(content=self.drag_area, on_pan_update=self._drag, drag_interval=30)
+        self.canvas.content = ft.GestureDetector(content=self.drag_area, on_pan_update=self._drag, drag_interval=16)
         self.play_button = ft.IconButton(ft.Icons.PLAY_ARROW, tooltip='Play / pause', on_click=self._toggle)
         self.counter = ft.Text('0 / 0', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.speed = ft.Dropdown(value='.6', width=100, height=36, dense=True,
@@ -66,6 +70,12 @@ class AlgorithmCube(ft.Column):
             return None
 
     def _update(self):
+        # During an interpolated turn, publish just the Canvas. The controls,
+        # stage labels and move list only change at move boundaries.
+        if self.playing and self._moving is not None:
+            if self._page() is not None:
+                self.canvas.update()
+            return
         # Canvas paints already have concrete colors. Resolve only the text
         # rebuilt during playback, rather than traversing every polygon/frame.
         apply_palette(self.move_text, self.dark_mode)
@@ -78,6 +88,7 @@ class AlgorithmCube(ft.Column):
         self.stop(update=False)
         self.algorithm = parse_algorithm(algorithm) if isinstance(algorithm, str) else algorithm
         self.states = algorithm_states(self.algorithm, initial)
+        self._caption_key = None
         self.affected = {frozenset(s) for s in changed_stickers(normalized_state(self.algorithm)) if len(s) > 1}
         self.scheme, self.targets, self.index = scheme, tuple(targets), 0
         self.stage_buttons.controls = [ft.TextButton(s.label, on_click=lambda e, stage=s: self.play_stage(stage))
@@ -110,6 +121,14 @@ class AlgorithmCube(ft.Column):
                     style=ft.TextStyle(color=tile.foreground, size=max(9, min(20, side * (.38 if len(tile.label) == 1 else .25))),
                                        weight=ft.FontWeight.W_600)))
         self.canvas.shapes = shapes
+        caption_key = (id(self.algorithm), self.index)
+        if caption_key != self._caption_key:
+            self._caption_key = caption_key
+            self._render_caption()
+        if update:
+            self._update()
+
+    def _render_caption(self):
         self.counter.value = f'{self.index} / {len(self.states) - 1}'
         if self.algorithm:
             stage = next((s.label for s in self.algorithm.stages if s.start <= self.index < s.end), 'Finished')
@@ -124,8 +143,6 @@ class AlgorithmCube(ft.Column):
                              ft.Colors.ON_SURFACE_VARIANT if 'setup' in s.label.lower() else ft.Colors.ON_SURFACE
                              for s in self.algorithm.stages if s.start <= i < s.end), ft.Colors.ON_SURFACE))))
                 for i, move in enumerate(self.algorithm.moves)]
-        if update:
-            self._update()
 
     def _drag(self, e):
         if self.mode_picker.value != '3D':
@@ -165,8 +182,10 @@ class AlgorithmCube(ft.Column):
         self.stop(update=False)
         if self._page() is None:
             return
+        self._redraw(update=False)
         self.playing = True
         self.play_button.icon = ft.Icons.PAUSE
+        self._update()
         self._page().run_task(self._play, self._token, end)
 
     def play_stage(self, stage):
@@ -177,13 +196,23 @@ class AlgorithmCube(ft.Column):
         while self.index < min(end, len(self.states) - 1) and token == self._token:
             self._moving = self.algorithm.moves[self.index]
             duration = float(self.speed.value)
-            frames = 8 if self.mode_picker.value == '3D' else 1
-            for frame in range(1, frames + 1):
+            frames = max(2, math.ceil(duration * TARGET_FPS)) if self.mode_picker.value == '3D' else 1
+            started = time.perf_counter()
+            frame = 1
+            while frame <= frames:
+                # Schedule against the move's start time so drawing/transport
+                # work does not lengthen every frame and slow the whole alg.
+                await asyncio.sleep(max(0, started + duration * frame / frames - time.perf_counter()))
                 if token != self._token:
                     return
-                self._fraction = frame / frames
+                progress = min(1, max(frame / frames, (time.perf_counter() - started) / duration))
+                self._fraction = progress * progress * (3 - 2 * progress)
                 self._redraw()
-                await asyncio.sleep(duration / frames)
+                if progress >= 1:
+                    break
+                # Skip missed deadlines on busy devices instead of queueing
+                # stale frames; seeking and pausing remain cancellable.
+                frame = max(frame + 1, math.floor((time.perf_counter() - started) / duration * frames) + 1)
             if token != self._token:
                 return
             self.index += 1

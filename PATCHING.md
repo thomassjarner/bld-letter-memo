@@ -1,58 +1,51 @@
-# Update to 2.27.0
+# Update to 2.28.0
 
-Copy the contents of `bld-letter-memo-web-2.27.0/` into your existing project,
+Copy the contents of `bld-letter-memo-web-2.28.0/` into your existing project,
 replacing matching files and including all new files/folders. Put the contents
-directly in the project folder. Patching and GitHub Pages deployment are unchanged.
+directly in `~/Desktop/letterpairscheme-helper-web/`, rather than placing the
+release folder inside it. Patching and GitHub Pages deployment are unchanged.
 
-Run these commands separately in Terminal inside your existing project:
+Run these commands in Terminal:
 
 ```bash
+cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Add UFR case library and algorithm learning"
+git commit -m "Improve Method Library navigation and smooth cube playback"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, reload, and confirm **2.27.0** in the header or tab title.
+Wait for GitHub Actions, reload, and confirm **2.28.0** in the header or tab title.
 Command+Shift+R can refresh the build on macOS. No new package installation,
 manual data migration, import or storage reset is required.
 
-## Use the new feature
+## What changed
 
-Open **Practice → Learn → Case Library**.
+- Open **Method Library** directly from Home or the main navigation tabs.
+  It is now separate from Practice, with the same saved case collection.
+- The overview offers **Commutator Lesson**, **Case Library** and **Algorithm
+  Explorer** routes, direct U/U, U/D, D/U and D/D subset shortcuts, and a summary
+  of your progress, favorites and saved algorithms. The selected section is
+  highlighted, and Overview stays available from every section.
+- 3D turns target **60 animation frames per second**, with eased motion and
+  more frequent camera updates. Fast / Normal / Slow support up to 18 / 36 /
+  72 frames per move. A timed schedule skips overdue frames on slower devices;
+  actual frame rate depends on the browser and hardware. Only the canvas is
+  republished during a turn, and the surrounding controls update at boundaries.
+- Main navigation and the library adapt to narrow screens with scrolling and
+  a stacked label-scheme picker. Timer remains a main tab and a Practice route.
 
-- The library uses **UFR** as a fixed corner buffer, independent of your existing
-  scheme's tracing buffer. The label-scheme picker does not switch the global
-  active scheme. Targets without assigned letters use sticker IDs.
-- Browse all **378 cases** in U/U, U/D, D/U and D/D subsets. The layers refer
-  to the target pieces, in memo order. Filter by first target, status, favorites
-  or search text. Scroll and More cases make every result accessible.
-- Each case has a verified **generated starter**, not a curated optimal alg.
-  Use the 3D/2D player to inspect it. Choose another saved alternative or paste
-  your own, Preview, then Save as new/Update selected. Validation checks the
-  exact target order and restoration of other pieces before saving/preference.
-- Set learning status, favorites, preferred alternatives and notes. Notes save
-  on leaving their field. Random matching case hides the alg and resets playback.
-- **Algorithm Explorer** accepts face/wide/slice moves, rotations, groups and
-  commutators. It starts solved and reports the final effect. Matching pure
-  UFR cases can be opened in the library and saved as personal alternatives.
-- **Commutator lesson** walks through A, B, undo A and undo B. The player includes
-  stage playback, speeds, stepping, camera dragging, letter and focus toggles.
-
-Data version 16 adds the case library automatically. Existing schemes, letter
-pairs/ratings/aliases, timer sessions/history, Progressive Memo history,
-preferences and browser storage keys are preserved. The existing tracer,
-focused generators, Timer layout and other activities are unchanged. Backups
-include the new library; import still replaces all current data as described
-in Settings. Dependencies and the deployment workflow are unchanged.
+Data version remains 16. Existing schemes, letter pairs/ratings/aliases,
+tracing, cycle-break overrides, timer sessions/history, Progressive Memo
+history, case alternatives/preferences/progress/notes/favorites, browser
+persistence and backups retain their behavior. Import still replaces current
+data as described in Settings. Dependencies and deployment are unchanged.
 
 ## Validation
 
-233 automated tests pass, including all previous tests. All 378 generated
-starters are checked against the existing tracer. New tests cover notation,
-validation, alternatives, preferences, old backups, recovery, buffer scope,
-filtering/pagination, drafts/notes, themes, responsive scrolling, animated
-geometry and cancellation. The Flet web Python runtime also checks the full
-catalog, notation, backup round-trip and Learn controls in wide/narrow layouts.
-Projected cube frames were visually inspected. Live browser/client rendering
-remains unverified here; no live deployment was performed.
+250 automated tests pass, retaining all previous checks and adding Method
+Library routes, overview/subset navigation, scroll bounds, frame scheduling,
+slow rendering, seeking/cancellation, canvas-only updates and playback restart.
+The Flet web Python runtime checked routes and all sections at three viewport
+sizes, preserved data, and increased interpolated turn frames. Actual browser
+client rendering remains unverified here; no live deployment was performed.

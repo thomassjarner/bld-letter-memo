@@ -3,7 +3,6 @@ import flet as ft
 
 from ui.design import activity_card, page_heading
 from ui.pages.progressive_memo_page import ProgressiveMemoPage
-from ui.pages.case_library_page import CaseLibraryPage
 from ui.theme_colors import ThemeAwarePage
 
 
@@ -21,7 +20,6 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.expand = True
         self.active = False
         self.mode = "menu"
-        self.learn = None
         self._viewport = (1400, 760)
         self.progressive = ProgressiveMemoPage(data=self.state)
         self.progressive.back_callback = self.show_menu
@@ -29,8 +27,6 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
 
     def show_menu(self, e=None, update=True):
         self.progressive.set_active(False)
-        if self.learn is not None:
-            self.learn.set_active(False)
         self.active = False
         self.mode = "menu"
         self.scroll = ft.ScrollMode.AUTO
@@ -42,14 +38,12 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
                               ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback()),
                 activity_card("Progressive Memo", "Memo a real scramble one pair at a time, then type your recall and check your accuracy.",
                               ft.Icons.PSYCHOLOGY, "Open Progressive Memo", self.open_progressive),
-                activity_card("Learn · Case Library", "Explore UFR corner cases, save your own algs, and see commutators in 3D or 2D.",
-                              ft.Icons.SCHOOL, "Open Learn", self.open_learn),
                 activity_card("Delayed Recall", "Memo, wait for a countdown, then type what you remember.",
                               ft.Icons.HOURGLASS_BOTTOM, "Coming soon", enabled=False),
                 activity_card("Letter Pair Drill", "Build fast, reliable pair-to-word recall from your dictionary.",
                               ft.Icons.BOLT, "Coming soon", enabled=False),
             ], spacing=12, run_spacing=12),
-            ft.Text("Blind Timer, Progressive Memo and Learn are ready. Delayed Recall and Letter Pair Drill are planned.",
+            ft.Text("Blind Timer and Progressive Memo are ready. Delayed Recall and Letter Pair Drill are planned.",
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
         if update and self.page is not None:
@@ -67,36 +61,15 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.set_active(True)
 
     def set_active(self, active):
-        self.active = bool(active) and self.mode in ("progressive", "learn")
+        self.active = bool(active) and self.mode == "progressive"
         self.progressive.set_active(self.active and self.mode == "progressive")
-        if self.learn is not None:
-            self.learn.set_active(self.active and self.mode == "learn")
-
-    def open_learn(self, e=None):
-        self.progressive.set_active(False)
-        if self.learn is None:
-            self.learn = CaseLibraryPage(data=self.state)
-            self.learn.back_callback = self.show_menu
-        self.mode = "learn"
-        self.scroll = None
-        self.spacing = 0
-        self.controls = [self.learn]
-        self.learn.set_viewport(*self._viewport)
-        self.learn.refresh(update=False)
-        self.set_active(True)
-        if self.page is not None:
-            self.update()
 
     def set_viewport(self, width, height):
         self.width, self.height = width, height
         self._viewport = (width, height)
         self.progressive.set_viewport(width, height)
-        if self.learn is not None:
-            self.learn.set_viewport(width, height)
 
     def refresh(self, update=True):
         if self.mode == "progressive":
             self.progressive.refresh(update=update)
-        elif self.mode == "learn" and self.learn is not None:
-            self.learn.refresh(update=update)
 

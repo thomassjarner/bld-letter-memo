@@ -80,12 +80,12 @@ def test_home_has_routes_and_no_embedded_tools():
     assert not any(isinstance(c, (ft.TextField, ft.Dropdown, ft.KeyboardListener, PracticePage)) for c in walk(home))
     for button in (c for c in walk(home) if isinstance(c, ft.TextButton)):
         button.on_click(None)
-    assert routed == ["Letter Schemes", "Letter Pairs", "Practice", "Scramble Memo", "Settings"]
+    assert routed == ["Letter Schemes", "Letter Pairs", "Practice", "Scramble Memo", "Method Library", "Settings"]
 
 
 def test_nav_order_and_home_default():
     page, _ = mount()
-    assert [label for label, _ in app.DESTINATIONS] == ["Home", "Letter Schemes", "Letter Pairs", "Scramble Memo", "Practice", "Timer", "Settings"]
+    assert [label for label, _ in app.DESTINATIONS] == ["Home", "Letter Schemes", "Letter Pairs", "Scramble Memo", "Method Library", "Practice", "Timer", "Settings"]
     assert "Build your memo.\nTrain your recall." in text_values(page.root.controls[0].content)
     for label, _ in app.DESTINATIONS:
         assert click_nav(page, label) is not None

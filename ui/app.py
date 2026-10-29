@@ -4,6 +4,7 @@ from data.shared_preferences_repository import SharedPreferencesAppDataRepositor
 from ui.design import build_theme
 from ui.theme_colors import apply_palette
 from ui.pages.home_page import build_home
+from ui.pages.case_library_page import CaseLibraryPage
 from ui.pages.letter_pairs_page import LetterPairsPage
 from ui.pages.letter_schemes_page import LetterSchemesPage
 from ui.pages.practice_page import PracticePage
@@ -17,15 +18,16 @@ DESTINATIONS = [
     ("Letter Schemes", ft.Icons.GRID_VIEW),
     ("Letter Pairs", ft.Icons.TABLE_CHART),
     ("Scramble Memo", ft.Icons.SHUFFLE),
+    ("Method Library", ft.Icons.SCHOOL_OUTLINED),
     ("Practice", ft.Icons.FITNESS_CENTER),
     ("Timer", ft.Icons.TIMER),
     ("Settings", ft.Icons.SETTINGS),
 ]
-HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, PRACTICE_INDEX, TIMER_INDEX, SETTINGS_INDEX = range(7)
+HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_INDEX, TIMER_INDEX, SETTINGS_INDEX = range(8)
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.27.0"
+    page.title = "BLD Letter Memo · 2.28.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -41,6 +43,7 @@ async def main(page: ft.Page):
     pairs_page = LetterPairsPage(data=state)
     scramble_page = ScrambleMemoPage(data=state)
     settings_page = SettingsPage(data=state)
+    method_page = CaseLibraryPage(data=state)
 
     content_area = ft.Container(expand=True, left=0, right=0, top=64, bottom=0,
                                 padding=16)
@@ -74,7 +77,7 @@ async def main(page: ft.Page):
     practice_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     practice_page.show_menu(update=False)
     home_page = build_home(lambda name: navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name)), data=state)
-    pages = [home_page, schemes_page, pairs_page, scramble_page, practice_page, timer_page, settings_page]
+    pages = [home_page, schemes_page, pairs_page, scramble_page, method_page, practice_page, timer_page, settings_page]
     content_area.content = home_page
 
     def apply_dark_mode(enabled):
@@ -83,6 +86,7 @@ async def main(page: ft.Page):
         # Memo spans use computed cycle colors rather than semantic color tokens.
         scramble_page.refresh(update=False)
         practice_page.refresh(update=False)
+        method_page.refresh(update=False)
         rebuild_navigation(update=False)
         page.update()
     settings_page.theme_callback = apply_dark_mode
@@ -102,7 +106,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE · v2.27.0", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.28.0", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)
@@ -149,7 +153,7 @@ async def main(page: ft.Page):
 
     def rebuild_navigation(update=True):
         width = page.width or 1200
-        narrow = width < 1120
+        narrow = width < 1320
         # Small screens get a scrollable top nav; the saved preference is unchanged.
         style = state.data.navigation_style
         if style == "compact_sidebar" and width < 700:
@@ -190,6 +194,8 @@ async def main(page: ft.Page):
                                   (page.height or 800) - content_area.top - 16 - bottom_padding)
         practice_page.set_viewport(width - content_area.left - horizontal_padding,
                                    (page.height or 800) - content_area.top - 16 - bottom_padding)
+        method_page.set_viewport(width - content_area.left - horizontal_padding,
+                                 (page.height or 800) - content_area.top - 16 - bottom_padding)
         for view in pages:
             apply_palette(view, state.data.dark_mode)
         for chrome in (top_nav, sidebar_nav, popout_panel, popout_button):
@@ -215,6 +221,7 @@ async def main(page: ft.Page):
         page.update()
         timer_page.set_active(index == TIMER_INDEX)
         practice_page.set_active(index == PRACTICE_INDEX)
+        method_page.set_active(index == METHOD_INDEX)
 
     def on_resize(e):
         # Reflow the existing timer body for every size change; its keyboard

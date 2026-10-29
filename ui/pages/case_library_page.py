@@ -1,4 +1,4 @@
-"""UFR case library, algorithm explorer and a first commutator lesson."""
+"""Method Library overview, UFR cases, explorer and commutator lesson."""
 import random
 
 import flet as ft
@@ -7,7 +7,7 @@ from core.algorithms import changed_stickers, inverse_state, normalized_state, p
 from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, corner_cases, identify_case
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
-from ui.design import panel
+from ui.design import activity_card, eyebrow, panel
 from ui.theme_colors import ThemeAwarePage, apply_palette
 
 
@@ -24,8 +24,6 @@ def dropdown(**kwargs):
 
 @ft.control
 class CaseLibraryPage(ThemeAwarePage, ft.Column):
-    back_callback = None
-
     @property
     def state(self):
         return self.data
@@ -33,9 +31,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def init(self):
         self.expand = True
         self.spacing = 8
-        self.mode = 'library'
-        self.cases = corner_cases()
-        self.selected_case = next(iter(self.cases))
+        self.mode = 'overview'
+        self._cases = None
+        self.selected_case = None
         self.selected_algorithm = ''
         self.label_scheme = self.state.data.active_scheme
         self._viewport = (1400, 760)
@@ -79,16 +77,80 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._make_header()
         self.refresh(update=False)
 
+    @property
+    def cases(self):
+        # Opening Home or the overview need not generate the algorithm catalog.
+        if self._cases is None:
+            self._cases = corner_cases()
+            self.selected_case = next(iter(self._cases))
+        return self._cases
+
     def _make_header(self):
-        self.controls = [ft.Row([
-            ft.IconButton(ft.Icons.ARROW_BACK, tooltip='Back to Practice', on_click=self._back),
-            ft.Text('Learn', size=23, weight=ft.FontWeight.W_600, expand=True, color=ft.Colors.ON_SURFACE),
-            self.scheme_picker,
-        ], height=44, spacing=8), ft.Row([
-            ft.TextButton('Case Library', on_click=lambda e: self._set_mode('library')),
-            ft.TextButton('Algorithm Explorer', on_click=lambda e: self._set_mode('explorer')),
-            ft.TextButton('Commutator lesson', on_click=lambda e: self._set_mode('lesson')),
-        ], spacing=4, scroll=ft.ScrollMode.AUTO, height=36), self.body]
+        self.title = ft.Text('Method Library', size=25, weight=ft.FontWeight.W_600,
+                             color=ft.Colors.ON_SURFACE)
+        self.header_top = ft.Container()
+        self.section_buttons = {
+            key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
+            for key, label in (('overview', 'Overview'), ('library', 'Case Library'),
+                               ('explorer', 'Algorithm Explorer'), ('lesson', 'Commutator Lesson'))
+        }
+        self.header = ft.Column([self.header_top,
+            ft.Row(list(self.section_buttons.values()), spacing=4, height=38,
+                   scroll=ft.ScrollMode.AUTO)], spacing=6)
+        self.controls = [self.header, self.body]
+
+    def _render_overview(self):
+        cards = [
+            activity_card('Learn the basics',
+                'Start with a short commutator lesson. Watch A, B, undo A and undo B move the corners.',
+                ft.Icons.SCHOOL_OUTLINED, 'Start the lesson', lambda e: self._set_mode('lesson'), 'START HERE'),
+            activity_card('Browse UFR cases',
+                'Find a case by subset, target letters or learning status. Save alternatives, notes and favorites.',
+                ft.Icons.GRID_VIEW, 'Open Case Library', lambda e: self._set_mode('library'), '378 CASES'),
+            activity_card('Explore an algorithm',
+                'Paste an alg or commutator, play it in 3D or 2D, and inspect its effect on the cube.',
+                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Algorithm Explorer', lambda e: self._set_mode('explorer'), 'TRY AN ALG'),
+        ]
+        for card in cards:
+            card.col = {'xs': 12, 'md': 4}
+        records = list(self.state.data.corner_case_library.values())
+        self.overview_controls = [
+            ft.Column([
+                eyebrow('Learn / explore / collect'),
+                ft.Text('Choose where to begin.', size=23, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text('Learn how commutators work, then build your own case collection. '
+                        'This library uses UFR as its corner buffer and your selected scheme for letter labels.',
+                        size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=6),
+            ft.ResponsiveRow(cards, spacing=12, run_spacing=12),
+            panel(ft.Column([
+                ft.Text('Jump to a subset', size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text('The two layers describe the first and second target pieces, in memo order.',
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.ResponsiveRow([
+                    ft.OutlinedButton(f'{subset} · {54 if subset == "U/U" else 108} cases',
+                        col={'xs': 6, 'md': 3}, on_click=lambda e, s=subset: self._open_subset(s))
+                    for subset in SUBSETS
+                ], spacing=8, run_spacing=8),
+            ], spacing=10), padding=16),
+            ft.Row([
+                ft.Text(f'{sum(r.status == "learned" for r in records)} / 378 learned', size=12, color=ft.Colors.PRIMARY),
+                ft.Text(f'{sum(r.status == "learning" for r in records)} learning', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(f'{sum(r.favorite for r in records)} favorites', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(f'{sum(len(r.algorithms) for r in records)} saved algorithms', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=20, wrap=True),
+        ]
+        self._layout()
+
+    def _open_subset(self, subset):
+        self.search.value = ''
+        self.subset.value = subset
+        self.first_target.value = self.status_filter.value = 'all'
+        self.favorites.value = False
+        self.limit = 50
+        self.mode = 'library'
+        self._loaded_key = None
+        self.select_case(next(c.id for c in self.cases.values() if c.subset == subset))
 
     def _page(self):
         try: return self.page
@@ -403,7 +465,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.mode = mode
         self._loaded_key = None
         self.error.value = self.notice.value = ''
-        if mode == 'library': self._render_library()
+        if mode == 'overview': self._render_overview()
+        elif mode == 'library': self._render_library()
         elif mode == 'explorer': self._analyze()
         else: self._render_lesson()
         self._update()
@@ -414,12 +477,30 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _layout(self):
         width, height = self._viewport
-        available = max(180, height - 96)
+        compact = width < 600
+        self.scheme_picker.width = min(230, width)
+        self.header_top.height = 78 if compact else 46
+        self.header_top.content = ft.Column([self.title, self.scheme_picker], spacing=6) if compact else ft.Row([
+            ft.Container(self.title, expand=True), self.scheme_picker,
+        ], spacing=12)
+        self.header.height = self.header_top.height + 44
+        for key, button in self.section_buttons.items():
+            selected = key == self.mode
+            button.style = ft.ButtonStyle(
+                color=ft.Colors.ON_PRIMARY_CONTAINER if selected else ft.Colors.ON_SURFACE_VARIANT,
+                bgcolor=ft.Colors.PRIMARY_CONTAINER if selected else ft.Colors.TRANSPARENT,
+                shape=ft.RoundedRectangleBorder(radius=7),
+                padding=ft.Padding.symmetric(horizontal=12, vertical=8))
+        available = max(120, height - self.header.height - self.spacing)
+        self.body.width, self.body.height = width, available
+        if self.mode == 'overview':
+            self.body.controls = [ft.ListView(controls=self.overview_controls, spacing=14,
+                height=available, scroll=ft.ScrollMode.AUTO)]
+            return
         wide = width >= 980 and self.mode == 'library'
         sidebar_width = 294
         detail_width = width - sidebar_width - 14 if wide else width
         self.viewer.set_viewport(max(180, detail_width - 28), min(350, max(220, height * .40)))
-        self.scheme_picker.width = min(230, max(120, width * .35))
         self.case_list.height = max(80, available - 316) if wide else 200
         sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.status_filter,
             self.favorites, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
@@ -454,7 +535,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.scheme_picker.options = [ft.DropdownOption(name) for name in names]
         self.scheme_picker.value = self.label_scheme
         self.scheme_picker.disabled = not bool(names)
-        if self.mode == 'library': self._render_library()
+        if self.mode == 'overview': self._render_overview()
+        elif self.mode == 'library': self._render_library()
         elif self.mode == 'lesson': self._render_lesson()
         else:
             self.viewer.scheme = self.scheme
@@ -466,7 +548,3 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def set_active(self, active):
         self.active = bool(active)
         if not active: self.viewer.stop(update=False)
-
-    def _back(self, e=None):
-        self.set_active(False)
-        if self.back_callback: self.back_callback()

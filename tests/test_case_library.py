@@ -25,9 +25,10 @@ def open_library():
     repo.data.schemes = {scheme.name: scheme}
     repo.data.active_scheme = scheme.name
     hub = click_nav(page, 'Practice')
-    assert hub.learn is None
-    hub.open_learn()
-    return page, repo, hub, hub.learn
+    view = click_nav(page, 'Method Library')
+    assert view.mode == 'overview' and view._cases is None
+    view._set_mode('library')
+    return page, repo, hub, view
 
 
 def test_all_378_cases_have_correct_subsets_and_starters_verified_by_the_original_tracer():
@@ -171,7 +172,7 @@ def test_filters_pagination_custom_save_drafts_and_delayed_note_blur_are_case_sc
 def test_explorer_lesson_and_navigation_leave_timer_and_scheme_behavior_intact():
     page, repo, hub, view = open_library()
     timer = click_nav(page, 'Timer')
-    click_nav(page, 'Practice')
+    click_nav(page, 'Method Library')
     before = deepcopy(repo.data.to_dict())
     view._set_mode('explorer')
     assert view._identified in view.cases
