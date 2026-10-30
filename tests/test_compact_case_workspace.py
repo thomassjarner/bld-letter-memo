@@ -105,9 +105,17 @@ def test_wide_layout_keeps_editing_in_a_separate_scroll_pane_and_preserves_draft
     view.set_viewport(1400, 760)
     assert view.split_tools and len(view.detail_scrolls) == 2
     cube_pane, tools_pane = view.detail_scrolls
-    assert cube_pane.controls == [view.viewer]
+    assert cube_pane.controls == [view.viewer, view.case_details]
     assert view.algorithm_editor in tools_pane.controls
     assert not any(c is view.algorithm_editor for c in walk(cube_pane))
+    assert view.learning_status in list(walk(view.case_details))
+    assert view.notes_field in list(walk(view.case_details))
+    assert not any(c in (view.learning_status, view.notes_tile) for c in walk(tools_pane))
+    case_row = view.body.controls[0].controls[1].content.controls[1]
+    assert case_row.controls[1].width >= 360
+    assert sum(c.width for c in case_row.controls) + case_row.spacing <= view.body.controls[0].controls[1].width - 20
+    assert view.viewer.canvas.width < view.body.width / 2
+    assert view.viewer.canvas.height <= 310
     canvas_height = view.viewer.canvas.height
     draft = view.algorithm_field.value + " R R'"
     view.algorithm_field.value = draft

@@ -390,8 +390,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
                                        on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
                         ft.TextButton('Preview alg', on_click=lambda e: self._preview_editor())], wrap=True, spacing=4),
-                ft.TextButton('Open in Playground', on_click=self._open_playground_draft),
-                ft.Row([ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
+                ft.Row([ft.TextButton('Open in Playground', on_click=self._open_playground_draft),
+                        ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
                         small_icon(ft.Icons.DELETE_OUTLINE, 'Delete selected personal alternative', self._delete_algorithm,
                                    disabled=not bool(personal))],
                        wrap=True, spacing=4),
@@ -401,15 +401,19 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             controls_padding=ft.Padding.only(top=6, bottom=8),
             expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
             on_change=lambda e: self._remember_tile('notes_open', e), controls=[self.notes_field])
+        self.case_details = panel(ft.Column([
+            self.learning_status, self.notes_tile,
+        ], spacing=8, tight=True), padding=12)
         self.tool_controls = [
             self.variant_picker,
             ft.Text(provenance, size=11, color=ft.Colors.PRIMARY, max_lines=2, tooltip=provenance),
             ft.TextButton('Use selected alg', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm)),
-            self.learning_status, self.algorithm_editor, self.notes_tile,
+            self.algorithm_editor,
             ft.Text(QUALITY_NOTICE, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
             self.error, self.notice,
         ]
-        self.detail_controls = [self.case_toolbar, self.viewer, ft.Column(self.tool_controls, spacing=8, tight=True)]
+        self.detail_controls = [self.case_toolbar, self.viewer,
+            ft.Column(self.tool_controls, spacing=8, tight=True), self.case_details]
         self.error.visible, self.notice.visible = bool(self.error.value), bool(self.notice.value)
         self._layout()
 
@@ -780,19 +784,19 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.second_target,
             self.filter_more, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
         if wide and inner_width >= 760:
-            # The cube and the always-visible alg editor scroll independently.
-            tools_width = min(320, max(280, inner_width * .32))
+            # Keep only algorithm work in the wider right pane. Case metadata
+            # uses the room under the compact cube in the left pane.
+            tools_width = max(360, round(inner_width * .46))
             viewer_width = inner_width - tools_width - gap
             content_height = max(80, available - padding * 2 - self.case_toolbar.height - 8)
-            self.viewer.set_viewport(viewer_width, min(390, max(140, content_height - 130)))
-            cube_scroll = ft.ListView(controls=[self.viewer], height=content_height,
+            self.viewer.set_viewport(viewer_width, min(310, max(140, content_height * .5)))
+            cube_scroll = ft.ListView(controls=[self.viewer, self.case_details], spacing=12, height=content_height,
                 build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
-            tools_scroll = ft.ListView(controls=self.tool_controls, spacing=8, height=content_height,
+            tools_scroll = ft.ListView(controls=self.tool_controls, spacing=8, height=max(56, content_height - 24),
                 build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
             case_content = ft.Column([self.case_toolbar, ft.Row([
                 ft.Container(cube_scroll, width=viewer_width),
-                ft.Container(tools_scroll, width=tools_width, padding=ft.Padding.only(left=8),
-                    border=ft.Border(left=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT))),
+                panel(tools_scroll, width=tools_width, height=content_height, padding=12),
             ], spacing=gap, vertical_alignment=ft.CrossAxisAlignment.START)], spacing=8)
             self.detail_scrolls = [cube_scroll, tools_scroll]
             self.case_canvas_top = padding + self.case_toolbar.height + 8

@@ -1,3 +1,40 @@
+# BLD Letter Memo Web 2.34.0
+
+## More room for case algorithms
+
+The 3-style corner case workspace now gives the algorithm editor a wider
+right-hand panel. Algorithm alternatives, provenance, both linked notation
+fields and all preview/save/copy/delete actions stay together there.
+Secondary algorithm actions share a wrapping row to reduce vertical space.
+
+Learning status and case notes have moved into a separate box below the cube
+on wide screens. The cube column is narrower, and its canvas is capped at
+310 logical pixels high rather than 390, leaving room for useful information
+below it. Playback controls and view options remain with the cube. The cube
+and algorithm panels still scroll independently, so expanding notes cannot
+push the editor out of view.
+
+On narrow screens, the cube comes first, followed by the algorithm editor
+and the status/notes box in one scrollable page. New case selection still
+starts at the cube; Random matching case still focuses the editor. The
+editor stays open, and the three status checkboxes still select exactly one
+status. Notes retain their existing save-on-blur behavior.
+
+The algorithm catalog, linked converter, animation engine, BLD logic, browser
+storage, data version 17, schemes, pairs, timer sessions/history and practice
+behavior are unchanged. No new dependencies or migration steps are required.
+
+**338 automated tests pass.** The Flet web Python runtime also verified the
+wider algorithm pane, status/notes below the compact cube, viewport bounds,
+independent scrolling, status and notes persistence, linked conversion,
+Playground saves, backups, navigation and themes at six screen sizes. Live
+browser client rendering remains unverified here; no deployment was performed.
+
+Patching is unchanged: copy all release contents into the existing project,
+then commit and push. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.33.0
 
 ## Simpler Method Library navigation
