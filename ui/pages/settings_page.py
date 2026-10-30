@@ -35,6 +35,10 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             value=bool(self.state.data.dark_mode),
             on_change=self._dark_mode_changed,
         )
+        self.simultaneous_moves_switch = ft.Switch(
+            label="Simultaneous moves", value=self.state.data.simultaneous_moves,
+            on_change=lambda e: self.state.set_simultaneous_moves(e.control.value),
+        )
         self.navigation_style_dropdown = ft.Dropdown(
             label="Navigation style",
             width=220,
@@ -67,13 +71,21 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         self._rebuild_rating_palette()
 
         self.controls = [
-            page_heading("Settings", "Make the workspace yours. Manage appearance, ratings, and backups."),
+            page_heading("Settings", "Make the workspace yours. Manage appearance, playback, ratings, and backups."),
             panel(ft.Column([
                 eyebrow("Appearance"),
                 ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=18, wrap=True),
                 ft.Text("Light and dark themes share the same quiet surfaces and teal accent.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=12)),
+            panel(ft.Column([
+                eyebrow("Algorithm playback"),
+                self.simultaneous_moves_switch,
+                ft.Text("Play consecutive opposite-face turns together, shown as (U D'). "
+                        "Applies to U/D, R/L and F/B, including primes and doubles. "
+                        "Saved algorithms and move counts stay the same.",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=8)),
             panel(ft.Column([
                 eyebrow("Letter pair ratings"),
                 ft.Row([self.rating_mode_dropdown, self.rating_levels_dropdown], wrap=True, spacing=10),
@@ -239,6 +251,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             self.state.replace_data(imported)
             self.dark_mode_switch.value = bool(imported.dark_mode)
             self.navigation_style_dropdown.value = imported.navigation_style
+            self.simultaneous_moves_switch.value = imported.simultaneous_moves
             if self.theme_callback:
                 self.theme_callback(bool(imported.dark_mode))
             if self.navigation_callback:

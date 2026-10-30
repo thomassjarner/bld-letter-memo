@@ -106,7 +106,7 @@ def test_old_backups_migrate_without_changing_old_fields_and_recovery_counts_cas
     old['version'] = 15
     old['global_words'] = {'AB': 'example'}
     migrated = AppData.from_dict(old)
-    assert CURRENT_VERSION == 17 and migrated.corner_case_library == {}
+    assert CURRENT_VERSION == 18 and migrated.corner_case_library == {}
     for name, value in old.items():
         if name != 'version': assert migrated.to_dict()[name] == value
     key = next(iter(corner_cases()))

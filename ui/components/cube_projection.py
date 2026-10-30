@@ -4,6 +4,7 @@ from itertools import product
 import math
 
 from core.algorithms import move_spec
+from core.algorithm_playback import can_turn_together
 from core.cube_definitions import face_groups
 from core.tracer import VEC, _at, _key
 from ui.components.cube_net import FACE_COLORS, orientation_colors
@@ -74,15 +75,21 @@ def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitc
                                   color, _label(home, scheme, letters), fg, highlights.get(home, '#0A0F0D')))
         return tiles
 
-    axis, layers, quarter = move_spec(moving) if moving else ('x', (), 0)
-    axis_index, angle = 'xyz'.index(axis), quarter * math.pi / 2 * fraction
+    moves = moving if isinstance(moving, tuple) else (moving,) if moving else ()
+    if len(moves) > 1 and (len(moves) != 2 or not can_turn_together(*moves)):
+        raise ValueError('Simultaneous playback needs two opposite outer-face turns.')
+    rotations = [(axis, 'xyz'.index(axis), layers, quarter * math.pi / 2 * fraction)
+                 for axis, layers, quarter in map(move_spec, moves)]
     scale = min(width, height) * .285
 
     def view(v):
         return _rotate(_rotate(v, 'y', yaw), 'x', pitch)
 
     def transform(v, p):
-        return view(_rotate(v, axis, angle) if p[axis_index] in layers else v)
+        for axis, index, layers, angle in rotations:
+            if p[index] in layers:
+                return view(_rotate(v, axis, angle))
+        return view(v)
 
     def face(p, normal, half, sticker=False):
         center = tuple(v * 2 / 3 + n * (1 / 3 + (.003 if sticker else 0)) for v, n in zip(p, normal))

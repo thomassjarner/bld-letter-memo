@@ -1,68 +1,72 @@
-# BLD Letter Memo Web 2.35.0
+# BLD Letter Memo Web 2.36.0
 
-## Cube switches and stable case browsing
+## Optional simultaneous turns
 
-**Show letters** and **Highlight pieces** are now visible switches directly
-below the cube, outside the collapsed view options. They work in both 3D and
-2D, and keep their values when switching cases or Method Library workspaces.
-Turning highlighting off removes both colored target outlines and dimming of
-other pieces. Turning letters off also hides buffer symbols. These view
-choices do not modify schemes, algorithms or training data.
+Enable **Settings → Algorithm playback → Simultaneous moves** to execute
+consecutive opposite outer-face turns together in the Method Library viewer.
+It is off by default and is saved with your browser preferences and backups.
+Older data and backups default to off without changing any existing fields.
 
-Selecting a case now keeps the browser panel, scroll controls and existing
-case rows mounted. The loaded page and your place in the list are retained.
-On narrow screens, ordinary selection also keeps the browser expanded and
-does not reset the shared page scroll. Desktop cube/editor panes can still
-start at the top independently. Random matching case retains its editor focus.
+Examples in the cube's move list:
 
-## Playground case comparison
+- `D' U'` is shown as `(D' U')`.
+- `U D'` is shown as `(U D')`.
+- `R2 L'` is shown as `(R2 L')`.
 
-For a pure UFR corner case, the Playground now shows a dedicated card with:
+Both faces rotate together over one playback beat in 3D. Next/previous move
+buttons step through the pair together. In 2D, the caption groups the pair
+and the next exact cube state includes both turns. The atomic move counter
+still counts two moves for a pair. Turning the setting off restores separate
+captions and steps, keeping the current exact cube state.
 
-- The ordered case using the selected letter scheme, plus physical sticker
-  IDs, buffer and subset. Unassigned letters fall back to sticker IDs.
-- The current saved preferred case algorithm and its name. A preferred
-  built-in alternative is respected; otherwise the built-in recommendation
-  is used. Execution moves are cleaned with the existing simplifier.
-- **Open case in library**, which opens that case and its saved preferred
-  algorithm. Conflicting filters are cleared and the matching case is
-  included among the loaded rows. This does not save the Playground draft.
+Grouping only uses consecutive U/D, R/L or F/B turns, including primes and
+doubles. It does not reorder moves or combine wide turns, slices, rotations
+or unrelated faces. Original commutator-stage boundaries remain separate,
+so setup, A/B and undo-stage lessons can still be played independently.
+Playing to a position inside a pair still stops at that exact atomic move.
+Changing the setting cancels any old animation before applying the new view.
 
-The existing draft route is labeled **Edit this alg for the case**. It opens
-that same case editor with the Playground algorithm ready to try, without
-saving or replacing the preferred algorithm. The Playground draft is retained
-when returning. Imported invalid preferred algs remain visible for repair.
+This is a display/playback preference. Saved algorithm text, converter fields,
+commutator search, move simplification, verification, sticker states and
+case identification retain their behavior. The earlier compact workspace,
+letters/highlight switches, stable case browsing and Playground case/preferred
+algorithm comparison are retained.
 
-General algorithms that do not match a UFR case remain analyzable and savable.
-Invalid or empty input clears the previous case card and disables case links.
-Changing the label scheme or saved preference refreshes the comparison.
+Data version 18 adds one boolean preference. Storage keys, timer sessions and
+history, practice modes, schemes, pairs, ratings, aliases, cycle breaks,
+existing algorithms/preferences, imports and exports retain their behavior.
+No new package or manual migration is required.
 
-The compact 2.34.0 layout is retained: a wider algorithm panel on the right,
-with learning status and notes in a box below the shorter cube. The notation
-engine, supplied algorithm IDs, BLD logic, timers, histories, practice modes,
-browser storage and import/export behavior are unchanged. Data version stays
-17; no package installation or migration is required.
+**364 automated tests pass.** Checks cover all 54 combinations of opposite
+face order and prime/double direction, exact combined-turn geometry, grouped
+captions and steps, cancellation, stage boundaries, partial endpoints, old-data
+migration, backup import and the Settings switch. Prior case browsing,
+comparison, data and training checks are retained. The Flet web Python runtime
+also checked the preference, geometry/endpoints, old-data migration, navigation,
+conversion, saving/backups and themes at six screen sizes. Live browser client
+rendering remains unverified here; no deployment was performed.
 
-**346 automated tests pass.** The Flet web Python runtime also checked stable
-browser/row identities during case selection, visible switches, letters and
-highlights off in both cube views, scheme-labeled case comparison, preferred
-algorithm routing, linked conversion, saving, backups and themes at six screen
-sizes. Live browser client rendering remains unverified here; no deployment
-was performed.
-
-Patching is unchanged: copy every release file into the existing project,
+Patching is unchanged: copy all release contents into the existing project,
 then commit and push. See PATCHING.md.
 
 ---
 
+# BLD Letter Memo Web 2.35.0
+
+Show letters and Highlight pieces became visible switches below the cube.
+Turning highlighting off removes colored outlines and dimming in both cube
+views. The case browser and its rows stay mounted during ordinary selection,
+retaining loaded cases and list position. The Playground identifies matching
+UFR cases using the selected scheme, shows the saved preferred algorithm and
+offers Open case in library. Edit this alg for the case retains the explicit
+Playground-draft editing route without saving it automatically.
+
 # BLD Letter Memo Web 2.34.0
 
 The case workspace gives the algorithm editor a wider right-hand panel.
-Learning status and case notes moved into a box below the cube on wide
-screens. The cube column is narrower, its canvas is capped at 310 logical
-pixels rather than 390, and secondary algorithm actions share a wrapping
-row. Narrow screens retain one scrollable cube-first layout. Saved data,
-converter behavior and animation are unchanged.
+Learning status and notes moved into a box below the shorter, narrower cube.
+Secondary algorithm actions share a wrapping row. Narrow screens keep a
+scrollable cube-first layout. Existing data and logic are preserved.
 
 ---
 

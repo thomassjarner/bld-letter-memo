@@ -252,6 +252,10 @@ class AppState:
         self.data.letter_scheme_editor = editor
         self._save(notify=False)
 
+    def set_simultaneous_moves(self, enabled: bool) -> None:
+        self.data.simultaneous_moves = bool(enabled)
+        self._save(notify=False)
+
     # ---- global words ------------------------------------------------------
 
     def set_word(self, pair: str, word: str) -> None:

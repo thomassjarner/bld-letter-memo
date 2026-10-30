@@ -139,7 +139,7 @@ def test_new_general_collection_migrates_old_backups_and_roundtrips_without_othe
     old['global_words'] = {'AB': 'Word'}
     old['pair_aliases'] = {'AB': 'ØB'}
     migrated = AppData.from_dict(old)
-    assert CURRENT_VERSION == 17 and migrated.playground_algorithms == []
+    assert CURRENT_VERSION == 18 and migrated.playground_algorithms == []
     for name, value in old.items():
         if name != 'version': assert migrated.to_dict()[name] == value
     migrated.playground_algorithms = [PlaygroundAlgorithm('one', 'Right turn', 'R', 'No fixed case')]

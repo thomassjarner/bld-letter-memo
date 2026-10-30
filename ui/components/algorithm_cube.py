@@ -7,6 +7,7 @@ import flet as ft
 import flet.canvas as cv
 
 from core.algorithms import algorithm_states, changed_stickers, normalized_state, parse_algorithm, simplified_algorithm
+from core.algorithm_playback import playback_steps
 from core.tracer import _orient, _solved
 from ui.components.cube_projection import project_cube
 from ui.theme_colors import apply_palette
@@ -20,6 +21,8 @@ class AlgorithmCube(ft.Column):
         self.spacing = 6
         self.algorithm = None
         self.original_algorithm = None
+        self.simultaneous_moves = False
+        self._steps = ()
         self._initial = None
         self.states = [_solved()]
         self.index = 0
@@ -70,9 +73,9 @@ class AlgorithmCube(ft.Column):
             self.canvas,
             self.display_switches,
             ft.Row([icon_button(ft.Icons.FIRST_PAGE, 'First move', lambda e: self.seek(0)),
-                    icon_button(ft.Icons.CHEVRON_LEFT, 'Previous move', lambda e: self.seek(self.index - 1)),
+                    icon_button(ft.Icons.CHEVRON_LEFT, 'Previous move', lambda e: self._step(-1)),
                     self.play_button,
-                    icon_button(ft.Icons.CHEVRON_RIGHT, 'Next move', lambda e: self.seek(self.index + 1)),
+                    icon_button(ft.Icons.CHEVRON_RIGHT, 'Next move', lambda e: self._step(1)),
                     icon_button(ft.Icons.LAST_PAGE, 'Last move', lambda e: self.seek(len(self.states) - 1)),
                     self.counter, self.speed], spacing=2, run_spacing=2, wrap=True),
             self.move_text, self.view_options,
@@ -112,6 +115,7 @@ class AlgorithmCube(ft.Column):
         self.stop(update=False)
         self.algorithm = self.original_algorithm if self.structure_switch.value else simplified_algorithm(self.original_algorithm)
         self.states = algorithm_states(self.algorithm, self._initial)
+        self._steps = playback_steps(self.algorithm, self.simultaneous_moves)
         self._caption_key, self.index = None, 0
         self.affected = {frozenset(s) for s in changed_stickers(normalized_state(self.original_algorithm)) if len(s) > 1}
         self.stage_buttons.controls = [ft.TextButton(s.label, on_click=lambda e, stage=s: self.play_stage(stage))
@@ -122,6 +126,15 @@ class AlgorithmCube(ft.Column):
         if self.original_algorithm is not None:
             self._set_playback_algorithm()
             self._update()
+
+    def set_simultaneous_moves(self, enabled):
+        enabled = bool(enabled)
+        if enabled != self.simultaneous_moves:
+            self.stop(update=False)
+            self.simultaneous_moves = enabled
+            self._steps = playback_steps(self.algorithm, enabled) if self.algorithm is not None else ()
+            self._caption_key = None
+            self._redraw(update=False)
 
     def set_viewport(self, width, height=300):
         width, height = max(180, width), max(140, height)
@@ -149,7 +162,7 @@ class AlgorithmCube(ft.Column):
                     style=ft.TextStyle(color=tile.foreground, size=max(9, min(20, side * (.38 if len(tile.label) == 1 else .25))),
                                        weight=ft.FontWeight.W_600)))
         self.canvas.shapes = shapes
-        caption_key = (id(self.algorithm), self.index)
+        caption_key = (id(self.algorithm), self.index, self.simultaneous_moves)
         if caption_key != self._caption_key:
             self._caption_key = caption_key
             self._render_caption()
@@ -161,16 +174,16 @@ class AlgorithmCube(ft.Column):
         if self.algorithm:
             stage = next((s.label for s in self.algorithm.stages if s.start <= self.index < s.end), 'Finished')
             self.stage_text.value = stage
-            self.move_text.spans = [ft.TextSpan(move + ' ', style=ft.TextStyle(
-                weight=ft.FontWeight.BOLD if i == self.index else ft.FontWeight.NORMAL,
-                decoration=ft.TextDecoration.UNDERLINE if i == self.index else None,
-                bgcolor=ft.Colors.PRIMARY_CONTAINER if i == self.index else None,
-                color=(ft.Colors.ON_PRIMARY_CONTAINER if i == self.index else
+            self.move_text.spans = [ft.TextSpan(step.caption + ' ', style=ft.TextStyle(
+                weight=ft.FontWeight.BOLD if step.start <= self.index < step.end else ft.FontWeight.NORMAL,
+                decoration=ft.TextDecoration.UNDERLINE if step.start <= self.index < step.end else None,
+                bgcolor=ft.Colors.PRIMARY_CONTAINER if step.start <= self.index < step.end else None,
+                color=(ft.Colors.ON_PRIMARY_CONTAINER if step.start <= self.index < step.end else
                        next((ft.Colors.PRIMARY if s.label in ('A', 'Undo A') else
                              ft.Colors.TERTIARY if s.label in ('B', 'Undo B') else
                              ft.Colors.ON_SURFACE_VARIANT if 'setup' in s.label.lower() else ft.Colors.ON_SURFACE
-                             for s in self.algorithm.stages if s.start <= i < s.end), ft.Colors.ON_SURFACE))))
-                for i, move in enumerate(self.algorithm.moves)]
+                             for s in self.algorithm.stages if s.start <= step.start < s.end), ft.Colors.ON_SURFACE))))
+                for step in self._steps]
 
     def _drag(self, e):
         if self.mode_picker.value != '3D':
@@ -189,6 +202,13 @@ class AlgorithmCube(ft.Column):
         self.stop(update=False)
         self.index = max(0, min(index, len(self.states) - 1))
         self._redraw()
+
+    def _step(self, direction):
+        if direction > 0:
+            index = next((step.end for step in self._steps if step.end > self.index), self.index)
+        else:
+            index = next((step.start for step in reversed(self._steps) if step.start < self.index), self.index)
+        self.seek(index)
 
     def stop(self, update=True):
         self._token += 1
@@ -222,7 +242,9 @@ class AlgorithmCube(ft.Column):
 
     async def _play(self, token, end):
         while self.index < min(end, len(self.states) - 1) and token == self._token:
-            self._moving = self.algorithm.moves[self.index]
+            finish = min(end, next(step.end for step in self._steps if step.start <= self.index < step.end))
+            moves = self.algorithm.moves[self.index:finish]
+            self._moving = moves[0] if len(moves) == 1 else moves
             duration = float(self.speed.value)
             frames = max(2, math.ceil(duration * TARGET_FPS)) if self.mode_picker.value == '3D' else 1
             started = time.perf_counter()
@@ -243,7 +265,7 @@ class AlgorithmCube(ft.Column):
                 frame = max(frame + 1, math.floor((time.perf_counter() - started) / duration * frames) + 1)
             if token != self._token:
                 return
-            self.index += 1
+            self.index = finish
             self._moving, self._fraction = None, 0
             self._redraw()
         if token == self._token:

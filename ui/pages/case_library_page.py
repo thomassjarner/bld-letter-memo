@@ -270,8 +270,6 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self._page().run_task(self._reveal_case_editor if edit else self._reset_case_scroll, self._navigation_token)
 
     async def _reset_case_scroll(self, token):
-        # On mobile this scroll also contains the case browser. A normal list
-        # selection must leave it, and the expanded browser, where the user was.
         if self._viewport[0] < 980:
             return
         for scroll in self.detail_scrolls:
@@ -922,6 +920,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._layout()
 
     def refresh(self, update=True):
+        self.viewer.set_simultaneous_moves(self.state.data.simultaneous_moves)
         names = self.state.scheme_names
         if self.label_scheme not in names:
             self.label_scheme = self.state.data.active_scheme if self.state.data.active_scheme in names else (names[0] if names else None)
