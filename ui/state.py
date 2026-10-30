@@ -8,7 +8,7 @@ can refresh when something they don't own changes.
 from typing import Callable, List, Optional
 
 from core.cube_definitions import CATEGORY_PIECES
-from data.models import AppData, CaseAlgorithm, CornerCaseRecord, CategoryScheme, LetterScheme
+from data.models import AppData, CaseAlgorithm, CornerCaseRecord, CategoryScheme, LetterScheme, PlaygroundAlgorithm
 from data.repository import AppDataRepository
 
 BUFFER_MARKER = "BUFFER"
@@ -424,6 +424,28 @@ class AppState:
         record.algorithms = [a for a in record.algorithms if a.id != algorithm_id]
         if record.preferred_algorithm == algorithm_id:
             record.preferred_algorithm = ''
+        self._save(notify=False)
+
+    # ---- standalone playground algorithms -------------------------------
+
+    def save_playground_algorithm(self, name, source, notes='', algorithm_id=None):
+        from uuid import uuid4
+        from core.algorithms import parse_algorithm
+        parse_algorithm(source)
+        existing = next((a for a in self.data.playground_algorithms if a.id == algorithm_id), None)
+        if algorithm_id and existing is None:
+            raise ValueError('The saved algorithm no longer exists. Save it as a new algorithm.')
+        if existing is None:
+            existing = PlaygroundAlgorithm(str(uuid4()), name.strip() or 'Untitled alg', source.strip(), notes)
+            self.data.playground_algorithms.append(existing)
+        else:
+            existing.name, existing.alg, existing.notes = name.strip() or 'Untitled alg', source.strip(), notes
+        self._save(notify=False)
+        return existing.id
+
+    def delete_playground_algorithm(self, algorithm_id):
+        if not any(a.id == algorithm_id for a in self.data.playground_algorithms): return
+        self.data.playground_algorithms = [a for a in self.data.playground_algorithms if a.id != algorithm_id]
         self._save(notify=False)
 
     # ---- progressive memo ------------------------------------------------

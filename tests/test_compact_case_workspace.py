@@ -93,7 +93,8 @@ def test_new_cases_show_the_full_cube_before_editing_and_keep_it_in_the_initial_
     assert view.detail_controls[:2] == [view.case_toolbar, view.viewer]
     assert view.case_canvas_top + view.viewer.canvas.height <= view.body.height
     assert view.header.height + view.spacing + view.body.height <= height
-    assert view.editor_tile.controls[0].controls[1] is view.algorithm_field
+    assert view.editor_tile.controls[0].controls[0] is view.case_converter
+    assert view.case_converter.final_alg is view.algorithm_field
     assert not view.error.visible and not view.notice.visible
     assert view.favorites.height is None and view.favorites.width is None
     assert repo.data.to_dict() == before

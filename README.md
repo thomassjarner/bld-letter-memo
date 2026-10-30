@@ -1,3 +1,74 @@
+# BLD Letter Memo Web 2.32.0
+
+## Two linked fields
+
+The case editor and Playground now use **Commutator** and **Final alg** fields.
+Paste or edit either one and the other updates automatically. Commutator input
+expands immediately into clean final moves. Final-move input searches for a
+verified commutator after a short typing pause. There are no separate Find
+commutator or Use notation steps.
+
+The last edited field supplies the algorithm for preview and saving. Existing
+saved notation stays unchanged until explicitly saved. Incomplete or invalid
+input clears the opposite result; late searches cannot replace a newer draft.
+When no short commutator is found, the final moves remain valid and usable.
+The same verified finder and bounded notation engine remain in use.
+
+## Algorithm Playground
+
+Open **Method Library → Playground**. This replaces the old Algorithm Explorer
+with a general workspace that starts blank and is independent of a case or
+buffer. Paste plain moves or a commutator, play the result from solved in 3D
+or 2D, and inspect:
+
+- Clean execution move count and affected corner/edge counts.
+- Physical piece cycles, showing where pieces move from solved.
+- Twists/flips of pieces that stay in place.
+- Detailed oriented sticker mappings with the selected scheme's letters.
+- Whole-cube reorientation, reported separately from piece effects relative
+  to the centers.
+- Matching UFR case targets when the alg is a pure supported corner cycle.
+
+**Save algorithm** stores any valid supported algorithm in the Playground
+collection, including algs that affect edges, many pieces, other buffers or
+only cube orientation. Add a name and notes, reopen a saved entry, update it,
+save a separate copy, or remove it. A commutator form is not required. Invalid
+algorithms in imported backups are retained for repair rather than discarded.
+
+Opening a matching UFR case is an optional separate route. It opens the normal
+case editor with the same draft; it does not automatically add or overwrite a
+case alternative. The case editor also offers **Open in Playground** for free
+exploration. Random case editing and ordinary cube-first browsing are preserved.
+
+Wide screens place the cube/effects and conversion/save controls beside each
+other in bounded scroll panes. Narrow screens stack them. Letter labels are
+local to the selected scheme; existing global buffers/settings are unchanged.
+
+## Data and checks
+
+Data version 17 adds a saved Playground collection. Older backups and browser
+data upgrade automatically with an empty collection while retaining all old
+fields. Playground entries and notes are included in browser persistence,
+recovery and export/import. Import keeps its existing replace-all behavior.
+Storage keys, supplied algorithm IDs, personal case alternatives/preferences,
+BLD logic, schemes/pairs/ratings/aliases, Timer, focused scrambles, Progressive
+Memo and smooth playback are preserved.
+
+**338 automated tests pass**, including prior checks. New coverage includes
+both conversion directions, partial input and stale searches, navigation/draft
+restoration, general effects/orientation, unrestricted save/update/copy/delete,
+import repair, old-data migration, backups, fresh-browser use and viewport
+bounds. The Flet web Python runtime also checked automatic conversion,
+async cancellation, effects, saving/notes, migration/backups, case routing,
+themes and navigation at four viewport sizes. Live browser client rendering
+remains unverified here; no deployment was performed.
+
+No new packages or deployment changes are required. Patching is unchanged:
+copy every release file into the existing project, then commit and push.
+See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.31.0
 
 All **332 algorithms** in the attached table have been added and verified

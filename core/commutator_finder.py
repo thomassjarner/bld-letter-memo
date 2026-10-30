@@ -74,6 +74,11 @@ def _notation_parts(source):
     return _parts(parser.sequence())
 
 
+def has_commutator_structure(source):
+    parse_algorithm(source)
+    return _notation_parts(source) is not None
+
+
 def _format(setup, a, b):
     setup, a, b = simplify_moves(setup), simplify_moves(a), simplify_moves(b)
     if not a or not b: return None

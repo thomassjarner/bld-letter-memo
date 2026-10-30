@@ -31,7 +31,7 @@ def test_home_and_top_level_navigation_open_the_same_method_library_without_load
 
 
 @pytest.mark.parametrize('label,mode', [('Start the lesson', 'lesson'), ('Open Case Library', 'library'),
-                                      ('Open Algorithm Explorer', 'explorer')])
+                                      ('Open Playground', 'explorer')])
 def test_overview_actions_open_the_correct_workspace_and_overview_is_always_accessible(label, mode):
     page, repo = mount()
     view = click_nav(page, 'Method Library')

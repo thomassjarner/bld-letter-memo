@@ -94,24 +94,24 @@ def test_search_budget_and_parser_limits_remain_bounded():
 
 
 @pytest.mark.parametrize('mode', ['library', 'explorer'])
-def test_find_then_use_notation_updates_only_the_editor_and_requires_an_explicit_save(mode):
+def test_linked_fields_convert_without_extra_steps_and_only_explicit_save_changes_data(mode):
     _, repo, _, view = open_library()
     if mode == 'library':
         view.select_case('UBL:LUF', edit=True)
         source = "F U2 R' D' R U2 R' D R F'"
-        target = view.algorithm_field
+        converter = view.case_converter
     else:
         view._set_mode('explorer')
         source = "M U2 M' U2"
-        target = view.explorer_field
+        converter = view.playground_converter
     before = deepcopy(repo.data.to_dict())
-    target.value = source
-    next(c for c in walk(view) if isinstance(c, ft.TextButton) and c.content == 'Find commutator').on_click(None)
-    assert view.commutator_panel.visible and view.use_commutator.visible
-    assert target.value == source and repo.data.to_dict() == before
-    expression = view.commutator_text.value
-    view.use_commutator.on_click(None)
-    assert target.value == expression and not view.error.value
+    converter.final_alg.value = source
+    converter.final_alg.on_change(None)
+    assert converter.commutator.value and not converter.final_alg.error_text
+    assert converter.source == source and repo.data.to_dict() == before
+    expression = converter.commutator.value
+    converter.commutator.on_change(None)
+    assert converter.source == expression and not view.error.value
     assert repo.data.to_dict() == before
     if mode == 'library':
         view._save_algorithm(False)
@@ -119,19 +119,22 @@ def test_find_then_use_notation_updates_only_the_editor_and_requires_an_explicit
         assert view.record().preferred_algorithm == view.selected_algorithm
 
 
-def test_stale_notation_and_case_switches_cannot_replace_a_new_draft():
+def test_invalid_or_partial_conversion_clears_stale_output_without_changing_saved_data():
     _, repo, _, view = open_library()
     before = deepcopy(repo.data.to_dict())
     view.select_case('UBL:LUF')
-    view.algorithm_field.value = "F U2 R' D' R U2 R' D R F'"
-    view._find_commutator()
-    view.algorithm_field.value = 'R U'
-    view._use_commutator()
-    assert view.algorithm_field.value == 'R U' and not view.commutator_panel.visible
-    view._find_commutator()
-    assert 'No short commutator' in view.commutator_text.value and not view.use_commutator.visible
+    converter = view.case_converter
+    converter.final_alg.value = "F U2 R' D' R U2 R' D R F'"
+    converter.final_alg.on_change(None)
+    assert converter.commutator.value
+    converter.final_alg.value = 'R +'
+    converter.final_alg.on_change(None)
+    assert not converter.commutator.value and converter.algorithm is None
+    converter.final_alg.value = 'R'
+    converter.final_alg.on_change(None)
+    assert not converter.commutator.value and converter.algorithm is not None
     view.select_case('UBL:RDF')
-    assert view._derived_for is None and not view.commutator_panel.visible
+    assert converter.algorithm is not None
     assert repo.data.to_dict() == before
 
 

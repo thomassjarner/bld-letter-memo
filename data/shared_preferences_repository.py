@@ -61,6 +61,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
             + len(data.progressive_memo_history) * 5
             + len(data.corner_case_library) * 20
             + sum(len(record.algorithms) * 10 for record in data.corner_case_library.values())
+            + len(data.playground_algorithms) * 20
             + (1 if data.dark_mode else 0)
         )
 

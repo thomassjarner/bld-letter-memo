@@ -106,7 +106,7 @@ def test_old_backups_migrate_without_changing_old_fields_and_recovery_counts_cas
     old['version'] = 15
     old['global_words'] = {'AB': 'example'}
     migrated = AppData.from_dict(old)
-    assert CURRENT_VERSION == 16 and migrated.corner_case_library == {}
+    assert CURRENT_VERSION == 17 and migrated.corner_case_library == {}
     for name, value in old.items():
         if name != 'version': assert migrated.to_dict()[name] == value
     key = next(iter(corner_cases()))
@@ -175,6 +175,7 @@ def test_explorer_lesson_and_navigation_leave_timer_and_scheme_behavior_intact()
     click_nav(page, 'Method Library')
     before = deepcopy(repo.data.to_dict())
     view._set_mode('explorer')
+    view.playground_converter.load("[R, U' L' U]", notify=True)
     assert view._identified in view.cases
     view._open_identified()
     assert view.mode == 'library' and not view.error.value

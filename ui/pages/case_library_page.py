@@ -3,11 +3,13 @@ import random
 
 import flet as ft
 
-from core.algorithms import changed_stickers, inverse_state, normalized_state, parse_algorithm
+from core.algorithms import inverse_state, normalized_state, parse_algorithm
+from core.algorithm_analysis import analyze_algorithm
 from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms, display_builtin_algorithms
 from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, corner_cases, identify_case
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
+from ui.components.algorithm_converter import AlgorithmConverter
 from ui.design import activity_card, eyebrow, panel
 from ui.theme_colors import ThemeAwarePage, apply_palette
 
@@ -81,18 +83,28 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                                       height=42, dense=True, on_select=self._choose_scheme)
         self.error = ft.Text('', color=ft.Colors.ERROR, size=12)
         self.notice = ft.Text('', color=ft.Colors.PRIMARY, size=12)
-        self._derived_for = None
-        self.commutator_text = ft.Text('', size=12, font_family='monospace', selectable=True, color=ft.Colors.ON_SURFACE)
-        self.commutator_note = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.use_commutator = ft.TextButton('Use this notation', on_click=self._use_commutator)
-        self.commutator_panel = ft.Column([self.commutator_text, self.commutator_note, self.use_commutator],
-                                          spacing=4, tight=True, visible=False)
-        self.algorithm_field = field(label='Algorithm · edit or paste your own', multiline=True, min_lines=2, max_lines=5,
-            hint_text="Supports Fw, Fw', f, [A,B] and setup:[A,B].",
-            value='', text_size=14, on_change=self._clear_commutator, on_submit=lambda e: self._preview_editor())
+        self.case_converter = AlgorithmConverter()
+        self.playground_converter = AlgorithmConverter()
+        self.case_converter.on_result = self._case_input_changed
+        self.playground_converter.on_result = self._playground_input_changed
+        self.algorithm_field = self.case_converter.final_alg
+        self.explorer_field = self.playground_converter.final_alg
         self.name_field = field(label='Algorithm name (optional)', value='My alg', height=38, dense=True)
-        self.explorer_field = field(label='Algorithm or commutator', value=BASE_ALG, multiline=True,
-            min_lines=2, max_lines=5, on_change=self._clear_commutator, on_submit=lambda e: self._analyze())
+        self.selected_playground = None
+        self._loaded_playground_record = None
+        self._playground_analysis_source = None
+        self._analysis = None
+        self.playground_saved = dropdown(label='Saved playground algorithms', value='', height=38, dense=True,
+            options=[ft.DropdownOption('', 'Unsaved playground')], on_select=self._choose_playground)
+        self.playground_name = field(label='Name', value='', height=38, dense=True)
+        self.playground_notes = field(label='Notes', value='', multiline=True, min_lines=2, max_lines=4)
+        self.playground_save = ft.FilledButton('Save algorithm', disabled=True, on_click=self._save_playground)
+        self.playground_copy = ft.TextButton('Save as new', disabled=True,
+            on_click=lambda e: self._save_playground(e, as_new=True))
+        self.playground_delete = ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip='Delete saved playground algorithm',
+            disabled=True, on_click=self._delete_playground)
+        self.open_case_button = ft.TextButton('Open matching UFR case', disabled=True, on_click=self._open_identified)
+        self.effect_area = ft.Column(spacing=6, tight=True)
         self.explorer_effect = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.body = ft.Column()
         self.detail_controls = []
@@ -114,7 +126,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.section_buttons = {
             key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
             for key, label in (('overview', 'Overview'), ('library', 'Case Library'),
-                               ('explorer', 'Algorithm Explorer'), ('lesson', 'Commutator Lesson'))
+                               ('explorer', 'Playground'), ('lesson', 'Commutator Lesson'))
         }
         self.section_nav = ft.Row(list(self.section_buttons.values()), spacing=2, height=36,
                                   scroll=ft.ScrollMode.AUTO)
@@ -129,9 +141,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             activity_card('Browse UFR cases',
                 'Find a case by subset, target letters or learning status. Save alternatives, notes and favorites.',
                 ft.Icons.GRID_VIEW, 'Open Case Library', lambda e: self._set_mode('library'), '378 CASES'),
-            activity_card('Explore an algorithm',
-                'Paste an alg or commutator, play it in 3D or 2D, and inspect its effect on the cube.',
-                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Algorithm Explorer', lambda e: self._set_mode('explorer'), 'TRY AN ALG'),
+            activity_card('Algorithm Playground',
+                'Link commutators and final moves, inspect any cube effect, and save algorithms in your own collection.',
+                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'TRY AN ALG'),
         ]
         for card in cards:
             card.col = {'xs': 12, 'md': 4}
@@ -256,7 +268,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.selected_algorithm = self.record().preferred_algorithm
         self.hidden = False
         self.editor_open, self.notes_open = bool(edit), False
-        self._clear_commutator(update=False)
+        self.case_converter.cancel_pending()
         self._navigation_token += 1
         if self.mobile_browser is not None:
             self.mobile_browser.expanded = False
@@ -308,6 +320,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self._loaded_key = key
         self.viewer.scheme = self.scheme
         self.viewer.dark_mode = self.state.data.dark_mode
+        self.viewer.play_button.disabled = False
         self.viewer._redraw(update=False)
 
     def _render_library(self):
@@ -320,24 +333,29 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         name, source = self._variant()
         editor_key = (case.id, self.selected_algorithm, source)
         changed_variant = editor_key != self._editor_key
+        if not changed_variant:
+            self.case_converter.sync(notify=False)
+        preview_source = self.case_converter.source if not changed_variant and self.case_converter.algorithm is not None else source
         parsed = parse_algorithm(case.starter)
         initial = inverse_state(normalized_state(parsed))
         try:
-            candidate = parse_algorithm(source)
+            candidate = parse_algorithm(preview_source)
             if identify_case(candidate) != case.id:
                 raise ValueError('Saved algorithm solves another case. Edit it before using it.')
-            if changed_variant or not self._loaded_key or self._loaded_key[1] != case.id:
-                self._load_viewer(source, initial, (case.first, case.second), case.id)
+            if changed_variant or self._loaded_key != (preview_source, case.id):
+                self._load_viewer(preview_source, initial, (case.first, case.second), case.id)
         except ValueError as ex:
             self.error.value = str(ex) + ' Showing the verified starter.'
             self._load_viewer(case.starter, initial, (case.first, case.second), case.id)
         if changed_variant:
-            self.algorithm_field.value, self.name_field.value = source, name if personal else 'My alg'
+            self.case_converter.load(source)
+            self.name_field.value = name if personal else 'My alg'
             self._editor_key = editor_key
         self.viewer.scheme = self.scheme
         self.viewer.dark_mode = self.state.data.dark_mode
         self.viewer._redraw(update=False)
-        self.algorithm_field.visible = not self.hidden
+        self.case_converter.visible = not self.hidden
+        self.algorithm_field.visible = self.case_converter.commutator.visible = not self.hidden
         self.viewer.move_text.visible = not self.hidden
         recommended = builtins[0]
         recommendation = {'supplied': 'Supplied algorithm', 'one_move': 'One-move setup', 'generated': 'Generated fallback'}[recommended.origin]
@@ -387,14 +405,11 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
             on_change=lambda e: self._remember_tile('editor_open', e),
             controls=[ft.Column([
-                ft.Text('Saved notation · paste a replacement, then save to make it preferred.',
-                        size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                self.algorithm_field, self.name_field,
+                self.case_converter, self.name_field,
                 ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
                                        on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
                         ft.TextButton('Preview alg', on_click=lambda e: self._preview_editor())], wrap=True, spacing=4),
-                ft.TextButton('Find commutator', icon=ft.Icons.AUTO_FIX_HIGH, on_click=self._find_commutator),
-                self.commutator_panel,
+                ft.TextButton('Open in Playground', on_click=self._open_playground_draft),
                 ft.Row([ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
                         small_icon(ft.Icons.DELETE_OUTLINE, 'Delete selected personal alternative', self._delete_algorithm,
                                    disabled=not bool(personal))],
@@ -418,16 +433,22 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._layout()
 
     def _choose_variant(self, e):
-        self._clear_commutator(update=False)
+        self.case_converter.cancel_pending()
         self.selected_algorithm = e.control.value or ''
         self.error.value = self.notice.value = ''
         self._render_library()
         self._update()
 
-    def _preview_editor(self):
+    def _case_input_changed(self, converter):
+        if self.mode == 'library': self._preview_editor(sync=False)
+
+    def _preview_editor(self, *, sync=True):
         case = self.cases[self.selected_case]
         try:
-            algorithm = parse_algorithm(self.algorithm_field.value or '')
+            if sync: self.case_converter.sync(notify=False)
+            algorithm = self.case_converter.algorithm
+            if algorithm is None:
+                raise ValueError(self.algorithm_field.error_text or self.case_converter.commutator.error_text or 'Enter an algorithm to preview it.')
             if identify_case(algorithm) != case.id:
                 raise ValueError('This alg solves a different target order/case.')
             self._load_viewer(algorithm.source, inverse_state(normalized_state(parse_algorithm(case.starter))),
@@ -442,8 +463,11 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def _save_algorithm(self, update):
         self.notice.value = ''
         try:
+            self.case_converter.sync(notify=False)
+            if self.case_converter.algorithm is None:
+                raise ValueError(self.algorithm_field.error_text or self.case_converter.commutator.error_text or 'Enter a valid algorithm before saving.')
             self.selected_algorithm = self.state.save_case_algorithm(self.selected_case,
-                self.name_field.value or '', self.algorithm_field.value or '',
+                self.name_field.value or '', self.case_converter.source,
                 self.selected_algorithm if update else None)
             self.error.value, self.notice.value = '', 'Algorithm saved and set as preferred.'
             self._render_library()
@@ -483,103 +507,164 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         alternatives = [c for c in matches if c.id != self.selected_case] or matches
         self.select_case(random.choice(alternatives).id, edit=True)
 
-    def _clear_commutator(self, e=None, *, update=True):
-        self._derived_for = None
-        self.commutator_panel.visible = False
-        if update and self._page() is not None:
-            self.commutator_panel.update()
-
-    def _find_commutator(self, e=None):
-        from core.commutator_finder import find_commutator
-        field = self.algorithm_field if self.mode == 'library' else self.explorer_field
-        source = field.value or ''
-        self._clear_commutator(update=False)
-        self.notice.value = ''
-        try:
-            result = find_commutator(source)
-            self.error.value = ''
-            self.commutator_panel.visible = True
-            self.use_commutator.visible = result is not None
-            if result is not None:
-                self._derived_for = (self.mode, source, result)
-                self.commutator_text.value = result.expression
-                self.commutator_note.value = ('Equivalent commutator · verified against your entered moves. Use it, then save when ready.'
-                    if self.mode == 'library' else 'Equivalent commutator · verified against your entered moves. Use it to analyze the notation.')
-            else:
-                self.commutator_text.value = 'No short commutator form found.'
-                self.commutator_note.value = 'Plain moves can still be saved and practised. Other commutator forms may exist.'
-        except ValueError as ex:
-            self.error.value = str(ex)
-        self._update()
-
-    def _use_commutator(self, e=None):
-        if self._derived_for is None:
-            return
-        mode, source, result = self._derived_for
-        field = self.algorithm_field if self.mode == 'library' else self.explorer_field
-        if mode != self.mode or source != (field.value or ''):
-            self._clear_commutator()
-            return
-        field.value = result.expression
-        self.use_commutator.visible = False
-        self.commutator_note.value = ('Notation applied to the editor. Save when ready.'
-            if self.mode == 'library' else 'Notation applied to Algorithm Explorer.')
-        if self.mode == 'library':
-            self._preview_editor()
-        else:
-            self._analyze()
+    def _playground_input_changed(self, converter):
+        if self.mode == 'explorer': self._update_playground_analysis()
 
     def _analyze(self, e=None):
+        self.playground_converter.sync(notify=False)
+        self._update_playground_analysis()
+
+    def _update_playground_analysis(self, *, update=True):
+        converter = self.playground_converter
+        source = converter.source
+        if converter.algorithm is None:
+            self._analysis = self._identified = None
+            self._playground_analysis_source = None
+            self._load_viewer("R R'", None, (), 'playground-empty')
+            self.viewer.move_text.visible = False
+            self.effect_area.controls = [ft.Text('Paste a commutator or final alg to inspect its effect.',
+                size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
+            self.explorer_effect.value = ''
+        else:
+            if source != self._playground_analysis_source or self._loaded_key != (source, 'playground'):
+                self._analysis = analyze_algorithm(converter.algorithm)
+                self._identified = self._analysis.ufr_case
+                targets = tuple(self._identified.split(':')) if self._identified else ()
+                self._load_viewer(source, None, targets, 'playground')
+                self._playground_analysis_source = source
+            self.viewer.move_text.visible = True
+            self._render_effect()
+        valid = converter.algorithm is not None
+        self.viewer.play_button.disabled = not valid
+        self.playground_save.disabled = self.playground_copy.disabled = not valid
+        self.open_case_button.disabled = self._identified is None
+        if update: self._update()
+
+    def _sticker_label(self, sticker):
+        if self.scheme is None: return sticker
+        category = self.scheme.corners if len(sticker) == 3 else self.scheme.edges
+        letter = category.stickers.get(sticker, '')
+        return f'{sticker} ({letter})' if letter and letter != 'BUFFER' else sticker
+
+    def _render_effect(self):
+        effect = self._analysis
+        if effect is None: return
+        self.explorer_effect.value = (f'{len(effect.moves)} moves · {len(effect.affected_corners)} corners · '
+                                     f'{len(effect.affected_edges)} edges affected')
+        controls = [ft.Text('Effect from solved', size=14, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    self.explorer_effect,
+                    ft.Text('Arrows show where pieces move. Sticker details include orientation.',
+                            size=11, color=ft.Colors.ON_SURFACE_VARIANT)]
+        for label, cycles in (('Corner cycles', effect.corner_cycles), ('Edge cycles', effect.edge_cycles)):
+            controls.append(ft.Text(label + ': ' + ('; '.join(' → '.join((*cycle, cycle[0])) for cycle in cycles) if cycles else 'None'),
+                                    size=12, color=ft.Colors.ON_SURFACE))
+        for label, pieces in (('Twists in place', effect.twisted_in_place), ('Flips in place', effect.flipped_in_place)):
+            if pieces: controls.append(ft.Text(label + ': ' + ', '.join(pieces), size=12, color=ft.Colors.ON_SURFACE))
+        if effect.ufr_case:
+            first, second = effect.ufr_case.split(':')
+            controls.append(ft.Text(f'UFR case it solves: {self._sticker_label(first)} → {self._sticker_label(second)}',
+                                    size=12, color=ft.Colors.PRIMARY))
+        if effect.reorients_cube:
+            controls.append(ft.Text('Includes a whole-cube reorientation. Piece effects are relative to the centers.',
+                                    size=11, color=ft.Colors.ON_SURFACE_VARIANT))
+        if effect.sticker_changes:
+            controls.append(ft.ExpansionTile(title=ft.Text(f'Sticker mappings · {len(effect.sticker_changes)} changed',
+                    size=12, color=ft.Colors.ON_SURFACE_VARIANT), dense=True, min_tile_height=34, tile_padding=0,
+                expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
+                controls=[ft.Text(f'{self._sticker_label(a)} → {self._sticker_label(b)}', size=11,
+                                  color=ft.Colors.ON_SURFACE) for a, b in effect.sticker_changes]))
+        self.effect_area.controls = controls
+
+    def _refresh_playground_saved(self):
+        saved = self.state.data.playground_algorithms
+        if self.selected_playground not in {a.id for a in saved}: self.selected_playground = None
+        self.playground_saved.options = [ft.DropdownOption('', 'Unsaved playground')] + [ft.DropdownOption(a.id, a.name) for a in saved]
+        self.playground_saved.value = self.selected_playground or ''
+        self.playground_delete.disabled = self.selected_playground is None
+        self.playground_save.content = 'Save changes' if self.selected_playground else 'Save algorithm'
+
+    def _render_explorer(self):
+        self.playground_converter.sync(notify=False)
+        self._refresh_playground_saved()
+        self.playground_toolbar = ft.Row([
+            ft.Container(self.playground_saved, expand=True),
+            ft.TextButton('New', icon=ft.Icons.ADD, on_click=lambda e: self._new_playground()), self.playground_delete,
+        ], spacing=6, height=42)
+        notes = ft.ExpansionTile(title=ft.Text('Notes', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            dense=True, min_tile_height=34, tile_padding=0, maintain_state=True,
+            controls=[self.playground_notes], expanded_cross_axis_alignment=ft.CrossAxisAlignment.START)
+        self.playground_tools = [self.playground_converter, self.playground_name, notes,
+            ft.Row([self.playground_save, self.playground_copy], wrap=True, spacing=4),
+            self.open_case_button, self.error, self.notice]
+        self._update_playground_analysis(update=False)
+        self._layout()
+
+    def _new_playground(self, source=''):
+        self.selected_playground = self._loaded_playground_record = None
+        self.playground_name.value = self.playground_notes.value = ''
+        self.playground_converter.load(source)
+        self._playground_analysis_source = None
+        self.error.value = self.notice.value = ''
+        self._render_explorer()
+        self._update()
+
+    def _choose_playground(self, e):
+        identifier = e.control.value or ''
+        if not identifier:
+            self._new_playground()
+            return
+        saved = next((a for a in self.state.data.playground_algorithms if a.id == identifier), None)
+        if saved is None: return
+        self.selected_playground = identifier
+        self._loaded_playground_record = (saved.id, saved.name, saved.alg, saved.notes)
+        self.playground_name.value, self.playground_notes.value = saved.name, saved.notes
+        self.playground_converter.load(saved.alg)
+        self._playground_analysis_source = None
+        self.error.value = self.notice.value = ''
+        self._render_explorer()
+        self._update()
+
+    def _save_playground(self, e=None, *, as_new=False):
+        self.notice.value = ''
         try:
-            algorithm = parse_algorithm(self.explorer_field.value or '')
-            net = normalized_state(algorithm)
-            self._identified = None
-            try:
-                self._identified = identify_case(algorithm)
-            except ValueError:
-                pass
-            changed = changed_stickers(net)
-            corners = {frozenset(s) for s in changed if len(s) == 3}
-            edges = {frozenset(s) for s in changed if len(s) == 2}
-            self.explorer_effect.value = f'Final effect: {len(corners)} corners, {len(edges)} edges changed (including orientation).'
-            if self._identified:
-                case = self.cases[self._identified]
-                self.explorer_effect.value += f' UFR case: {case.first} → {case.second}.'
-            targets = (case.first, case.second) if self._identified else ()
-            self._load_viewer(algorithm.source, None, targets, 'explorer')
-            self.error.value = ''
-            self._render_explorer()
+            self.playground_converter.sync(notify=False)
+            if self.playground_converter.algorithm is None:
+                raise ValueError('Enter a valid algorithm before saving.')
+            self.selected_playground = self.state.save_playground_algorithm(self.playground_name.value or '',
+                self.playground_converter.source, self.playground_notes.value or '',
+                None if as_new else self.selected_playground)
+            saved = next(a for a in self.state.data.playground_algorithms if a.id == self.selected_playground)
+            self.playground_name.value = saved.name
+            self._loaded_playground_record = (saved.id, saved.name, saved.alg, saved.notes)
+            self.error.value, self.notice.value = '', 'Playground algorithm saved.'
+            self._refresh_playground_saved()
+            self._update_playground_analysis(update=False)
         except ValueError as ex:
-            self.viewer.stop(update=False)
             self.error.value = str(ex)
         self._update()
 
-    def _render_explorer(self):
-        self.viewer.move_text.visible = True
-        self.detail_controls = [
-            ft.Text('Algorithm Explorer', size=20, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-            ft.Text("Start solved and inspect an alg’s final effect. Supports wide turns such as Fw / Fw' (or f / f'), "
-                    'face/slice turns, rotations, groups, [A, B], [setup: alg] and setup:[A,B].',
-                    size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            self.explorer_field, ft.Row([ft.FilledButton('Analyze & load', on_click=self._analyze),
-                ft.TextButton('Find commutator', icon=ft.Icons.AUTO_FIX_HIGH, on_click=self._find_commutator)], wrap=True),
-            self.commutator_panel, self.error,
-            self.explorer_effect, self.viewer,
-            ft.Text('Final effects are compared in the original cube orientation. Camera dragging changes only the view.',
-                    size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.TextButton('Open matching UFR case', disabled=self._identified is None,
-                          on_click=self._open_identified),
-        ]
-        self._layout()
+    def _delete_playground(self, e=None):
+        self.state.delete_playground_algorithm(self.selected_playground)
+        self.selected_playground = self._loaded_playground_record = None
+        self.notice.value = 'Removed from saved playground algorithms.'
+        self._refresh_playground_saved()
+        self._update()
+
+    def _open_playground_draft(self, e=None):
+        source = self.case_converter.source
+        self._set_mode('explorer')
+        self._new_playground(source)
 
     def _open_identified(self, e=None):
         if self._identified:
-            source = self.explorer_field.value
+            key, source = self._identified, self.playground_converter.source
+            name = self.playground_name.value or 'My alg'
             self.mode = 'library'
-            self.select_case(self._identified)
-            self.algorithm_field.value = source
-            self.name_field.value = 'My alg'
-            self._preview_editor()
+            self._loaded_key = None
+            self.select_case(key, edit=True)
+            self.case_converter.load(source)
+            self.name_field.value = name
+            self._preview_editor(sync=False)
 
     def _render_lesson(self):
         alg = parse_algorithm(BASE_ALG)
@@ -617,7 +702,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.select_case(key)
 
     def _set_mode(self, mode):
-        self._clear_commutator(update=False)
+        self.case_converter.cancel_pending()
+        self.playground_converter.cancel_pending()
         self._navigation_token += 1
         self.viewer.stop(update=False)
         self.mode = mode
@@ -625,7 +711,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.error.value = self.notice.value = ''
         if mode == 'overview': self._render_overview()
         elif mode == 'library': self._render_library()
-        elif mode == 'explorer': self._analyze()
+        elif mode == 'explorer': self._render_explorer()
         else: self._render_lesson()
         self._update()
 
@@ -666,10 +752,34 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         if self.mode == 'library':
             self._layout_library(width, available)
             return
+        if self.mode == 'explorer':
+            self._layout_playground(width, available)
+            return
         self.viewer.set_viewport(max(180, width - 24), min(340, max(160, available - 210)))
         self.body.controls = [ft.ListView(controls=[panel(ft.Column(self.detail_controls, spacing=10, tight=True),
             padding=12, width=width)], height=available, scroll=ft.ScrollMode.AUTO,
             build_controls_on_demand=False)]
+
+    def _layout_playground(self, width, available):
+        content_height = max(100, available - 60)
+        if width >= 980:
+            tools_width = min(460, width * .42)
+            viewer_width = width - tools_width - 18
+            self.viewer.set_viewport(viewer_width, min(360, max(140, content_height - 170)))
+            left = ft.ListView(controls=[self.viewer, self.effect_area], spacing=14,
+                height=content_height - 20, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
+            right = ft.ListView(controls=self.playground_tools, spacing=10,
+                height=content_height - 20, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
+            self.body.controls = [self.playground_toolbar, ft.Row([
+                panel(left, padding=10, width=viewer_width + 20, height=content_height),
+                panel(right, padding=10, width=tools_width - 12, height=content_height),
+            ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START)]
+        else:
+            self.viewer.set_viewport(width - 24, min(280, max(160, available - 260)))
+            self.body.controls = [ft.ListView(controls=[self.playground_toolbar,
+                self.playground_converter, self.viewer, self.effect_area,
+                ft.Column(self.playground_tools[1:], spacing=10, tight=True)],
+                height=available, spacing=12, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)]
 
     def _layout_library(self, width, available):
         wide = width >= 980
@@ -750,6 +860,12 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         elif self.mode == 'library': self._render_library()
         elif self.mode == 'lesson': self._render_lesson()
         else:
+            record = next((a for a in self.state.data.playground_algorithms if a.id == self.selected_playground), None)
+            if record is not None and (record.id, record.name, record.alg, record.notes) != self._loaded_playground_record:
+                self._loaded_playground_record = (record.id, record.name, record.alg, record.notes)
+                self.playground_name.value, self.playground_notes.value = record.name, record.notes
+                self.playground_converter.load(record.alg)
+                self._playground_analysis_source = None
             self.viewer.scheme = self.scheme
             self.viewer.dark_mode = self.state.data.dark_mode
             self.viewer._redraw(update=False)
@@ -760,4 +876,6 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.active = bool(active)
         if not active:
             self._navigation_token += 1
+            self.case_converter.cancel_pending()
+            self.playground_converter.cancel_pending()
             self.viewer.stop(update=False)
