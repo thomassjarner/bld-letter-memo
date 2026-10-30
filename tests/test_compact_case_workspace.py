@@ -44,7 +44,7 @@ def test_screenshot_case_shows_only_the_actual_clean_execution():
     assert cube.counter.value == '0 / 10'
 
 
-def test_cleanup_keeps_exact_full_cube_effects_for_all_765_supplied_options_and_mixed_notation():
+def test_cleanup_keeps_exact_full_cube_effects_for_all_supplied_options_and_mixed_notation():
     sources = [a.alg for group in supplied_case_algorithms().values() for a in group]
     rng = random.Random(2300)
     moves = tuple(face + wide + suffix for face in 'URFDLB' for wide in ('', 'w') for suffix in ('', "'", '2'))

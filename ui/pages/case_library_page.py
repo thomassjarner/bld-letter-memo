@@ -4,7 +4,7 @@ import random
 import flet as ft
 
 from core.algorithms import changed_stickers, inverse_state, normalized_state, parse_algorithm
-from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms
+from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms, display_builtin_algorithms
 from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, corner_cases, identify_case
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
@@ -81,12 +81,18 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                                       height=42, dense=True, on_select=self._choose_scheme)
         self.error = ft.Text('', color=ft.Colors.ERROR, size=12)
         self.notice = ft.Text('', color=ft.Colors.PRIMARY, size=12)
+        self._derived_for = None
+        self.commutator_text = ft.Text('', size=12, font_family='monospace', selectable=True, color=ft.Colors.ON_SURFACE)
+        self.commutator_note = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.use_commutator = ft.TextButton('Use this notation', on_click=self._use_commutator)
+        self.commutator_panel = ft.Column([self.commutator_text, self.commutator_note, self.use_commutator],
+                                          spacing=4, tight=True, visible=False)
         self.algorithm_field = field(label='Algorithm · edit or paste your own', multiline=True, min_lines=2, max_lines=5,
             hint_text="Supports Fw, Fw', f, [A,B] and setup:[A,B].",
-            value='', text_size=14, on_submit=lambda e: self._preview_editor())
+            value='', text_size=14, on_change=self._clear_commutator, on_submit=lambda e: self._preview_editor())
         self.name_field = field(label='Algorithm name (optional)', value='My alg', height=38, dense=True)
         self.explorer_field = field(label='Algorithm or commutator', value=BASE_ALG, multiline=True,
-            min_lines=2, max_lines=5, on_submit=lambda e: self._analyze())
+            min_lines=2, max_lines=5, on_change=self._clear_commutator, on_submit=lambda e: self._analyze())
         self.explorer_effect = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.body = ft.Column()
         self.detail_controls = []
@@ -244,20 +250,23 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.case_list.controls = rows or [ft.Text('No cases match these filters.', color=ft.Colors.ON_SURFACE_VARIANT)]
         self.more_button.visible = len(matches) > self.limit
 
-    def select_case(self, key):
+    def select_case(self, key, *, edit=False):
         self.viewer.stop(update=False)
         self.selected_case = key
         self.selected_algorithm = self.record().preferred_algorithm
         self.hidden = False
-        self.editor_open = self.notes_open = False
+        self.editor_open, self.notes_open = bool(edit), False
+        self._clear_commutator(update=False)
         self._navigation_token += 1
         if self.mobile_browser is not None:
             self.mobile_browser.expanded = False
         self.error.value = self.notice.value = ''
         self._render_library()
+        self.viewer.index = 0
+        self.viewer._redraw(update=False)
         self._update()
         if self._page() is not None:
-            self._page().run_task(self._reset_case_scroll, self._navigation_token)
+            self._page().run_task(self._reveal_case_editor if edit else self._reset_case_scroll, self._navigation_token)
 
     async def _reset_case_scroll(self, token):
         for scroll in self.detail_scrolls:
@@ -268,6 +277,18 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                     await scroll.scroll_to(offset=0, duration=0)
             except RuntimeError:
                 return  # navigation can detach the old pane before it scrolls
+
+    async def _reveal_case_editor(self, token):
+        if token != self._navigation_token or not self.detail_scrolls:
+            return
+        try:
+            scroll = self.detail_scrolls[-1]
+            if scroll.page is not None:
+                await scroll.scroll_to(scroll_key=self.editor_tile.key, duration=0)
+                if token == self._navigation_token:
+                    await self.algorithm_field.focus()
+        except RuntimeError:
+            return
 
     def _remember_tile(self, name, e):
         setattr(self, name, e.data is True or str(e.data).lower() == 'true')
@@ -321,7 +342,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         recommended = builtins[0]
         recommendation = {'supplied': 'Supplied algorithm', 'one_move': 'One-move setup', 'generated': 'Generated fallback'}[recommended.origin]
         options = [ft.DropdownOption('', f'Recommended · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
-        options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in builtins]
+        options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else ''))
+                    for a in display_builtin_algorithms(case.id, (self.selected_algorithm, record.preferred_algorithm))]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in record.algorithms]
         valid_ids = {o.key for o in options}
         self.selected_algorithm = self.selected_algorithm if self.selected_algorithm in valid_ids else ''
@@ -356,6 +378,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                        'Reveal algorithm' if self.hidden else 'Hide algorithm', self._hide),
         ], spacing=2, height=42)
         self.editor_tile = ft.ExpansionTile(
+            key=ft.ScrollKey('case-algorithm-editor'),
             title=ft.Text('Edit / replace alg', size=13, color=ft.Colors.ON_SURFACE),
             leading=ft.Icon(ft.Icons.EDIT_OUTLINED, size=17, color=ft.Colors.PRIMARY),
             expanded=self.editor_open, visible=not self.hidden, maintain_state=True,
@@ -370,6 +393,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
                                        on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
                         ft.TextButton('Preview alg', on_click=lambda e: self._preview_editor())], wrap=True, spacing=4),
+                ft.TextButton('Find commutator', icon=ft.Icons.AUTO_FIX_HIGH, on_click=self._find_commutator),
+                self.commutator_panel,
                 ft.Row([ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
                         small_icon(ft.Icons.DELETE_OUTLINE, 'Delete selected personal alternative', self._delete_algorithm,
                                    disabled=not bool(personal))],
@@ -393,6 +418,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._layout()
 
     def _choose_variant(self, e):
+        self._clear_commutator(update=False)
         self.selected_algorithm = e.control.value or ''
         self.error.value = self.notice.value = ''
         self._render_library()
@@ -455,11 +481,53 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self._update()
             return
         alternatives = [c for c in matches if c.id != self.selected_case] or matches
-        self.select_case(random.choice(alternatives).id)
-        self.hidden = True
-        self.viewer.seek(0)
-        self._render_library()
+        self.select_case(random.choice(alternatives).id, edit=True)
+
+    def _clear_commutator(self, e=None, *, update=True):
+        self._derived_for = None
+        self.commutator_panel.visible = False
+        if update and self._page() is not None:
+            self.commutator_panel.update()
+
+    def _find_commutator(self, e=None):
+        from core.commutator_finder import find_commutator
+        field = self.algorithm_field if self.mode == 'library' else self.explorer_field
+        source = field.value or ''
+        self._clear_commutator(update=False)
+        self.notice.value = ''
+        try:
+            result = find_commutator(source)
+            self.error.value = ''
+            self.commutator_panel.visible = True
+            self.use_commutator.visible = result is not None
+            if result is not None:
+                self._derived_for = (self.mode, source, result)
+                self.commutator_text.value = result.expression
+                self.commutator_note.value = ('Equivalent commutator · verified against your entered moves. Use it, then save when ready.'
+                    if self.mode == 'library' else 'Equivalent commutator · verified against your entered moves. Use it to analyze the notation.')
+            else:
+                self.commutator_text.value = 'No short commutator form found.'
+                self.commutator_note.value = 'Plain moves can still be saved and practised. Other commutator forms may exist.'
+        except ValueError as ex:
+            self.error.value = str(ex)
         self._update()
+
+    def _use_commutator(self, e=None):
+        if self._derived_for is None:
+            return
+        mode, source, result = self._derived_for
+        field = self.algorithm_field if self.mode == 'library' else self.explorer_field
+        if mode != self.mode or source != (field.value or ''):
+            self._clear_commutator()
+            return
+        field.value = result.expression
+        self.use_commutator.visible = False
+        self.commutator_note.value = ('Notation applied to the editor. Save when ready.'
+            if self.mode == 'library' else 'Notation applied to Algorithm Explorer.')
+        if self.mode == 'library':
+            self._preview_editor()
+        else:
+            self._analyze()
 
     def _analyze(self, e=None):
         try:
@@ -493,7 +561,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             ft.Text("Start solved and inspect an alg’s final effect. Supports wide turns such as Fw / Fw' (or f / f'), "
                     'face/slice turns, rotations, groups, [A, B], [setup: alg] and setup:[A,B].',
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            self.explorer_field, ft.FilledButton('Analyze & load', on_click=self._analyze), self.error,
+            self.explorer_field, ft.Row([ft.FilledButton('Analyze & load', on_click=self._analyze),
+                ft.TextButton('Find commutator', icon=ft.Icons.AUTO_FIX_HIGH, on_click=self._find_commutator)], wrap=True),
+            self.commutator_panel, self.error,
             self.explorer_effect, self.viewer,
             ft.Text('Final effects are compared in the original cube orientation. Camera dragging changes only the view.',
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -547,6 +617,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.select_case(key)
 
     def _set_mode(self, mode):
+        self._clear_commutator(update=False)
         self._navigation_token += 1
         self.viewer.stop(update=False)
         self.mode = mode

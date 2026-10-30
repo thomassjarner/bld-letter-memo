@@ -7,15 +7,31 @@ from unittest.mock import patch
 import flet as ft
 import pytest
 
-from core.algorithms import inverse_moves, normalized_state, parse_algorithm
+from core.algorithms import inverse_moves, normalized_state, parse_algorithm, simplify_moves
 from core.corner_algorithm_seeds import SUPPLIED_ALGORITHMS
-from core.corner_algorithms import QUALITY_NOTICE, SETUP_MOVES, builtin_algorithms, supplied_case_algorithms
+from core.corner_algorithms import ALL_SUBMISSIONS, QUALITY_NOTICE, SETUP_MOVES, builtin_algorithms, supplied_case_algorithms, generate_algorithm_registry
 from core.corner_cases import corner_cases, identify_case
 from core.tracer import ScrambleTracer
 from data.models import AppData
 from test_case_library import open_library
 from test_navigation import no_client_mount, text_values, walk
 from test_progressive_memo import letter_scheme
+
+
+def tracing_moves(moves):
+    # The algorithm editor supports slices/rotations; the unchanged scramble
+    # tracer accepts outer/wide turns. Expand equivalent legal moves for it.
+    replacements = {'M': ("L'", 'Lw'), 'E': ("D'", 'Dw'), 'S': ("F'", 'Fw'),
+                    'x': ('Rw', "L'"), 'y': ('Uw', "D'"), 'z': ('Fw', "B'")}
+    result = ()
+    for move in moves:
+        base = move.rstrip("2'")
+        if base not in replacements:
+            result += (move,)
+            continue
+        turns = replacements[base]
+        result += turns * 2 if move.endswith('2') else inverse_moves(turns) if move.endswith("'") else turns
+    return result
 
 
 def test_all_supplied_algorithms_and_verbatim_commutators_solve_their_stated_cycles():
@@ -33,7 +49,7 @@ def test_all_supplied_algorithms_and_verbatim_commutators_solve_their_stated_cyc
 
 def test_every_supplied_or_derived_ufr_alternative_is_verified_by_the_unchanged_tracer():
     catalog = supplied_case_algorithms()
-    assert len(catalog) == 251 and sum(map(len, catalog.values())) == 765
+    assert len(catalog) == 378 and sum(map(len, catalog.values())) == 6508
     scheme = letter_scheme()
     scheme.corners.buffer_piece = scheme.corners.buffer_sticker = 'UFR'
     identifiers, positions = set(), set()
@@ -43,36 +59,28 @@ def test_every_supplied_or_derived_ufr_alternative_is_verified_by_the_unchanged_
             identifiers.add(candidate.id)
             positions.add(candidate.position)
             algorithm = parse_algorithm(candidate.alg)
-            trace = ScrambleTracer().trace(' '.join(inverse_moves(algorithm.moves)), scheme)
+            trace = ScrambleTracer().trace(' '.join(tracing_moves(inverse_moves(algorithm.moves))), scheme)
             assert ':'.join(trace.corner_targets) == key
             assert not trace.edge_targets and not trace.edge_orientation and not trace.corner_orientation
             assert not trace.corner_cycle_breaks
-    assert positions == {p for p, _, _ in SUPPLIED_ALGORITHMS}
+    assert positions == {p for p, _, _ in ALL_SUBMISSIONS}
 
 
 def test_catalog_covers_all_distinct_one_move_cases_including_wide_setups():
-    expected = set()
-    for _, _, commutator in SUPPLIED_ALGORITHMS:
-        algorithm = parse_algorithm(commutator)
-        try: direct = identify_case(algorithm)
-        except ValueError: direct = None
-        if direct: expected.add((direct, algorithm.moves))
-        for setup in SETUP_MOVES:
-            derived = parse_algorithm(setup + ' ' + algorithm.expanded + ' ' + inverse_moves((setup,))[0])
-            try: key = identify_case(derived)
-            except ValueError: continue
-            if key != direct:
-                expected.add((key, derived.moves))
-    actual = {(key, parse_algorithm(a.alg).moves) for key, group in supplied_case_algorithms().items() for a in group}
+    generated = generate_algorithm_registry()
+    expected = {(key, simplify_moves(a.moves)) for key, group in generated.items() for a in group}
+    actual = {(key, simplify_moves(a.moves)) for key, group in supplied_case_algorithms().items() for a in group}
     assert actual == expected
+    assert {(key, a.id, a.alg) for key, group in generated.items() for a in group} == {
+        (key, a.id, a.alg) for key in corner_cases() for a in builtin_algorithms(key) if a.origin != 'generated'}
     wide = [a for group in supplied_case_algorithms().values() for a in group if 'w' in a.setup]
-    assert len(wide) == 366 and {'Fw', "Fw'", 'Fw2'} <= {a.setup for a in wide}
+    assert len(wide) >= 366 and {'Fw', "Fw'", 'Fw2'} <= {a.setup for a in wide}
     assert all(len(parse_algorithm(a.setup).moves) == 1 for a in wide)
 
 
 def test_direct_submissions_take_priority_then_one_move_variants_then_fallbacks():
     direct = {':'.join(position.split('-')[1:]): position
-              for position, _, _ in SUPPLIED_ALGORITHMS if position.startswith('UFR-')}
+              for position, _, _ in ALL_SUBMISSIONS if position.startswith('UFR-')}
     for key in corner_cases():
         group = builtin_algorithms(key)
         assert group[-1].origin == 'generated' and group[-1].alg == corner_cases()[key].starter

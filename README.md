@@ -1,3 +1,75 @@
+# BLD Letter Memo Web 2.31.0
+
+All **332 algorithms** in the attached table have been added and verified
+against their stated corner cycles. The old and new lists contain 349 unique
+submissions. UFR entries are available directly; entries with UFL, UBR or UBL
+buffers contribute valid one-move UFR setup variants. Multiple algorithms for
+the same targets remain alternatives.
+
+The supplied/setup collection now covers **all 378 UFR cases**, with 6,508
+execution choices. Duplicate executions are folded in the menu while all
+7,001 registered choice IDs remain addressable. All 765 earlier built-in IDs
+and their exact notation are retained, including preferred choices that would
+otherwise be hidden as duplicate executions. Personal alternatives, notes,
+progress, favorites and preferences are preserved. Built-ins may still be
+non-optimal, as stated in the overview and editor.
+
+## Find commutator notation from moves
+
+Plain moves remain valid input; knowing commutator notation is optional.
+In **Case Library → Edit / replace alg**, paste the moves and press **Find
+commutator**. The same button is available in **Algorithm Explorer**.
+
+The finder recognizes supplied forms and searches for setup/A/B structure.
+A returned expression is checked against the entered execution after same-axis
+turn cleanup and equivalent wide/slice/rotation notation, then checked again
+against the exact full sticker state. A different algorithm for the same case
+is never substituted as a recovered form. Both "Not found" rows in the attached
+table now have recoverable forms through this feature.
+
+Press **Use this notation** to put the result in the editor and preview it.
+That action does not save or overwrite anything. **Save & use my alg** or
+**Save changes & use** explicitly saves the chosen notation. Editing the
+input or switching cases clears the old result so stale suggestions cannot
+replace another draft.
+
+A short commutator form cannot be guaranteed for every input. Structural
+search is limited in input length, checks, depth and time. When no form is
+found, the app says so; the original plain moves can still be saved and
+practised if they solve the selected case. This is a notation finder rather
+than an optimal-algorithm search.
+
+## Random case editing
+
+**Random matching case** now opens the normal selected-case editor with the
+algorithm visible and **Edit / replace alg** expanded. It scrolls/focuses the
+algorithm field so a replacement can be pasted. Existing filters still apply,
+and a single matching case resets to its starting cube state. Ordinary list
+selection retains the compact cube-first view and collapsed editing. Hide
+algorithm remains available as a separate manual action.
+
+The larger collection uses a bundled verified index for fast loading. It does
+not run setup generation when a user opens the library. Maintainers can rebuild
+it with `python3 tools/build_corner_algorithm_index.py` after changing the
+supplied data, or use `--check` to verify it. Normal personal-alg editing needs
+no rebuild, extra package or deployment change.
+
+Data version stays 16. Models, persistence keys, import/export, BLD tracing,
+cycle-break overrides, letter schemes/pairs/ratings/aliases, Timer, focused
+scrambles, Progressive Memo and smooth cube playback retain their behavior.
+
+**314 automated tests pass.** The Flet web Python runtime independently checked
+all 6,508 catalog choices against the original tracer, recovered verified forms
+for all 332 attached algorithms and unknown examples, retained all older IDs,
+and exercised random editing, finder/use/save, backups and navigation at three
+viewport sizes. Live browser client rendering remains unverified here; no
+live deployment was performed.
+
+Patching is unchanged. Copy all release contents, including every new core
+file, then commit and push as described in PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.30.0
 
 The Method Library case workspace now leads with the **cube**. A compact case
