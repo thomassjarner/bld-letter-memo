@@ -195,17 +195,19 @@ def test_responsive_layout_keeps_case_list_and_all_details_scrollable(width, hei
     viewer = view.viewer
     view.set_viewport(width, height)
     assert view.viewer is viewer
-    assert view.body.height <= height - 96
+    assert view.header.height + view.spacing + view.body.height <= height
     if width >= 980:
         row = view.body.controls[0]
         assert isinstance(row, ft.Row)
         assert sum(c.width for c in row.controls) + row.spacing <= width
-        assert all(isinstance(panel.content, ft.ListView) for panel in row.controls)
-        assert all(panel.content.height < panel.height for panel in row.controls)
+        assert isinstance(row.controls[0].content, ft.ListView)
+        assert row.controls[0].content.height < row.controls[0].height
+        assert all(isinstance(pane, ft.ListView) and pane.height < view.body.height for pane in view.detail_scrolls)
     else:
         assert isinstance(view.body.controls[0], ft.ListView)
         assert isinstance(view.body.controls[0].controls[0], ft.ExpansionTile)
-    assert viewer.canvas.width <= width - 28
+    assert view.case_canvas_top + viewer.canvas.height <= view.body.height
+    assert viewer.canvas.width <= width - 20
     assert repo.data.to_dict() == before
 
 

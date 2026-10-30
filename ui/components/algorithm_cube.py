@@ -6,7 +6,7 @@ import time
 import flet as ft
 import flet.canvas as cv
 
-from core.algorithms import algorithm_states, changed_stickers, normalized_state, parse_algorithm
+from core.algorithms import algorithm_states, changed_stickers, normalized_state, parse_algorithm, simplified_algorithm
 from core.tracer import _orient, _solved
 from ui.components.cube_projection import project_cube
 from ui.theme_colors import apply_palette
@@ -19,6 +19,8 @@ class AlgorithmCube(ft.Column):
     def init(self):
         self.spacing = 6
         self.algorithm = None
+        self.original_algorithm = None
+        self._initial = None
         self.states = [_solved()]
         self.index = 0
         self.scheme = None
@@ -35,31 +37,43 @@ class AlgorithmCube(ft.Column):
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('3D'), ft.DropdownOption('2D')],
             on_select=lambda e: self._redraw())
-        self.letter_switch = ft.Switch(label='Letters', value=True, on_change=lambda e: self._redraw())
-        self.focus_switch = ft.Switch(label='Focus case', value=True, on_change=lambda e: self._redraw())
+        self.letter_switch = ft.Checkbox(label='Letters', value=True, visual_density=ft.VisualDensity.COMPACT,
+            label_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
+        self.focus_switch = ft.Checkbox(label='Focus case', value=True, visual_density=ft.VisualDensity.COMPACT,
+            label_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
+        self.structure_switch = ft.Checkbox(label='Original commutator stages', value=False,
+            visual_density=ft.VisualDensity.COMPACT, label_style=ft.TextStyle(size=11),
+            tooltip='Study the original setup and A/B stages. Clean execution is the default.', on_change=self._change_structure)
         self.canvas = cv.Canvas(width=460, height=300)
-        self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT)
+        self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT,
+                                      tooltip='Drag the 3D cube to rotate the view.')
         self.canvas.content = ft.GestureDetector(content=self.drag_area, on_pan_update=self._drag, drag_interval=16)
-        self.play_button = ft.IconButton(ft.Icons.PLAY_ARROW, tooltip='Play / pause', on_click=self._toggle)
+        def icon_button(icon, tooltip, callback):
+            return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
+                                 icon_size=19, width=32, height=32, padding=4)
+        self.play_button = icon_button(ft.Icons.PLAY_ARROW, 'Play / pause', self._toggle)
         self.counter = ft.Text('0 / 0', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.speed = ft.Dropdown(value='.6', width=100, height=36, dense=True,
+        self.speed = ft.Dropdown(value='.6', width=88, height=34, dense=True, text_size=12,
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('.3', 'Fast'), ft.DropdownOption('.6', 'Normal'), ft.DropdownOption('1.2', 'Slow')])
         self.move_text = ft.Text('', size=13, font_family='monospace', color=ft.Colors.ON_SURFACE)
         self.stage_buttons = ft.Row(spacing=2, wrap=True)
-        self.stage_text = ft.Text('Drag the 3D cube to rotate the view.', size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.stage_text = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.view_options = ft.ExpansionTile(title=ft.Text('View options & stages', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            dense=True, min_tile_height=34, tile_padding=0, controls_padding=ft.Padding.only(bottom=4),
+            maintain_state=True, expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
+            controls=[ft.Row([self.mode_picker, self.letter_switch, self.focus_switch,
+                    icon_button(ft.Icons.RESTART_ALT, 'Reset camera', self._reset_camera)], spacing=4, wrap=True),
+                      ft.Row([self.structure_switch], tight=True), self.stage_text, self.stage_buttons])
         self.controls = [
-            ft.Row([self.mode_picker, self.letter_switch, self.focus_switch,
-                    ft.IconButton(ft.Icons.RESTART_ALT, tooltip='Reset camera', on_click=self._reset_camera)],
-                   spacing=6, wrap=True),
             self.canvas,
-            ft.Row([ft.IconButton(ft.Icons.FIRST_PAGE, tooltip='First move', on_click=lambda e: self.seek(0)),
-                    ft.IconButton(ft.Icons.CHEVRON_LEFT, tooltip='Previous move', on_click=lambda e: self.seek(self.index - 1)),
+            ft.Row([icon_button(ft.Icons.FIRST_PAGE, 'First move', lambda e: self.seek(0)),
+                    icon_button(ft.Icons.CHEVRON_LEFT, 'Previous move', lambda e: self.seek(self.index - 1)),
                     self.play_button,
-                    ft.IconButton(ft.Icons.CHEVRON_RIGHT, tooltip='Next move', on_click=lambda e: self.seek(self.index + 1)),
-                    ft.IconButton(ft.Icons.LAST_PAGE, tooltip='Last move', on_click=lambda e: self.seek(len(self.states) - 1)),
-                    self.counter, self.speed], spacing=0, wrap=True),
-            self.stage_text, self.move_text, self.stage_buttons,
+                    icon_button(ft.Icons.CHEVRON_RIGHT, 'Next move', lambda e: self.seek(self.index + 1)),
+                    icon_button(ft.Icons.LAST_PAGE, 'Last move', lambda e: self.seek(len(self.states) - 1)),
+                    self.counter, self.speed], spacing=2, run_spacing=2, wrap=True),
+            self.move_text, self.view_options,
         ]
         self._redraw(update=False)
 
@@ -86,17 +100,29 @@ class AlgorithmCube(ft.Column):
 
     def load(self, algorithm, *, initial=None, scheme=None, targets=()):
         self.stop(update=False)
-        self.algorithm = parse_algorithm(algorithm) if isinstance(algorithm, str) else algorithm
-        self.states = algorithm_states(self.algorithm, initial)
-        self._caption_key = None
-        self.affected = {frozenset(s) for s in changed_stickers(normalized_state(self.algorithm)) if len(s) > 1}
-        self.scheme, self.targets, self.index = scheme, tuple(targets), 0
+        self.original_algorithm = parse_algorithm(algorithm) if isinstance(algorithm, str) else algorithm
+        self._initial = dict(initial) if initial is not None else None
+        self.structure_switch.value = False
+        self.scheme, self.targets = scheme, tuple(targets)
+        self._set_playback_algorithm()
+
+    def _set_playback_algorithm(self):
+        self.stop(update=False)
+        self.algorithm = self.original_algorithm if self.structure_switch.value else simplified_algorithm(self.original_algorithm)
+        self.states = algorithm_states(self.algorithm, self._initial)
+        self._caption_key, self.index = None, 0
+        self.affected = {frozenset(s) for s in changed_stickers(normalized_state(self.original_algorithm)) if len(s) > 1}
         self.stage_buttons.controls = [ft.TextButton(s.label, on_click=lambda e, stage=s: self.play_stage(stage))
-                                      for s in self.algorithm.stages]
+                                      for s in self.algorithm.stages] if len(self.algorithm.stages) > 1 else []
         self._redraw(update=False)
 
+    def _change_structure(self, e=None):
+        if self.original_algorithm is not None:
+            self._set_playback_algorithm()
+            self._update()
+
     def set_viewport(self, width, height=300):
-        width, height = max(180, width), max(180, height)
+        width, height = max(180, width), max(140, height)
         self._viewport = (width, height)
         self.width = self.canvas.width = self.drag_area.width = width
         self.canvas.height = self.drag_area.height = height
@@ -132,7 +158,7 @@ class AlgorithmCube(ft.Column):
         self.counter.value = f'{self.index} / {len(self.states) - 1}'
         if self.algorithm:
             stage = next((s.label for s in self.algorithm.stages if s.start <= self.index < s.end), 'Finished')
-            self.stage_text.value = f'{stage} · Drag the 3D cube to rotate the view.'
+            self.stage_text.value = stage
             self.move_text.spans = [ft.TextSpan(move + ' ', style=ft.TextStyle(
                 weight=ft.FontWeight.BOLD if i == self.index else ft.FontWeight.NORMAL,
                 decoration=ft.TextDecoration.UNDERLINE if i == self.index else None,

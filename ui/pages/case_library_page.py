@@ -14,13 +14,14 @@ from ui.theme_colors import ThemeAwarePage, apply_palette
 
 def field(**kwargs):
     return ft.TextField(color=ft.Colors.ON_SURFACE,
-        label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
+        label_style=ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT),
         hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), **kwargs)
 
 
 def dropdown(**kwargs):
-    return ft.Dropdown(color=ft.Colors.ON_SURFACE,
-        label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), **kwargs)
+    return ft.Dropdown(color=ft.Colors.ON_SURFACE, text_size=12,
+        content_padding=ft.Padding.symmetric(horizontal=10, vertical=6),
+        label_style=ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT), **kwargs)
 
 
 @ft.control
@@ -45,24 +46,34 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._editor_key = None
         self._identified = None
         self.browser_title = None
+        self.mobile_browser = None
+        self.editor_open = self.notes_open = False
+        self._navigation_token = 0
+        self.detail_scrolls = []
         self.viewer = AlgorithmCube()
-        self.search = field(hint_text='Search letters or stickers', height=38, dense=True,
+        self.search = field(hint_text='Search letters or stickers', height=36, text_size=12, dense=True,
                             on_change=lambda e: self._filter_changed())
-        self.subset = dropdown(label='Subset · target piece layers', value='all', height=44, dense=True,
+        self.subset = dropdown(label='Subset · target layers', value='all', height=38, dense=True,
             options=[ft.DropdownOption('all', 'All cases · 378')] +
                     [ft.DropdownOption(s, f'{s} · {54 if s == "U/U" else 108} cases') for s in SUBSETS],
             on_select=lambda e: self._filter_changed())
-        self.first_target = dropdown(label='First target sticker', value='all', height=44, dense=True,
+        self.first_target = dropdown(label='First target sticker', value='all', height=38, dense=True,
             options=[ft.DropdownOption('all', 'Any first target')] + [ft.DropdownOption(s) for s in TARGETS],
             on_select=lambda e: self._filter_changed())
-        self.second_target = dropdown(label='Second target sticker (optional)', value='all', height=44, dense=True,
+        self.second_target = dropdown(label='Second target (optional)', value='all', height=38, dense=True,
             options=[ft.DropdownOption('all', 'Any second target')] + [ft.DropdownOption(s) for s in TARGETS],
             on_select=lambda e: self._filter_changed())
-        self.status_filter = dropdown(label='Learning status', value='all', height=44, dense=True,
+        self.status_filter = dropdown(label='Learning status', value='all', height=38, dense=True,
             options=[ft.DropdownOption('all', 'Any status')] +
                     [ft.DropdownOption(s, s.title()) for s in ('new', 'learning', 'learned')],
             on_select=lambda e: self._filter_changed())
-        self.favorites = ft.Checkbox(label='Favorites only', value=False, height=32, on_change=lambda e: self._filter_changed())
+        self.favorites = ft.Checkbox(label='Favorites only', value=False, visual_density=ft.VisualDensity.COMPACT,
+            label_style=ft.TextStyle(size=12), on_change=lambda e: self._filter_changed())
+        self.filter_more = ft.ExpansionTile(title=ft.Text('More filters', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            dense=True, min_tile_height=34, tile_padding=0, maintain_state=True,
+            expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
+            controls=[self.status_filter, ft.Row([self.favorites], tight=True)],
+            on_change=self._filter_expanded)
         self.case_list = ft.ListView(height=320, spacing=2, scroll=ft.ScrollMode.ALWAYS)
         self.list_meta = ft.Text('', size=11, height=16, color=ft.Colors.ON_SURFACE_VARIANT)
         self.more_button = ft.TextButton('More cases', height=32, on_click=self._more)
@@ -73,7 +84,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.algorithm_field = field(label='Algorithm · edit or paste your own', multiline=True, min_lines=2, max_lines=5,
             hint_text="Supports Fw, Fw', f, [A,B] and setup:[A,B].",
             value='', text_size=14, on_submit=lambda e: self._preview_editor())
-        self.name_field = field(label='Algorithm name (optional)', value='My alg', height=42, dense=True)
+        self.name_field = field(label='Algorithm name (optional)', value='My alg', height=38, dense=True)
         self.explorer_field = field(label='Algorithm or commutator', value=BASE_ALG, multiline=True,
             min_lines=2, max_lines=5, on_submit=lambda e: self._analyze())
         self.explorer_effect = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
@@ -91,17 +102,17 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         return self._cases
 
     def _make_header(self):
-        self.title = ft.Text('Method Library', size=25, weight=ft.FontWeight.W_600,
-                             color=ft.Colors.ON_SURFACE)
+        self.title = ft.Text('Method Library', size=20, weight=ft.FontWeight.W_600,
+                             max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE)
         self.header_top = ft.Container()
         self.section_buttons = {
             key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
             for key, label in (('overview', 'Overview'), ('library', 'Case Library'),
                                ('explorer', 'Algorithm Explorer'), ('lesson', 'Commutator Lesson'))
         }
-        self.header = ft.Column([self.header_top,
-            ft.Row(list(self.section_buttons.values()), spacing=4, height=38,
-                   scroll=ft.ScrollMode.AUTO)], spacing=6)
+        self.section_nav = ft.Row(list(self.section_buttons.values()), spacing=2, height=36,
+                                  scroll=ft.ScrollMode.AUTO)
+        self.header = ft.Column(spacing=4)
         self.controls = [self.header, self.body]
 
     def _render_overview(self):
@@ -163,6 +174,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         except RuntimeError: return None
 
     def _update(self):
+        self.error.visible = bool(self.error.value)
+        self.notice.visible = bool(self.notice.value)
         self.viewer.dark_mode = self.state.data.dark_mode
         apply_palette(self, self.state.data.dark_mode)
         if self._page() is not None:
@@ -201,6 +214,11 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self.browser_title.value = f'Browse cases · {len(self.filtered_cases())} matching'
         self._update()
 
+    def _filter_expanded(self, e):
+        self.filter_more.expanded = e.data is True or str(e.data).lower() == 'true'
+        self._layout()
+        self._update()
+
     def _more(self, e=None):
         self.limit += 50
         self._render_list()
@@ -214,12 +232,13 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             record = self.record(case.id)
             rows.append(ft.Container(ft.TextButton(content=ft.Row([
                 ft.Column([
-                    ft.Text(self._label(case), size=15, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    ft.Text(self._label(case), size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                     ft.Text(f'{case.first} → {case.second} · {record.status}', size=10, color=ft.Colors.ON_SURFACE_VARIANT),
                 ], spacing=1, expand=True),
                 ft.Icon(ft.Icons.STAR if record.favorite else ft.Icons.CHECK_CIRCLE if record.status == 'learned' else ft.Icons.CHEVRON_RIGHT,
                         size=16, color=ft.Colors.PRIMARY),
-            ], spacing=4), on_click=lambda e, key=case.id: self.select_case(key)),
+            ], spacing=4), style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=8, vertical=4)),
+                on_click=lambda e, key=case.id: self.select_case(key)), height=40,
             bgcolor=ft.Colors.PRIMARY_CONTAINER if case.id == self.selected_case else ft.Colors.TRANSPARENT,
             border_radius=6))
         self.case_list.controls = rows or [ft.Text('No cases match these filters.', color=ft.Colors.ON_SURFACE_VARIANT)]
@@ -230,9 +249,28 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.selected_case = key
         self.selected_algorithm = self.record().preferred_algorithm
         self.hidden = False
+        self.editor_open = self.notes_open = False
+        self._navigation_token += 1
+        if self.mobile_browser is not None:
+            self.mobile_browser.expanded = False
         self.error.value = self.notice.value = ''
         self._render_library()
         self._update()
+        if self._page() is not None:
+            self._page().run_task(self._reset_case_scroll, self._navigation_token)
+
+    async def _reset_case_scroll(self, token):
+        for scroll in self.detail_scrolls:
+            if token != self._navigation_token:
+                return
+            try:
+                if scroll.page is not None:
+                    await scroll.scroll_to(offset=0, duration=0)
+            except RuntimeError:
+                return  # navigation can detach the old pane before it scrolls
+
+    def _remember_tile(self, name, e):
+        setattr(self, name, e.data is True or str(e.data).lower() == 'true')
 
     def _variant(self):
         case, record = self.cases[self.selected_case], self.record()
@@ -282,17 +320,17 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.viewer.move_text.visible = not self.hidden
         recommended = builtins[0]
         recommendation = {'supplied': 'Supplied algorithm', 'one_move': 'One-move setup', 'generated': 'Generated fallback'}[recommended.origin]
-        options = [ft.DropdownOption('', f'Recommended built-in · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
+        options = [ft.DropdownOption('', f'Recommended · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in builtins]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in record.algorithms]
         valid_ids = {o.key for o in options}
         self.selected_algorithm = self.selected_algorithm if self.selected_algorithm in valid_ids else ''
         self.variant_picker = dropdown(label='Algorithm alternative', value=self.selected_algorithm,
-                                      options=options, on_select=self._choose_variant, height=44, dense=True)
+                                      options=options, on_select=self._choose_variant, height=38, dense=True)
         self.notes_field = field(label='Case notes · saves on leaving this field', value=record.notes,
             multiline=True, min_lines=2, max_lines=4,
             on_blur=lambda e, key=case.id: self._save_notes(key, e.control.value or ''))
-        status = dropdown(label='Learning status', value=record.status, height=42, dense=True, width=160,
+        status = dropdown(label='Learning status', value=record.status, height=38, dense=True,
             options=[ft.DropdownOption(s, s.title()) for s in ('new', 'learning', 'learned')],
             on_select=lambda e, key=case.id: self._set_record(key, status=e.control.value))
         missing = '?' in case_letters(case, self.scheme)
@@ -300,34 +338,58 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         provenance = 'Your saved algorithm' if personal else (
             f'One-move setup {selected_builtin.setup} of {selected_builtin.position}' if selected_builtin.origin == 'one_move' else
             f'Supplied algorithm · {selected_builtin.position}' if selected_builtin.origin == 'supplied' else 'Generated fallback')
-        self.detail_controls = [
-            ft.Row([ft.Text(self._label(case), size=24, weight=ft.FontWeight.W_600, expand=True, color=ft.Colors.ON_SURFACE),
-                    ft.IconButton(ft.Icons.STAR if record.favorite else ft.Icons.STAR_BORDER, tooltip='Favorite case',
-                                  on_click=lambda e, key=case.id: self._set_record(key, favorite=not self.record(key).favorite))]),
-            ft.Text(f'UFR buffer · targets {case.first}, {case.second} · subset {case.subset}', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            *([ft.Text('Some target letters are unassigned in this scheme; sticker IDs identify the case.',
-                       size=11, color=ft.Colors.ON_SURFACE_VARIANT)] if missing else []),
-            ft.Text(QUALITY_NOTICE, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Row([ft.OutlinedButton('Random matching case', icon=ft.Icons.SHUFFLE, on_click=self._random_case),
-                    ft.TextButton('Reveal algorithm' if self.hidden else 'Hide algorithm', on_click=self._hide)], wrap=True),
+        def small_icon(icon, tooltip, callback, disabled=False):
+            return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
+                icon_size=19, width=32, height=32, padding=4, disabled=disabled)
+        self.case_toolbar = ft.Row([
+            ft.Column([
+                ft.Text(self._label(case), size=20, weight=ft.FontWeight.W_600, max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE),
+                ft.Text(f'UFR · {case.first} → {case.second} · {case.subset}', size=11,
+                        max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=0, expand=True,
+                tooltip='Unassigned target letters use sticker IDs.' if missing else None),
+            small_icon(ft.Icons.STAR if record.favorite else ft.Icons.STAR_BORDER, 'Favorite case',
+                lambda e, key=case.id: self._set_record(key, favorite=not self.record(key).favorite)),
+            small_icon(ft.Icons.SHUFFLE, 'Random matching case', self._random_case),
+            small_icon(ft.Icons.VISIBILITY if self.hidden else ft.Icons.VISIBILITY_OFF,
+                       'Reveal algorithm' if self.hidden else 'Hide algorithm', self._hide),
+        ], spacing=2, height=42)
+        self.editor_tile = ft.ExpansionTile(
+            title=ft.Text('Edit / replace alg', size=13, color=ft.Colors.ON_SURFACE),
+            leading=ft.Icon(ft.Icons.EDIT_OUTLINED, size=17, color=ft.Colors.PRIMARY),
+            expanded=self.editor_open, visible=not self.hidden, maintain_state=True,
+            dense=True, min_tile_height=38, tile_padding=0,
+            controls_padding=ft.Padding.only(top=6, bottom=8),
+            expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
+            on_change=lambda e: self._remember_tile('editor_open', e),
+            controls=[ft.Column([
+                ft.Text('Saved notation · paste a replacement, then save to make it preferred.',
+                        size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.algorithm_field, self.name_field,
+                ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
+                                       on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
+                        ft.TextButton('Preview alg', on_click=lambda e: self._preview_editor())], wrap=True, spacing=4),
+                ft.Row([ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
+                        small_icon(ft.Icons.DELETE_OUTLINE, 'Delete selected personal alternative', self._delete_algorithm,
+                                   disabled=not bool(personal))],
+                       wrap=True, spacing=4),
+            ], spacing=8, tight=True)])
+        self.notes_tile = ft.ExpansionTile(title=ft.Text('Case notes', size=13, color=ft.Colors.ON_SURFACE),
+            expanded=self.notes_open, maintain_state=True, dense=True, min_tile_height=38, tile_padding=0,
+            controls_padding=ft.Padding.only(top=6, bottom=8),
+            expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
+            on_change=lambda e: self._remember_tile('notes_open', e), controls=[self.notes_field])
+        self.tool_controls = [
             self.variant_picker,
-            ft.Text(provenance, size=11, color=ft.Colors.PRIMARY),
-            self.algorithm_field,
-            self.name_field,
-            ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
-                                   on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
-                    ft.OutlinedButton('Preview alg', on_click=lambda e: self._preview_editor()),
-                    ft.TextButton('Use selected alg', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm))], wrap=True),
+            ft.Text(provenance, size=11, color=ft.Colors.PRIMARY, max_lines=2, tooltip=provenance),
+            ft.TextButton('Use selected alg', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm)),
+            self.editor_tile, status, self.notes_tile,
+            ft.Text(QUALITY_NOTICE, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
             self.error, self.notice,
-            ft.Row([ft.TextButton('Save as another alternative', on_click=lambda e: self._save_algorithm(False)),
-                    ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip='Delete selected personal alternative', disabled=not bool(personal),
-                                  on_click=self._delete_algorithm)], wrap=True),
-            self.viewer,
-            ft.Text('The case starts scrambled; executing the alg restores it. Outlined stickers mark UFR and the two targets. '
-                    "Wide turns such as Fw / Fw' (or f / f') work in the editor and player.",
-                    size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-            status, self.notes_field,
         ]
+        self.detail_controls = [self.case_toolbar, self.viewer, ft.Column(self.tool_controls, spacing=8, tight=True)]
+        self.error.visible, self.notice.visible = bool(self.error.value), bool(self.notice.value)
         self._layout()
 
     def _choose_variant(self, e):
@@ -345,7 +407,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self._load_viewer(algorithm.source, inverse_state(normalized_state(parse_algorithm(case.starter))),
                               (case.first, case.second), case.id)
             self.error.value = ''
-            self.notice.value = f'Verified · {len(algorithm.moves)} moves · edges restored.'
+            self.notice.value = f'Verified · {len(self.viewer.algorithm.moves)} moves · edges restored.'
         except ValueError as ex:
             self.viewer.stop(update=False)
             self.error.value, self.notice.value = str(ex), ''
@@ -485,6 +547,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.select_case(key)
 
     def _set_mode(self, mode):
+        self._navigation_token += 1
         self.viewer.stop(update=False)
         self.mode = mode
         self._loaded_key = None
@@ -501,54 +564,107 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _layout(self):
         width, height = self._viewport
-        compact = width < 600
-        self.scheme_picker.width = min(230, width)
-        self.header_top.height = 78 if compact else 46
-        self.header_top.content = ft.Column([self.title, self.scheme_picker], spacing=6) if compact else ft.Row([
-            ft.Container(self.title, expand=True), self.scheme_picker,
-        ], spacing=12)
-        self.header.height = self.header_top.height + 44
+        self.title.size = 18 if width < 440 else 20
+        self.scheme_picker.width = min(200, max(108, width * .38))
+        self.scheme_picker.height = 38
+        self.header_top.height = 42
+        if width >= 1080:
+            self.section_nav.expand = True
+            self.header_top.content = ft.Row([self.title, self.section_nav, self.scheme_picker], spacing=12)
+            self.header.controls = [self.header_top]
+            self.header.height = 42
+        else:
+            self.section_nav.expand = False
+            self.header_top.content = ft.Row([ft.Container(self.title, expand=True), self.scheme_picker], spacing=8)
+            self.header.controls = [self.header_top, self.section_nav]
+            self.header.height = 82
         for key, button in self.section_buttons.items():
             selected = key == self.mode
             button.style = ft.ButtonStyle(
                 color=ft.Colors.ON_PRIMARY_CONTAINER if selected else ft.Colors.ON_SURFACE_VARIANT,
                 bgcolor=ft.Colors.PRIMARY_CONTAINER if selected else ft.Colors.TRANSPARENT,
-                shape=ft.RoundedRectangleBorder(radius=7),
-                padding=ft.Padding.symmetric(horizontal=12, vertical=8))
-        available = max(120, height - self.header.height - self.spacing)
+                text_style=ft.TextStyle(size=12), shape=ft.RoundedRectangleBorder(radius=7),
+                padding=ft.Padding.symmetric(horizontal=9, vertical=6))
+        available = max(60, height - self.header.height - self.spacing)
         self.body.width, self.body.height = width, available
+        self.detail_scrolls = []
         if self.mode == 'overview':
-            self.body.controls = [ft.ListView(controls=self.overview_controls, spacing=14,
+            self.body.controls = [ft.ListView(controls=self.overview_controls, spacing=12,
                 height=available, scroll=ft.ScrollMode.AUTO)]
             return
-        wide = width >= 980 and self.mode == 'library'
-        sidebar_width = 294
-        detail_width = width - sidebar_width - 14 if wide else width
-        self.viewer.set_viewport(max(180, detail_width - 28), min(350, max(220, height * .40)))
-        self.case_list.height = max(80, available - 366) if wide else 200
-        sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.second_target, self.status_filter,
-            self.favorites, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
-        if wide:
-            self.body.controls = [ft.Row([
-                panel(ft.ListView(controls=sidebar_content.controls, spacing=6, height=available - 24),
-                      padding=12, width=sidebar_width, height=available),
-                panel(ft.ListView(controls=self.detail_controls, spacing=12, height=available - 28),
-                      padding=14, width=detail_width, height=available),
-            ], spacing=14, vertical_alignment=ft.CrossAxisAlignment.START)]
-            self.body.height = available
+        if self.mode == 'library':
+            self._layout_library(width, available)
+            return
+        self.viewer.set_viewport(max(180, width - 24), min(340, max(160, available - 210)))
+        self.body.controls = [ft.ListView(controls=[panel(ft.Column(self.detail_controls, spacing=10, tight=True),
+            padding=12, width=width)], height=available, scroll=ft.ScrollMode.AUTO,
+            build_controls_on_demand=False)]
+
+    def _layout_library(self, width, available):
+        wide = width >= 980
+        sidebar_width, gap, padding = 244, 10, 10
+        detail_width = width - sidebar_width - gap if wide else width
+        inner_width = detail_width - padding * 2
+        self.case_list.height = max(72, available - 294 - (86 if self.filter_more.expanded else 0)) if wide else 180
+        sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.second_target,
+            self.filter_more, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
+        if wide and inner_width >= 760:
+            # The cube and alg tools scroll independently. Opening the editor
+            # cannot push the cube below the first view.
+            tools_width = min(320, max(280, inner_width * .32))
+            viewer_width = inner_width - tools_width - gap
+            content_height = max(80, available - padding * 2 - self.case_toolbar.height - 8)
+            self.viewer.set_viewport(viewer_width, min(390, max(140, content_height - 130)))
+            cube_scroll = ft.ListView(controls=[self.viewer], height=content_height,
+                build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
+            tools_scroll = ft.ListView(controls=self.tool_controls, spacing=8, height=content_height,
+                build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
+            case_content = ft.Column([self.case_toolbar, ft.Row([
+                ft.Container(cube_scroll, width=viewer_width),
+                ft.Container(tools_scroll, width=tools_width, padding=ft.Padding.only(left=8),
+                    border=ft.Border(left=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT))),
+            ], spacing=gap, vertical_alignment=ft.CrossAxisAlignment.START)], spacing=8)
+            self.detail_scrolls = [cube_scroll, tools_scroll]
+            self.case_canvas_top = padding + self.case_toolbar.height + 8
+            self.split_tools = True
         else:
-            items = []
-            if self.mode == 'library':
-                self.browser_title = ft.Text(f'Browse cases · {len(self.filtered_cases())} matching',
-                                             size=13, color=ft.Colors.ON_SURFACE)
-                items.append(ft.ExpansionTile(title=self.browser_title, controls=[sidebar_content]))
-            items.append(panel(ft.Column(self.detail_controls, spacing=12, tight=True), padding=14, width=width))
-            self.body.controls = [ft.ListView(controls=items, spacing=10, height=available, scroll=ft.ScrollMode.ALWAYS)]
-            self.body.height = available
-        self.body.width = width
+            before_cube = padding + self.case_toolbar.height + 8 + (46 if not wide else 0)
+            self.viewer.set_viewport(inner_width, min(320, max(140, available - before_cube - 130)))
+            case_content = ft.ListView(controls=self.detail_controls, spacing=8,
+                height=available - padding * 2, build_controls_on_demand=False,
+                scroll=ft.ScrollMode.AUTO, key=f'case-{self.selected_case}')
+            self.detail_scrolls = [case_content]
+            self.case_canvas_top = before_cube
+            self.split_tools = False
+        case_panel = panel(case_content, padding=padding, width=detail_width, height=available)
+        if wide:
+            browser_scroll = ft.ListView(controls=sidebar_content.controls, spacing=6,
+                height=available - padding * 2, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
+            self.body.controls = [ft.Row([
+                panel(browser_scroll, padding=padding, width=sidebar_width, height=available), case_panel,
+            ], spacing=gap, vertical_alignment=ft.CrossAxisAlignment.START)]
+        else:
+            if self.mobile_browser is None:
+                self.browser_title = ft.Text('', size=12, color=ft.Colors.ON_SURFACE)
+                self.mobile_browser = ft.ExpansionTile(title=self.browser_title, dense=True,
+                    min_tile_height=38, tile_padding=ft.Padding.symmetric(horizontal=6),
+                    expanded_cross_axis_alignment=ft.CrossAxisAlignment.START, maintain_state=True)
+            self.browser_title.value = f'Browse cases · {len(self.filtered_cases())} matching'
+            self.mobile_browser.controls = [sidebar_content]
+            # One outer scroll view avoids nesting another full-height detail
+            # viewport below the mobile browser tile.
+            case_content.height = None
+            case_content = ft.Column(self.detail_controls, spacing=8, tight=True)
+            case_panel.content = case_content
+            case_panel.height = None
+            body_scroll = ft.ListView(controls=[self.mobile_browser, case_panel], spacing=8,
+                height=available, scroll=ft.ScrollMode.AUTO, build_controls_on_demand=False,
+                key=f'case-mobile-{self.selected_case}')
+            self.body.controls = [body_scroll]
+            self.detail_scrolls = [body_scroll]
 
     def set_viewport(self, width, height):
-        self._viewport = (max(240, width), max(300, height))
+        self._viewport = (max(240, width), max(220, height))
         self.width, self.height = self._viewport
         self._layout()
 
@@ -571,4 +687,6 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def set_active(self, active):
         self.active = bool(active)
-        if not active: self.viewer.stop(update=False)
+        if not active:
+            self._navigation_token += 1
+            self.viewer.stop(update=False)

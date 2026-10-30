@@ -206,6 +206,49 @@ def algorithm_states(algorithm, initial=None):
     return states
 
 
+def simplify_moves(moves):
+    """Combine matching turns, including across commuting same-axis turns.
+
+    Preserve the order of unrelated turns and keep wide/slice/rotation move
+    types distinct. This is cancellation cleanup, not an algorithm optimizer.
+    """
+    result = []
+    for move in moves:
+        base = move.rstrip("2'")
+        amount = 2 if move.endswith('2') else 3 if move.endswith("'") else 1
+        axis = move_spec(move)[0]
+        for index in range(len(result) - 1, -1, -1):
+            previous, count, previous_axis = result[index]
+            if previous_axis != axis:
+                break
+            if previous == base:
+                count = (count + amount) % 4
+                if count:
+                    result[index] = (base, count, axis)
+                else:
+                    result.pop(index)
+                break
+        else:
+            result.append((base, amount, axis))
+            continue
+        # The loop can also end at an unrelated turn rather than a match.
+        if previous_axis != axis:
+            result.append((base, amount, axis))
+    return tuple(base + ('2' if count == 2 else "'" if count == 3 else '')
+                 for base, count, _ in result)
+
+
+def simplified_algorithm(algorithm):
+    """A clean execution sequence; retain the exact original source text."""
+    if isinstance(algorithm, str):
+        algorithm = parse_algorithm(algorithm)
+    moves = simplify_moves(algorithm.moves)
+    if moves == algorithm.moves:
+        return algorithm
+    stages = (Stage('Execution', 0, len(moves)),) if moves else ()
+    return Algorithm(algorithm.source, moves, stages)
+
+
 def normalized_state(algorithm):
     return _orient(algorithm_states(algorithm)[-1], 'W', 'G')
 

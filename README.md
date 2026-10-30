@@ -1,3 +1,58 @@
+# BLD Letter Memo Web 2.30.0
+
+The Method Library case workspace now leads with the **cube**. A compact case
+header replaces the stack of messages and buttons. On larger screens, the
+cube and algorithm tools sit beside each other with separate scroll panes,
+so opening the editor or notes cannot move the cube down. At narrower widths,
+the cube comes before the editing controls. Choosing a case returns to the
+top and closes the editor, notes and mobile browser.
+
+The library header uses one row when space allows. The case browser is
+narrower, has denser rows and fields, and folds learning-status/favorite
+filters into More filters. Favorites and viewer checkboxes use their natural
+size. Empty feedback messages no longer leave blank rows. Editing remains
+one clearly labeled **Edit / replace alg** section with the same preview,
+save/preference, copy and delete actions. Notes and viewer options are also
+collapsed initially. The notice about non-optimal built-ins remains available.
+
+## Clean execution
+
+The main move display and default playback now combine matching turns and
+remove cancellations, including matching turns separated by commuting moves
+on the same axis. R R becomes R2, R2 R' becomes R, R R' disappears, and
+R L R' becomes L. Wide, slice and rotation moves are supported without
+rewriting distinct move types or changing unrelated turn order.
+
+For the screenshot example, the expanded 14-turn sequence becomes:
+
+`D' R' D R U2 R' D' R U2 D`
+
+Cleanup shortens 564 of the 765 supplied/setup alternatives. Exact full cube
+effects are unchanged. The cube state sequence, counter, stepping and normal
+playback all use the cleaned execution. Saved algorithm/commutator text is
+preserved exactly. To study the original setup and A/B stages, open **View
+options & stages → Original commutator stages**. The default on loading a
+new algorithm remains clean execution; the introductory lesson retains its
+unchanged four stages.
+
+All case identities, supplied alternatives, preferred IDs, personal algorithms,
+notes/progress/favorites, schemes, pairs/ratings/aliases, BLD tracing, temporary
+cycle breaks, focused scrambles, Timer and Progressive Memo data are preserved.
+Data version remains 16, and no storage/dependency/deployment changes are needed.
+
+**294 automated tests pass**, covering cube-first desktop/mobile bounds,
+independent editing panes, navigation scroll reset, themes and natural-size
+checkboxes, safe cleanup, exact effects of all 765 supplied options, mixed
+notation, original stage mode, persistence and existing training behavior.
+The Flet web Python runtime also verified layout/control behavior, clean cube
+effects, saves/backups, original stages and smooth timed playback. Actual
+browser client rendering remains unverified here; no deployment was performed.
+
+Patching is unchanged. Copy all extracted contents into the existing project,
+then commit and push as shown in PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.29.0
 
 Method Library now has an optional **Second target sticker** filter. Use either
