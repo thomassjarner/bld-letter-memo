@@ -1,43 +1,47 @@
-# Update to 2.34.0
+# Update to 2.35.0
 
-Copy all contents of `bld-letter-memo-web-2.34.0/` directly into your existing
-`~/Desktop/letterpairscheme-helper-web/` project, replacing matching files.
-Do not put the release folder itself inside the project. Patching and GitHub
-Pages deployment are unchanged.
+Copy all contents of `bld-letter-memo-web-2.35.0/` directly into your existing
+`~/Desktop/letterpairscheme-helper-web/` project, replacing matching files
+and including all new files. Do not put the release folder itself inside
+the project. Patching and GitHub Pages deployment are unchanged.
 
 Run in Terminal:
 
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Rebalance cube and algorithm workspace"
+git commit -m "Add cube switches and improve case browsing and Playground"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, reload, and confirm **2.34.0** in the header or tab title.
+Wait for GitHub Actions, reload, and confirm **2.35.0** in the header or tab title.
 Command+Shift+R can refresh the build on macOS. No package installation,
 manual migration, import or storage reset is required.
 
 ## What changed
 
-- Wider right-hand algorithm panel, keeping alternatives, linked fields and
-  preview/save/copy/delete actions together.
-- Learning status and case notes move to a separate box below the cube on
-  wide screens. The cube uses a narrower column and a shorter canvas.
-- Cube playback and view controls stay beside the algorithm editor, with
-  independent scrolling. Secondary algorithm actions use fewer rows.
-- Narrow screens retain a scrollable cube-first layout, followed by editing
-  and then the status/notes box. The editor remains open.
+- Visible **Show letters** and **Highlight pieces** switches below the cube.
+  Highlighting off removes both dimming and colored outlines, in 3D and 2D.
+- Stable browser panels and rows retain list position and loaded cases during
+  selection. Narrow-screen browsing also retains the expanded browser and
+  shared page scroll. Random case editing still focuses the alg field.
+- A Playground comparison card shows the case using your selected letter
+  scheme, its sticker IDs and its current preferred case algorithm. The new
+  **Open case in library** button opens that saved case without replacing its
+  algorithm. **Edit this alg for the case** keeps the existing draft workflow.
+- The wider algorithm panel and status/notes box below the compact cube from
+  2.34.0 are retained.
 
 Data version stays 17. Existing data and saving behavior are preserved;
-algorithm choices/IDs, converter, animation, Timer and practice are unchanged.
+algorithm choices/IDs, converter, BLD logic, Timer and practice are unchanged.
 
 ## Validation
 
-**338 automated tests pass.** The Flet web Python runtime also verified the
-wider algorithm pane, status/notes below the compact cube, viewport bounds,
-independent scrolling, status and notes persistence, linked conversion,
-Playground saves, backups, navigation and themes at six screen sizes. Live
-browser client rendering remains unverified here; no deployment was performed.
+**346 automated tests pass.** The Flet web Python runtime also checked stable
+browser/row identities during case selection, visible switches, letters and
+highlights off in both cube views, scheme-labeled case comparison, preferred
+algorithm routing, linked conversion, saving, backups and themes at six screen
+sizes. Live browser client rendering remains unverified here; no deployment
+was performed.
 

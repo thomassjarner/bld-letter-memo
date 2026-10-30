@@ -54,7 +54,7 @@ def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitc
                  letters=True, focus=True, targets=(), affected=None, moving=None, fraction=0):
     involved = ({frozenset(s) for s in affected} if affected is not None else
                 {frozenset(s) for s in ('UFR', *targets)} if targets else set())
-    highlights = {s: color for s, color in zip(('UFR', *targets), ('#80CFC1', '#6DD8C3', '#FFD08A'))}
+    highlights = {s: color for s, color in zip(('UFR', *targets), ('#80CFC1', '#6DD8C3', '#FFD08A'))} if focus else {}
     if mode == '2D':
         corners, edges = dict(face_groups('corners')), dict(face_groups('edges'))
         positions = {f: (corners[f][0], edges[f][0], corners[f][1], edges[f][3], f,

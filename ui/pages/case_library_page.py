@@ -3,7 +3,7 @@ import random
 
 import flet as ft
 
-from core.algorithms import inverse_state, normalized_state, parse_algorithm
+from core.algorithms import inverse_state, normalized_state, parse_algorithm, simplified_algorithm
 from core.algorithm_analysis import analyze_algorithm
 from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms, display_builtin_algorithms
 from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, corner_cases, identify_case
@@ -49,6 +49,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._identified = None
         self.browser_title = None
         self.mobile_browser = None
+        self.browser_scroll = self.browser_panel = self.library_row = None
+        self.mobile_case_scroll = self.mobile_sidebar = None
+        self._case_rows = {}
         self.notes_open = False
         self._navigation_token = 0
         self.detail_scrolls = []
@@ -103,7 +106,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             on_click=lambda e: self._save_playground(e, as_new=True))
         self.playground_delete = ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip='Delete saved playground algorithm',
             disabled=True, on_click=self._delete_playground)
-        self.open_case_button = ft.TextButton('Open matching UFR case', disabled=True, on_click=self._open_identified)
+        self.open_case_button = ft.TextButton('Edit this alg for the case', disabled=True, on_click=self._open_identified)
+        self.view_case_button = ft.TextButton('Open case in library', icon=ft.Icons.ARROW_FORWARD,
+                                             disabled=True, on_click=self._open_matching_case)
+        self.matched_case = panel(ft.Column(spacing=6, tight=True), padding=12, visible=False)
         self.effect_area = ft.Column(spacing=6, tight=True)
         self.explorer_effect = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.body = ft.Column()
@@ -226,17 +232,22 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         rows = []
         for case in matches[:self.limit]:
             record = self.record(case.id)
-            rows.append(ft.Container(ft.TextButton(content=ft.Row([
-                ft.Column([
-                    ft.Text(self._label(case), size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                    ft.Text(f'{case.first} → {case.second} · {record.status}', size=10, color=ft.Colors.ON_SURFACE_VARIANT),
-                ], spacing=1, expand=True),
-                ft.Icon(ft.Icons.STAR if record.favorite else ft.Icons.CHECK_CIRCLE if record.status == 'learned' else ft.Icons.CHEVRON_RIGHT,
-                        size=16, color=ft.Colors.PRIMARY),
-            ], spacing=4), style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=8, vertical=4)),
-                on_click=lambda e, key=case.id: self.select_case(key)), height=40,
-            bgcolor=ft.Colors.PRIMARY_CONTAINER if case.id == self.selected_case else ft.Colors.TRANSPARENT,
-            border_radius=6))
+            if case.id not in self._case_rows:
+                label = ft.Text(size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE)
+                meta = ft.Text(size=10, color=ft.Colors.ON_SURFACE_VARIANT)
+                icon = ft.Icon(ft.Icons.CHEVRON_RIGHT, size=16, color=ft.Colors.PRIMARY)
+                row = ft.Container(ft.TextButton(content=ft.Row([
+                    ft.Column([label, meta], spacing=1, expand=True), icon,
+                ], spacing=4), style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=8, vertical=4)),
+                    on_click=lambda e, key=case.id: self.select_case(key)), height=40,
+                    key=f'case-row-{case.id}', border_radius=6)
+                self._case_rows[case.id] = row, label, meta, icon
+            row, label, meta, icon = self._case_rows[case.id]
+            label.value = self._label(case)
+            meta.value = f'{case.first} → {case.second} · {record.status}'
+            icon.icon = ft.Icons.STAR if record.favorite else ft.Icons.CHECK_CIRCLE if record.status == 'learned' else ft.Icons.CHEVRON_RIGHT
+            row.bgcolor = ft.Colors.PRIMARY_CONTAINER if case.id == self.selected_case else ft.Colors.TRANSPARENT
+            rows.append(row)
         self.case_list.controls = rows or [ft.Text('No cases match these filters.', color=ft.Colors.ON_SURFACE_VARIANT)]
         self.more_button.visible = len(matches) > self.limit
 
@@ -248,7 +259,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.notes_open = False
         self.case_converter.cancel_pending()
         self._navigation_token += 1
-        if self.mobile_browser is not None:
+        if edit and self.mobile_browser is not None:
             self.mobile_browser.expanded = False
         self.error.value = self.notice.value = ''
         self._render_library()
@@ -259,6 +270,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self._page().run_task(self._reveal_case_editor if edit else self._reset_case_scroll, self._navigation_token)
 
     async def _reset_case_scroll(self, token):
+        # On mobile this scroll also contains the case browser. A normal list
+        # selection must leave it, and the expanded browser, where the user was.
+        if self._viewport[0] < 980:
+            return
         for scroll in self.detail_scrolls:
             if token != self._navigation_token:
                 return
@@ -532,6 +547,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.viewer.play_button.disabled = not valid
         self.playground_save.disabled = self.playground_copy.disabled = not valid
         self.open_case_button.disabled = self._identified is None
+        self.view_case_button.disabled = self._identified is None
+        self._render_matched_case(valid)
         if update: self._update()
 
     def _sticker_label(self, sticker):
@@ -554,10 +571,6 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                                     size=12, color=ft.Colors.ON_SURFACE))
         for label, pieces in (('Twists in place', effect.twisted_in_place), ('Flips in place', effect.flipped_in_place)):
             if pieces: controls.append(ft.Text(label + ': ' + ', '.join(pieces), size=12, color=ft.Colors.ON_SURFACE))
-        if effect.ufr_case:
-            first, second = effect.ufr_case.split(':')
-            controls.append(ft.Text(f'UFR case it solves: {self._sticker_label(first)} → {self._sticker_label(second)}',
-                                    size=12, color=ft.Colors.PRIMARY))
         if effect.reorients_cube:
             controls.append(ft.Text('Includes a whole-cube reorientation. Piece effects are relative to the centers.',
                                     size=11, color=ft.Colors.ON_SURFACE_VARIANT))
@@ -568,6 +581,48 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 controls=[ft.Text(f'{self._sticker_label(a)} → {self._sticker_label(b)}', size=11,
                                   color=ft.Colors.ON_SURFACE) for a, b in effect.sticker_changes]))
         self.effect_area.controls = controls
+
+    def _render_matched_case(self, valid):
+        self.matched_case.visible = valid
+        if not valid:
+            self.matched_case.content.controls = []
+            return
+        if not self._identified:
+            self.matched_case.content.controls = [
+                ft.Text('No matching UFR corner case', size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text('You can still inspect and save this algorithm in the Playground.',
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ]
+            return
+        case = self.cases[self._identified]
+        record = self.record(case.id)
+        personal = next((a for a in record.algorithms if a.id == record.preferred_algorithm), None)
+        builtins = builtin_algorithms(case.id)
+        selected = personal or next((a for a in builtins if a.id == record.preferred_algorithm), builtins[0])
+        algorithm_text = ft.Text(selected.alg, size=12, selectable=True, font_family='monospace', color=ft.Colors.ON_SURFACE)
+        controls = [
+            ft.Text(f'Solves case · {self._label(case)}', size=15, weight=ft.FontWeight.W_600, color=ft.Colors.PRIMARY),
+            ft.Text(f'UFR buffer · {self._sticker_label(case.first)} → {self._sticker_label(case.second)} · {case.subset}',
+                    size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text('Current case algorithm · ' + selected.name, size=12, weight=ft.FontWeight.W_600,
+                    color=ft.Colors.ON_SURFACE),
+            algorithm_text,
+        ]
+        try:
+            algorithm = parse_algorithm(selected.alg)
+            if identify_case(algorithm) != case.id:
+                raise ValueError('The saved algorithm does not solve this case.')
+            moves = simplified_algorithm(algorithm).expanded
+            if '[' not in selected.alg:
+                algorithm_text.value = moves
+            elif moves != selected.alg.strip():
+                controls.append(ft.Text('Moves: ' + moves, size=11, selectable=True,
+                                        font_family='monospace', color=ft.Colors.ON_SURFACE_VARIANT))
+        except ValueError:
+            controls.append(ft.Text('This saved algorithm needs correction in the case library.',
+                                    size=11, color=ft.Colors.ERROR))
+        controls.append(self.view_case_button)
+        self.matched_case.content.controls = controls
 
     def _refresh_playground_saved(self):
         saved = self.state.data.playground_algorithms
@@ -651,14 +706,28 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _open_identified(self, e=None):
         if self._identified:
-            key, source = self._identified, self.playground_converter.source
+            source = self.playground_converter.source
             name = self.playground_name.value or 'My alg'
-            self.mode = 'library'
-            self._loaded_key = None
-            self.select_case(key, edit=True)
+            self._open_matching_case()
             self.case_converter.load(source)
             self.name_field.value = name
             self._preview_editor(sync=False)
+
+    def _open_matching_case(self, e=None):
+        if not self._identified:
+            return
+        key = self._identified
+        matches = self.filtered_cases()
+        if not any(case.id == key for case in matches):
+            self.search.value = ''
+            self.subset.value = self.first_target.value = self.second_target.value = self.status_filter.value = 'all'
+            self.favorites.value = False
+            matches = self.filtered_cases()
+        index = next(i for i, case in enumerate(matches) if case.id == key)
+        self.limit = max(self.limit, min(len(matches), (index // 50 + 1) * 50))
+        self.mode = 'library'
+        self._loaded_key = self._editor_key = None
+        self.select_case(key, edit=True)
 
     def _render_lesson(self):
         alg = parse_algorithm(BASE_ALG)
@@ -760,7 +829,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             tools_width = min(460, width * .42)
             viewer_width = width - tools_width - 18
             self.viewer.set_viewport(viewer_width, min(360, max(140, content_height - 170)))
-            left = ft.ListView(controls=[self.viewer, self.effect_area], spacing=14,
+            left = ft.ListView(controls=[self.viewer, self.matched_case, self.effect_area], spacing=14,
                 height=content_height - 20, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
             right = ft.ListView(controls=self.playground_tools, spacing=10,
                 height=content_height - 20, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
@@ -771,7 +840,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         else:
             self.viewer.set_viewport(width - 24, min(280, max(160, available - 260)))
             self.body.controls = [ft.ListView(controls=[self.playground_toolbar,
-                self.playground_converter, self.viewer, self.effect_area,
+                self.playground_converter, self.viewer, self.matched_case, self.effect_area,
                 ft.Column(self.playground_tools[1:], spacing=10, tight=True)],
                 height=available, spacing=12, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)]
 
@@ -812,11 +881,16 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self.split_tools = False
         case_panel = panel(case_content, padding=padding, width=detail_width, height=available)
         if wide:
-            browser_scroll = ft.ListView(controls=sidebar_content.controls, spacing=6,
-                height=available - padding * 2, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
-            self.body.controls = [ft.Row([
-                panel(browser_scroll, padding=padding, width=sidebar_width, height=available), case_panel,
-            ], spacing=gap, vertical_alignment=ft.CrossAxisAlignment.START)]
+            if self.browser_scroll is None:
+                self.browser_scroll = ft.ListView(spacing=6, build_controls_on_demand=False,
+                    scroll=ft.ScrollMode.AUTO, key='case-browser-scroll')
+                self.browser_panel = panel(self.browser_scroll, padding=padding, width=sidebar_width)
+                self.library_row = ft.Row(spacing=gap, vertical_alignment=ft.CrossAxisAlignment.START)
+            self.browser_scroll.controls = sidebar_content.controls
+            self.browser_scroll.height = available - padding * 2
+            self.browser_panel.height = available
+            self.library_row.controls = [self.browser_panel, case_panel]
+            self.body.controls = [self.library_row]
         else:
             if self.mobile_browser is None:
                 self.browser_title = ft.Text('', size=12, color=ft.Colors.ON_SURFACE)
@@ -824,18 +898,23 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                     min_tile_height=38, tile_padding=ft.Padding.symmetric(horizontal=6),
                     expanded_cross_axis_alignment=ft.CrossAxisAlignment.START, maintain_state=True)
             self.browser_title.value = f'Browse cases · {len(self.filtered_cases())} matching'
-            self.mobile_browser.controls = [sidebar_content]
+            if self.mobile_sidebar is None:
+                self.mobile_sidebar = ft.Column(spacing=6, tight=True)
+            self.mobile_sidebar.controls = sidebar_content.controls
+            self.mobile_browser.controls = [self.mobile_sidebar]
             # One outer scroll view avoids nesting another full-height detail
             # viewport below the mobile browser tile.
             case_content.height = None
             case_content = ft.Column(self.detail_controls, spacing=8, tight=True)
             case_panel.content = case_content
             case_panel.height = None
-            body_scroll = ft.ListView(controls=[self.mobile_browser, case_panel], spacing=8,
-                height=available, scroll=ft.ScrollMode.AUTO, build_controls_on_demand=False,
-                key=f'case-mobile-{self.selected_case}')
-            self.body.controls = [body_scroll]
-            self.detail_scrolls = [body_scroll]
+            if self.mobile_case_scroll is None:
+                self.mobile_case_scroll = ft.ListView(spacing=8, scroll=ft.ScrollMode.AUTO,
+                    build_controls_on_demand=False, key='case-library-mobile')
+            self.mobile_case_scroll.controls = [self.mobile_browser, case_panel]
+            self.mobile_case_scroll.height = available
+            self.body.controls = [self.mobile_case_scroll]
+            self.detail_scrolls = [self.mobile_case_scroll]
 
     def set_viewport(self, width, height):
         self._viewport = (max(240, width), max(220, height))

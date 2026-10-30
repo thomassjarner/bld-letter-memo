@@ -1,37 +1,68 @@
+# BLD Letter Memo Web 2.35.0
+
+## Cube switches and stable case browsing
+
+**Show letters** and **Highlight pieces** are now visible switches directly
+below the cube, outside the collapsed view options. They work in both 3D and
+2D, and keep their values when switching cases or Method Library workspaces.
+Turning highlighting off removes both colored target outlines and dimming of
+other pieces. Turning letters off also hides buffer symbols. These view
+choices do not modify schemes, algorithms or training data.
+
+Selecting a case now keeps the browser panel, scroll controls and existing
+case rows mounted. The loaded page and your place in the list are retained.
+On narrow screens, ordinary selection also keeps the browser expanded and
+does not reset the shared page scroll. Desktop cube/editor panes can still
+start at the top independently. Random matching case retains its editor focus.
+
+## Playground case comparison
+
+For a pure UFR corner case, the Playground now shows a dedicated card with:
+
+- The ordered case using the selected letter scheme, plus physical sticker
+  IDs, buffer and subset. Unassigned letters fall back to sticker IDs.
+- The current saved preferred case algorithm and its name. A preferred
+  built-in alternative is respected; otherwise the built-in recommendation
+  is used. Execution moves are cleaned with the existing simplifier.
+- **Open case in library**, which opens that case and its saved preferred
+  algorithm. Conflicting filters are cleared and the matching case is
+  included among the loaded rows. This does not save the Playground draft.
+
+The existing draft route is labeled **Edit this alg for the case**. It opens
+that same case editor with the Playground algorithm ready to try, without
+saving or replacing the preferred algorithm. The Playground draft is retained
+when returning. Imported invalid preferred algs remain visible for repair.
+
+General algorithms that do not match a UFR case remain analyzable and savable.
+Invalid or empty input clears the previous case card and disables case links.
+Changing the label scheme or saved preference refreshes the comparison.
+
+The compact 2.34.0 layout is retained: a wider algorithm panel on the right,
+with learning status and notes in a box below the shorter cube. The notation
+engine, supplied algorithm IDs, BLD logic, timers, histories, practice modes,
+browser storage and import/export behavior are unchanged. Data version stays
+17; no package installation or migration is required.
+
+**346 automated tests pass.** The Flet web Python runtime also checked stable
+browser/row identities during case selection, visible switches, letters and
+highlights off in both cube views, scheme-labeled case comparison, preferred
+algorithm routing, linked conversion, saving, backups and themes at six screen
+sizes. Live browser client rendering remains unverified here; no deployment
+was performed.
+
+Patching is unchanged: copy every release file into the existing project,
+then commit and push. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.34.0
 
-## More room for case algorithms
-
-The 3-style corner case workspace now gives the algorithm editor a wider
-right-hand panel. Algorithm alternatives, provenance, both linked notation
-fields and all preview/save/copy/delete actions stay together there.
-Secondary algorithm actions share a wrapping row to reduce vertical space.
-
-Learning status and case notes have moved into a separate box below the cube
-on wide screens. The cube column is narrower, and its canvas is capped at
-310 logical pixels high rather than 390, leaving room for useful information
-below it. Playback controls and view options remain with the cube. The cube
-and algorithm panels still scroll independently, so expanding notes cannot
-push the editor out of view.
-
-On narrow screens, the cube comes first, followed by the algorithm editor
-and the status/notes box in one scrollable page. New case selection still
-starts at the cube; Random matching case still focuses the editor. The
-editor stays open, and the three status checkboxes still select exactly one
-status. Notes retain their existing save-on-blur behavior.
-
-The algorithm catalog, linked converter, animation engine, BLD logic, browser
-storage, data version 17, schemes, pairs, timer sessions/history and practice
-behavior are unchanged. No new dependencies or migration steps are required.
-
-**338 automated tests pass.** The Flet web Python runtime also verified the
-wider algorithm pane, status/notes below the compact cube, viewport bounds,
-independent scrolling, status and notes persistence, linked conversion,
-Playground saves, backups, navigation and themes at six screen sizes. Live
-browser client rendering remains unverified here; no deployment was performed.
-
-Patching is unchanged: copy all release contents into the existing project,
-then commit and push. See PATCHING.md.
+The case workspace gives the algorithm editor a wider right-hand panel.
+Learning status and case notes moved into a box below the cube on wide
+screens. The cube column is narrower, its canvas is capped at 310 logical
+pixels rather than 390, and secondary algorithm actions share a wrapping
+row. Narrow screens retain one scrollable cube-first layout. Saved data,
+converter behavior and animation are unchanged.
 
 ---
 

@@ -88,7 +88,7 @@ def test_new_cases_keep_the_cube_in_view_and_the_editor_visible_without_expandin
     assert view.viewer.index == 0
     assert view.algorithm_editor.visible and not isinstance(view.algorithm_editor, ft.ExpansionTile)
     assert not view.notes_tile.expanded
-    assert view.mobile_browser is None or not view.mobile_browser.expanded
+    assert view.mobile_browser is None or view.mobile_browser.expanded
     assert view.viewer.controls[0] is view.viewer.canvas
     assert view.detail_controls[:2] == [view.case_toolbar, view.viewer]
     assert view.case_canvas_top + view.viewer.canvas.height <= view.body.height
@@ -110,7 +110,7 @@ def test_wide_layout_keeps_editing_in_a_separate_scroll_pane_and_preserves_draft
     assert not any(c is view.algorithm_editor for c in walk(cube_pane))
     assert view.learning_status in list(walk(view.case_details))
     assert view.notes_field in list(walk(view.case_details))
-    assert not any(c in (view.learning_status, view.notes_tile) for c in walk(tools_pane))
+    assert not any(c is view.learning_status or c is view.notes_tile for c in walk(tools_pane))
     case_row = view.body.controls[0].controls[1].content.controls[1]
     assert case_row.controls[1].width >= 360
     assert sum(c.width for c in case_row.controls) + case_row.spacing <= view.body.controls[0].controls[1].width - 20
@@ -129,11 +129,15 @@ def test_case_scroll_reset_goes_to_top_and_ignores_stale_navigation():
     view.set_viewport(1400, 760)
     calls = [AsyncMock(), AsyncMock()]
     for pane, callback in zip(view.detail_scrolls, calls): pane.scroll_to = callback
+    view.case_list.scroll_to = AsyncMock()
+    view.browser_scroll.scroll_to = AsyncMock()
     with patch('flet.controls.base_control.BaseControl.page', property(lambda self: object())):
         asyncio.run(view._reset_case_scroll(view._navigation_token))
         for callback in calls: callback.assert_awaited_once_with(offset=0, duration=0)
         asyncio.run(view._reset_case_scroll(view._navigation_token - 1))
         for callback in calls: assert callback.await_count == 1
+        view.case_list.scroll_to.assert_not_awaited()
+        view.browser_scroll.scroll_to.assert_not_awaited()
 
 
 @pytest.mark.parametrize('dark', [False, True])
@@ -144,6 +148,9 @@ def test_compact_fields_and_always_open_editing_keep_readable_theme_colors(dark)
     expected = '#F0F4F3' if dark else '#182B25'
     for c in walk(view):
         if isinstance(c, (ft.TextField, ft.Dropdown)): assert c.color == expected
-    for c in (view.favorites, view.viewer.letter_switch, view.viewer.focus_switch, *view.status_choices.values()):
+    for c in (view.favorites, *view.status_choices.values()):
         assert c.height is None and c.width is None
         assert c.label_style.color == expected
+    for c in (view.viewer.letter_switch, view.viewer.focus_switch):
+        assert c.height is None and c.width is None
+        assert c.label_text_style.color == expected

@@ -37,10 +37,11 @@ class AlgorithmCube(ft.Column):
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('3D'), ft.DropdownOption('2D')],
             on_select=lambda e: self._redraw())
-        self.letter_switch = ft.Checkbox(label='Letters', value=True, visual_density=ft.VisualDensity.COMPACT,
-            label_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
-        self.focus_switch = ft.Checkbox(label='Focus case', value=True, visual_density=ft.VisualDensity.COMPACT,
-            label_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
+        self.letter_switch = ft.Switch(label='Show letters', value=True,
+            label_text_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
+        self.focus_switch = ft.Switch(label='Highlight pieces', value=True,
+            label_text_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
+        self.display_switches = ft.Row([self.letter_switch, self.focus_switch], spacing=12, run_spacing=0, wrap=True)
         self.structure_switch = ft.Checkbox(label='Original commutator stages', value=False,
             visual_density=ft.VisualDensity.COMPACT, label_style=ft.TextStyle(size=11),
             tooltip='Study the original setup and A/B stages. Clean execution is the default.', on_change=self._change_structure)
@@ -62,11 +63,12 @@ class AlgorithmCube(ft.Column):
         self.view_options = ft.ExpansionTile(title=ft.Text('View options & stages', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             dense=True, min_tile_height=34, tile_padding=0, controls_padding=ft.Padding.only(bottom=4),
             maintain_state=True, expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
-            controls=[ft.Row([self.mode_picker, self.letter_switch, self.focus_switch,
+            controls=[ft.Row([self.mode_picker,
                     icon_button(ft.Icons.RESTART_ALT, 'Reset camera', self._reset_camera)], spacing=4, wrap=True),
                       ft.Row([self.structure_switch], tight=True), self.stage_text, self.stage_buttons])
         self.controls = [
             self.canvas,
+            self.display_switches,
             ft.Row([icon_button(ft.Icons.FIRST_PAGE, 'First move', lambda e: self.seek(0)),
                     icon_button(ft.Icons.CHEVRON_LEFT, 'Previous move', lambda e: self.seek(self.index - 1)),
                     self.play_button,
