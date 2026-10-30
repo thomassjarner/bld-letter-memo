@@ -22,7 +22,9 @@ def test_home_and_top_level_navigation_open_the_same_method_library_without_load
         button.on_click(None)
         view = page.root.controls[0].content
         assert view.mode == 'overview' and view.active and view._cases is None
-        assert {'Method Library', 'Choose where to begin.', 'Jump to a subset'} <= set(text_values(view))
+        labels = set(text_values(view))
+        assert {'Method Library', 'Choose a workspace.', '3-style corner cases', 'Algorithm Playground'} <= labels
+        assert not {'Browse UFR cases', 'Jump to a subset', 'Learn the basics'} & labels
         practice = click_nav(page, 'Practice')
         assert 'Learn · Case Library' not in text_values(practice)
         assert not view.active
@@ -30,7 +32,7 @@ def test_home_and_top_level_navigation_open_the_same_method_library_without_load
         assert repo.data.to_dict() == before
 
 
-@pytest.mark.parametrize('label,mode', [('Start the lesson', 'lesson'), ('Open Case Library', 'library'),
+@pytest.mark.parametrize('label,mode', [('Open corner cases', 'library'),
                                       ('Open Playground', 'explorer')])
 def test_overview_actions_open_the_correct_workspace_and_overview_is_always_accessible(label, mode):
     page, repo = mount()
@@ -45,18 +47,60 @@ def test_overview_actions_open_the_correct_workspace_and_overview_is_always_acce
     assert repo.data.to_dict() == before
 
 
-def test_subset_shortcuts_clear_conflicting_filters_and_select_a_case_in_that_subset():
+def test_subsets_are_selected_inside_the_case_library_and_the_lesson_remains_accessible():
     page, repo = mount()
     view = click_nav(page, 'Method Library')
     before = deepcopy(repo.data.to_dict())
+    actions = [c for c in walk(view.body) if isinstance(c, ft.TextButton)]
+    assert [c.content for c in actions] == ['Open corner cases', 'Open Playground']
+    actions[0].on_click(None)
     for subset, count in (('U/U', 54), ('U/D', 108), ('D/U', 108), ('D/D', 108)):
-        view.search.value, view.status_filter.value, view.favorites.value = 'no-match', 'learned', True
-        button = next(c for c in walk(view) if isinstance(c, ft.OutlinedButton) and c.content == f'{subset} · {count} cases')
-        button.on_click(None)
+        view.subset.value = subset
+        view.subset.on_select(SimpleNamespace(control=view.subset))
         assert view.mode == 'library' and view.subset.value == subset
-        assert len(view.filtered_cases()) == count and view.cases[view.selected_case].subset == subset
-        view._set_mode('overview')
+        assert len(view.filtered_cases()) == count
+    view.section_buttons['lesson'].on_click(None)
+    assert view.mode == 'lesson' and view.viewer.algorithm is not None
     assert repo.data.to_dict() == before
+
+
+def test_learning_status_checkmarks_are_exclusive_persist_and_keep_the_current_draft():
+    page, repo = mount()
+    view = click_nav(page, 'Method Library')
+    view._set_mode('library')
+    before = deepcopy(repo.data.to_dict())
+    key = view.selected_case
+    draft = view.case_converter.source + " R R'"
+    view.case_converter.final_alg.value = draft
+    for status in ('learning', 'learned', 'new'):
+        choice = view.status_choices[status]
+        choice.value = True
+        choice.on_change(SimpleNamespace(control=choice))
+        assert view.record().status == status
+        assert [s for s, c in view.status_choices.items() if c.value] == [status]
+        assert view.algorithm_field.value == draft
+        checked = view.status_choices[status]
+        checked.value = False
+        with patch.object(repo, 'save') as save:
+            checked.on_change(SimpleNamespace(control=checked))
+            save.assert_not_called()
+        assert checked.value and view.record().status == status
+        view.refresh()
+        assert [s for s, c in view.status_choices.items() if c.value] == [status]
+    view.select_case('UBL:LUF')
+    assert view.status_choices['new'].value
+    choice = view.status_choices['learned']
+    choice.value = True
+    choice.on_change(SimpleNamespace(control=choice))
+    view.select_case(key)
+    assert view.status_choices['new'].value
+    view.select_case('UBL:LUF')
+    assert view.status_choices['learned'].value
+    view.status_filter.value = 'learned'
+    view.status_filter.on_select(SimpleNamespace(control=view.status_filter))
+    assert [c.id for c in view.filtered_cases()] == ['UBL:LUF']
+    for name, value in before.items():
+        if name != 'corner_case_library': assert repo.data.to_dict()[name] == value
 
 
 @pytest.mark.parametrize('width,height', [(1400, 760), (1000, 430), (600, 400), (366, 570), (280, 380)])

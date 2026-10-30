@@ -148,9 +148,9 @@ def test_random_matching_case_opens_the_normal_editor_with_visible_moves_and_no_
     view._random_case()
     assert view.cases[view.selected_case].subset == 'U/D'
     assert view.viewer.index == 0 and not view.hidden and view.viewer.move_text.visible
-    assert view.editor_open and view.editor_tile.expanded and view.editor_tile.visible
+    assert view.algorithm_editor.visible
     assert view.algorithm_field.visible and view.name_field.value
-    assert any(isinstance(c, ft.FilledButton) and c.content == 'Save & use my alg' for c in walk(view.editor_tile))
+    assert any(isinstance(c, ft.FilledButton) and c.content == 'Save & use my alg' for c in walk(view.algorithm_editor))
     assert repo.data.to_dict() == before
 
 
@@ -162,16 +162,16 @@ def test_random_editor_scroll_and_focus_respect_navigation_cancellation():
     view.algorithm_field.focus = AsyncMock()
     with patch('flet.controls.base_control.BaseControl.page', property(lambda self: object())):
         asyncio.run(view._reveal_case_editor(view._navigation_token))
-        pane.scroll_to.assert_awaited_once_with(scroll_key=view.editor_tile.key, duration=0)
+        pane.scroll_to.assert_awaited_once_with(scroll_key=view.algorithm_editor.key, duration=0)
         view.algorithm_field.focus.assert_awaited_once()
         asyncio.run(view._reveal_case_editor(view._navigation_token - 1))
         assert pane.scroll_to.await_count == 1 and view.algorithm_field.focus.await_count == 1
 
 
-def test_regular_browse_still_starts_with_the_cube_and_a_collapsed_editor():
+def test_regular_browse_still_starts_with_the_cube_and_an_open_editor():
     _, _, _, view = open_library()
     view._random_case()
     view.select_case('UBL:LUF')
-    assert not view.editor_open and not view.editor_tile.expanded
+    assert view.algorithm_editor.visible and not isinstance(view.algorithm_editor, ft.ExpansionTile)
     assert view.viewer.controls[0] is view.viewer.canvas
     assert view.case_canvas_top + view.viewer.canvas.height <= view.body.height

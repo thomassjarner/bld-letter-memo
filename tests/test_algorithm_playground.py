@@ -228,7 +228,7 @@ def test_matching_case_is_an_optional_explicit_route_and_navigation_restores_eac
     assert view._identified == 'BUR:BUL' and not view.open_case_button.disabled
     before = deepcopy(repo.data.to_dict())
     view._open_identified()
-    assert view.mode == 'library' and view.editor_tile.expanded and view.case_converter.source == source
+    assert view.mode == 'library' and view.algorithm_editor.visible and view.case_converter.source == source
     assert repo.data.to_dict() == before
     view._set_mode('explorer')
     assert view.playground_converter.source == source and view.viewer.algorithm.source == source

@@ -2,7 +2,6 @@
 import asyncio
 from copy import deepcopy
 import random
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import flet as ft
@@ -78,22 +77,23 @@ def test_original_commutator_stages_remain_available_and_switching_cancels_playb
 
 
 @pytest.mark.parametrize('width,height', [(1800, 960), (1400, 760), (1080, 620), (1000, 430), (900, 650), (366, 570), (280, 380)])
-def test_new_cases_show_the_full_cube_before_editing_and_keep_it_in_the_initial_view(width, height):
+def test_new_cases_keep_the_cube_in_view_and_the_editor_visible_without_expanding(width, height):
     _, repo, _, view = open_library()
     before = deepcopy(repo.data.to_dict())
     view.set_viewport(width, height)
-    view.editor_open = view.notes_open = True
+    view.notes_open = True
     if view.mobile_browser is not None: view.mobile_browser.expanded = True
     view.viewer.seek(len(view.viewer.states) - 1)
     view.select_case('UBL:FDR')
     assert view.viewer.index == 0
-    assert not view.editor_tile.expanded and not view.notes_tile.expanded
+    assert view.algorithm_editor.visible and not isinstance(view.algorithm_editor, ft.ExpansionTile)
+    assert not view.notes_tile.expanded
     assert view.mobile_browser is None or not view.mobile_browser.expanded
     assert view.viewer.controls[0] is view.viewer.canvas
     assert view.detail_controls[:2] == [view.case_toolbar, view.viewer]
     assert view.case_canvas_top + view.viewer.canvas.height <= view.body.height
     assert view.header.height + view.spacing + view.body.height <= height
-    assert view.editor_tile.controls[0].controls[0] is view.case_converter
+    assert view.case_converter in view.algorithm_editor.controls
     assert view.case_converter.final_alg is view.algorithm_field
     assert not view.error.visible and not view.notice.visible
     assert view.favorites.height is None and view.favorites.width is None
@@ -106,14 +106,13 @@ def test_wide_layout_keeps_editing_in_a_separate_scroll_pane_and_preserves_draft
     assert view.split_tools and len(view.detail_scrolls) == 2
     cube_pane, tools_pane = view.detail_scrolls
     assert cube_pane.controls == [view.viewer]
-    assert view.editor_tile in tools_pane.controls
-    assert not any(c is view.editor_tile for c in walk(cube_pane))
+    assert view.algorithm_editor in tools_pane.controls
+    assert not any(c is view.algorithm_editor for c in walk(cube_pane))
     canvas_height = view.viewer.canvas.height
     draft = view.algorithm_field.value + " R R'"
     view.algorithm_field.value = draft
-    view.editor_tile.on_change(SimpleNamespace(data=True))
     view._set_record(view.selected_case, favorite=True)
-    assert view.editor_tile.expanded and view.algorithm_field.value == draft
+    assert view.algorithm_editor.visible and view.algorithm_field.value == draft
     assert view.viewer.canvas.height == canvas_height
 
 
@@ -130,13 +129,13 @@ def test_case_scroll_reset_goes_to_top_and_ignores_stale_navigation():
 
 
 @pytest.mark.parametrize('dark', [False, True])
-def test_compact_fields_and_collapsed_editing_keep_readable_theme_colors(dark):
+def test_compact_fields_and_always_open_editing_keep_readable_theme_colors(dark):
     _, repo, _, view = open_library()
     repo.data.dark_mode = dark
     view.refresh()
     expected = '#F0F4F3' if dark else '#182B25'
     for c in walk(view):
         if isinstance(c, (ft.TextField, ft.Dropdown)): assert c.color == expected
-    for c in (view.favorites, view.viewer.letter_switch, view.viewer.focus_switch):
+    for c in (view.favorites, view.viewer.letter_switch, view.viewer.focus_switch, *view.status_choices.values()):
         assert c.height is None and c.width is None
         assert c.label_style.color == expected

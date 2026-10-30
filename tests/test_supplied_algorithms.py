@@ -106,7 +106,9 @@ def test_second_target_filter_is_optional_independent_and_combines_with_first_ta
     view._filter_changed()
     assert not view.filtered_cases()
     assert 'No cases match these filters.' in text_values(view)
-    view._open_subset('D/D')
+    view.first_target.value = view.second_target.value = 'all'
+    view.subset.value = 'D/D'
+    view.subset.on_select(SimpleNamespace(control=view.subset))
     assert view.first_target.value == view.second_target.value == 'all'
     assert len(view.filtered_cases()) == 108
     assert repo.data.to_dict() == before

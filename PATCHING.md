@@ -1,52 +1,43 @@
-# Update to 2.32.0
+# Update to 2.33.0
 
-Copy the contents of `bld-letter-memo-web-2.32.0/` into your existing project,
-replacing matching files and including all new files/folders. Include the new
-`core/algorithm_analysis.py` and `ui/components/algorithm_converter.py` files.
-Copy the contents directly into `~/Desktop/letterpairscheme-helper-web/`,
-rather than placing the release folder inside it. Patching and GitHub Pages
-deployment are unchanged.
+Copy all contents of `bld-letter-memo-web-2.33.0/` directly into your existing
+`~/Desktop/letterpairscheme-helper-web/` project, replacing matching files.
+Do not put the release folder itself inside the project. Patching and GitHub
+Pages deployment are unchanged.
 
 Run in Terminal:
 
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Add linked alg converter and general playground"
+git commit -m "Simplify Method Library navigation and case editing"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, reload, and confirm **2.32.0** in the header or tab title.
-Command+Shift+R can refresh the build on macOS. No new package installation,
+Wait for GitHub Actions, reload, and confirm **2.33.0** in the header or tab title.
+Command+Shift+R can refresh the build on macOS. No package installation,
 manual migration, import or storage reset is required.
 
 ## What changed
 
-- **Commutator** and **Final alg** are two editable linked fields in the case
-  editor and Playground. Editing one updates the other automatically, without
-  Find/Use steps. Comm input expands to clean moves; final moves search for a
-  verified commutator. If no short form is found, final moves still work.
-- **Method Library → Playground** accepts any supported algorithm independently
-  of a case. It shows piece cycles, affected corners/edges, in-place twists/
-  flips, detailed sticker mappings and cube reorientation, with 3D/2D playback.
-- Save general algorithms with names and notes in the Playground collection.
-  Reopen, update, copy or delete them. Matching UFR case routing is optional;
-  saving a general alg does not modify the case library.
-- Existing saved source text is preserved until explicitly saved. Case editing,
-  random-to-editor behavior and normal cube-first browsing are retained.
+- **Edit / replace alg** is always open, with no dropdown arrow or extra click.
+  The cube remains first, with independent editing scroll space on wide screens.
+- **Learning status** is three small checkboxes: New, Learning and Learned.
+  Exactly one is selected at a time; the existing saved status is preserved.
+- **Browse UFR cases** is now **3-style corner cases**, also used in the section
+  tab. The Method Library overview has two clear routes: corner cases and
+  Algorithm Playground. Subset selection remains inside the case library.
+- Removed the overview's **Jump to a subset** section and **Learn the basics**
+  card. The existing lesson remains available from the Commutator Lesson tab.
 
-Data version 17 automatically adds the Playground collection. Saved entries
-are included in browser persistence/recovery and export/import. Import retains
-its replace-all behavior and names the new collection in Settings. Existing
-case algorithms/preferences, schemes, pairs/ratings/aliases, tracing, cycle
-breaks, timer sessions/history and practice data remain intact. Storage keys,
-dependencies, supplied algorithm IDs, playback and deployment are unchanged.
+Data version remains 17. Existing user data, supplied algorithm choices and
+IDs, BLD logic, converter, animation, Timer and practice behavior are unchanged.
 
 ## Validation
 
-338 automated tests pass. The Flet web Python runtime also verified linked
-conversion, async cancellation, effect analysis, arbitrary-algorithm saves,
-notes, migration/backups, optional case routing, themes and navigation at four
-viewport sizes. Live browser client rendering remains unverified here; no
-live deployment was performed.
+338 automated tests pass. The Flet web Python runtime checked navigation,
+exclusive persistent status checkmarks, always-open editing, cube bounds,
+linked conversion, Playground saves, backups and themes at four screen sizes.
+Live browser client rendering remains unverified here; no deployment was
+performed.

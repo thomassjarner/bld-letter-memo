@@ -271,7 +271,7 @@ def test_random_matching_case_supports_a_single_case_filter_and_reports_empty_fi
     assert len(view.filtered_cases()) == 1
     view.viewer.seek(len(view.viewer.states) - 1)
     view._random_case()
-    assert view.viewer.index == 0 and not view.hidden and view.editor_open and view.editor_tile.expanded
+    assert view.viewer.index == 0 and not view.hidden and view.algorithm_editor.visible
     view.search.value = 'no-such-sticker'
     view._filter_changed()
     view._random_case()

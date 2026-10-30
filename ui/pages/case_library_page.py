@@ -10,7 +10,7 @@ from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, 
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
 from ui.components.algorithm_converter import AlgorithmConverter
-from ui.design import activity_card, eyebrow, panel
+from ui.design import activity_card, panel
 from ui.theme_colors import ThemeAwarePage, apply_palette
 
 
@@ -49,7 +49,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._identified = None
         self.browser_title = None
         self.mobile_browser = None
-        self.editor_open = self.notes_open = False
+        self.notes_open = False
         self._navigation_token = 0
         self.detail_scrolls = []
         self.viewer = AlgorithmCube()
@@ -65,7 +65,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.second_target = dropdown(label='Second target (optional)', value='all', height=38, dense=True,
             options=[ft.DropdownOption('all', 'Any second target')] + [ft.DropdownOption(s) for s in TARGETS],
             on_select=lambda e: self._filter_changed())
-        self.status_filter = dropdown(label='Learning status', value='all', height=38, dense=True,
+        self.status_filter = dropdown(label='Filter by status', value='all', height=38, dense=True,
             options=[ft.DropdownOption('all', 'Any status')] +
                     [ft.DropdownOption(s, s.title()) for s in ('new', 'learning', 'learned')],
             on_select=lambda e: self._filter_changed())
@@ -125,7 +125,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.header_top = ft.Container()
         self.section_buttons = {
             key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
-            for key, label in (('overview', 'Overview'), ('library', 'Case Library'),
+            for key, label in (('overview', 'Overview'), ('library', '3-style corner cases'),
                                ('explorer', 'Playground'), ('lesson', 'Commutator Lesson'))
         }
         self.section_nav = ft.Row(list(self.section_buttons.values()), spacing=2, height=36,
@@ -135,57 +135,35 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _render_overview(self):
         cards = [
-            activity_card('Learn the basics',
-                'Start with a short commutator lesson. Watch A, B, undo A and undo B move the corners.',
-                ft.Icons.SCHOOL_OUTLINED, 'Start the lesson', lambda e: self._set_mode('lesson'), 'START HERE'),
-            activity_card('Browse UFR cases',
-                'Find a case by subset, target letters or learning status. Save alternatives, notes and favorites.',
-                ft.Icons.GRID_VIEW, 'Open Case Library', lambda e: self._set_mode('library'), '378 CASES'),
+            activity_card('3-style corner cases',
+                'Find an algorithm for two target stickers, edit it and track your progress. '
+                '378 cases with UFR as the buffer; subsets and filters are inside.',
+                ft.Icons.GRID_VIEW, 'Open corner cases', lambda e: self._set_mode('library'), 'CASE LIBRARY'),
             activity_card('Algorithm Playground',
-                'Link commutators and final moves, inspect any cube effect, and save algorithms in your own collection.',
-                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'TRY AN ALG'),
+                'Paste moves or a commutator, see what happens to the cube and save your alg. '
+                'No case or buffer required.',
+                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'FREE EXPLORATION'),
         ]
         for card in cards:
-            card.col = {'xs': 12, 'md': 4}
+            card.col = {'xs': 12, 'md': 6}
         records = list(self.state.data.corner_case_library.values())
         self.overview_controls = [
             ft.Column([
-                eyebrow('Learn / explore / collect'),
-                ft.Text('Choose where to begin.', size=23, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text('Learn how commutators work, then build your own case collection. '
-                        'This library uses UFR as its corner buffer and your selected scheme for letter labels.',
+                ft.Text('Choose a workspace.', size=23, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text('Study a corner case, or test an algorithm of your own. '
+                        'Your selected letter scheme supplies the sticker labels.',
                         size=13, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Text(QUALITY_NOTICE, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=6),
             ft.ResponsiveRow(cards, spacing=12, run_spacing=12),
-            panel(ft.Column([
-                ft.Text('Jump to a subset', size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text('The two layers describe the first and second target pieces, in memo order.',
-                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.ResponsiveRow([
-                    ft.OutlinedButton(f'{subset} · {54 if subset == "U/U" else 108} cases',
-                        col={'xs': 6, 'md': 3}, on_click=lambda e, s=subset: self._open_subset(s))
-                    for subset in SUBSETS
-                ], spacing=8, run_spacing=8),
-            ], spacing=10), padding=16),
             ft.Row([
                 ft.Text(f'{sum(r.status == "learned" for r in records)} / 378 learned', size=12, color=ft.Colors.PRIMARY),
                 ft.Text(f'{sum(r.status == "learning" for r in records)} learning', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Text(f'{sum(r.favorite for r in records)} favorites', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Text(f'{sum(len(r.algorithms) for r in records)} saved algorithms', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=20, wrap=True),
+            ft.Text(QUALITY_NOTICE, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
         self._layout()
-
-    def _open_subset(self, subset):
-        self.search.value = ''
-        self.subset.value = subset
-        self.first_target.value = self.second_target.value = self.status_filter.value = 'all'
-        self.favorites.value = False
-        self.limit = 50
-        self.mode = 'library'
-        self._loaded_key = None
-        self.select_case(next(c.id for c in self.cases.values() if c.subset == subset))
 
     def _page(self):
         try: return self.page
@@ -267,7 +245,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.selected_case = key
         self.selected_algorithm = self.record().preferred_algorithm
         self.hidden = False
-        self.editor_open, self.notes_open = bool(edit), False
+        self.notes_open = False
         self.case_converter.cancel_pending()
         self._navigation_token += 1
         if self.mobile_browser is not None:
@@ -296,7 +274,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         try:
             scroll = self.detail_scrolls[-1]
             if scroll.page is not None:
-                await scroll.scroll_to(scroll_key=self.editor_tile.key, duration=0)
+                await scroll.scroll_to(scroll_key=self.algorithm_editor.key, duration=0)
                 if token == self._navigation_token:
                     await self.algorithm_field.focus()
         except RuntimeError:
@@ -370,9 +348,16 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.notes_field = field(label='Case notes · saves on leaving this field', value=record.notes,
             multiline=True, min_lines=2, max_lines=4,
             on_blur=lambda e, key=case.id: self._save_notes(key, e.control.value or ''))
-        status = dropdown(label='Learning status', value=record.status, height=38, dense=True,
-            options=[ft.DropdownOption(s, s.title()) for s in ('new', 'learning', 'learned')],
-            on_select=lambda e, key=case.id: self._set_record(key, status=e.control.value))
+        self.status_choices = {
+            status: ft.Checkbox(label=status.title(), value=record.status == status,
+                visual_density=ft.VisualDensity.COMPACT, label_style=ft.TextStyle(size=12),
+                on_change=lambda e, key=case.id, s=status: self._choose_learning_status(key, s, e))
+            for status in ('new', 'learning', 'learned')
+        }
+        self.learning_status = ft.Column([
+            ft.Text('Learning status', size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Row(list(self.status_choices.values()), spacing=8, run_spacing=0, wrap=True),
+        ], spacing=0, tight=True)
         missing = '?' in case_letters(case, self.scheme)
         selected_builtin = next((a for a in builtins if a.id == self.selected_algorithm), recommended)
         provenance = 'Your saved algorithm' if personal else (
@@ -395,16 +380,12 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             small_icon(ft.Icons.VISIBILITY if self.hidden else ft.Icons.VISIBILITY_OFF,
                        'Reveal algorithm' if self.hidden else 'Hide algorithm', self._hide),
         ], spacing=2, height=42)
-        self.editor_tile = ft.ExpansionTile(
+        self.algorithm_editor = ft.Column(
             key=ft.ScrollKey('case-algorithm-editor'),
-            title=ft.Text('Edit / replace alg', size=13, color=ft.Colors.ON_SURFACE),
-            leading=ft.Icon(ft.Icons.EDIT_OUTLINED, size=17, color=ft.Colors.PRIMARY),
-            expanded=self.editor_open, visible=not self.hidden, maintain_state=True,
-            dense=True, min_tile_height=38, tile_padding=0,
-            controls_padding=ft.Padding.only(top=6, bottom=8),
-            expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
-            on_change=lambda e: self._remember_tile('editor_open', e),
-            controls=[ft.Column([
+            visible=not self.hidden, spacing=8, tight=True,
+            controls=[
+                ft.Row([ft.Icon(ft.Icons.EDIT_OUTLINED, size=17, color=ft.Colors.PRIMARY),
+                        ft.Text('Edit / replace alg', size=13, color=ft.Colors.ON_SURFACE)], spacing=6),
                 self.case_converter, self.name_field,
                 ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
                                        on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
@@ -414,7 +395,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                         small_icon(ft.Icons.DELETE_OUTLINE, 'Delete selected personal alternative', self._delete_algorithm,
                                    disabled=not bool(personal))],
                        wrap=True, spacing=4),
-            ], spacing=8, tight=True)])
+            ])
         self.notes_tile = ft.ExpansionTile(title=ft.Text('Case notes', size=13, color=ft.Colors.ON_SURFACE),
             expanded=self.notes_open, maintain_state=True, dense=True, min_tile_height=38, tile_padding=0,
             controls_padding=ft.Padding.only(top=6, bottom=8),
@@ -424,7 +405,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self.variant_picker,
             ft.Text(provenance, size=11, color=ft.Colors.PRIMARY, max_lines=2, tooltip=provenance),
             ft.TextButton('Use selected alg', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm)),
-            self.editor_tile, status, self.notes_tile,
+            self.learning_status, self.algorithm_editor, self.notes_tile,
             ft.Text(QUALITY_NOTICE, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
             self.error, self.notice,
         ]
@@ -483,6 +464,15 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _save_notes(self, key, value):
         self.state.update_corner_case(key, notes=value)
+
+    def _choose_learning_status(self, key, status, e):
+        if e.control.value:
+            self._set_record(key, status=status)
+        else:
+            # One status always remains selected; clicking its checkmark again
+            # leaves it selected without writing a different or empty status.
+            e.control.value = self.record(key).status == status
+            self._update()
 
     def _set_record(self, key, **values):
         try:
@@ -790,8 +780,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.second_target,
             self.filter_more, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
         if wide and inner_width >= 760:
-            # The cube and alg tools scroll independently. Opening the editor
-            # cannot push the cube below the first view.
+            # The cube and the always-visible alg editor scroll independently.
             tools_width = min(320, max(280, inner_width * .32))
             viewer_width = inner_width - tools_width - gap
             content_height = max(80, available - padding * 2 - self.case_toolbar.height - 8)

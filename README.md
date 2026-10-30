@@ -1,3 +1,54 @@
+# BLD Letter Memo Web 2.33.0
+
+## Simpler Method Library navigation
+
+The Method Library overview now has two destinations:
+
+- **3-style corner cases**: find an algorithm for two targets, edit it and
+  track progress. The library still uses UFR as its buffer. Subset, target,
+  search, favorite and status filters are inside this workspace.
+- **Algorithm Playground**: paste any supported algorithm or commutator,
+  inspect its cube effect and save it independently of a case.
+
+The duplicate **Jump to a subset** section and **Learn the basics** card have
+been removed. The existing Commutator Lesson remains available from its tab.
+The site Home page also describes the two Method Library workspaces clearly.
+Opening the overview does not load the case catalog or modify saved data.
+
+## Open editor and status checkmarks
+
+**Edit / replace alg** is now a permanent open section, with no expansion
+arrow or extra click. Both linked fields, name and save actions are directly
+available. On wide screens, the editor and cube retain separate scroll panes;
+on narrow screens, the cube stays first and the editor follows in the same
+scrollable view. Random matching case still focuses the algorithm field.
+The separate Hide algorithm action remains available for recall practice.
+
+Learning status is now three compact checkboxes: **New**, **Learning** and
+**Learned**. Choosing one unchecks the others. One status always remains
+selected, and changes save immediately using the existing per-case status.
+Status filters, progress counts, imports and exports retain their behavior.
+The status filter is labeled **Filter by status** to distinguish it from the
+case's current status.
+
+Data version remains 17. Existing schemes, pairs, ratings, aliases, case
+algorithms, preferences, notes, favorites, Playground saves, tracing, cycle
+breaks, timers, histories and practice data are preserved. The algorithm
+catalog, converter, cube playback, storage keys and dependencies are unchanged.
+
+**338 automated tests pass.** Checks cover exclusive status selection and
+saving, draft preservation, filters, random-case focus, navigation and the
+cube staying in view. The Flet web Python runtime also checked the two-route
+landing page, status persistence, linked conversion, Playground saves/notes,
+backups and themes at four screen sizes. Live browser client rendering remains
+unverified here; no live deployment was performed.
+
+No package installation or manual migration is required. Patching is unchanged:
+copy all release contents into the existing project, then commit and push.
+See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.32.0
 
 ## Two linked fields
