@@ -3,7 +3,7 @@ import json
 
 import flet as ft
 
-from core.corner_walkthrough import build_corner_plan, edge_parity_pair, target_letter, walkthrough_initial
+from core.corner_walkthrough import build_corner_plan, target_letter, walkthrough_initial
 from core.corner_cases import subset_for
 from core.walkthrough_details import move_statistics, step_commutator
 from data.models import LetterScheme
@@ -51,14 +51,19 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
             options=[ft.DropdownOption('hidden', 'Hide edge colors'),
                      ft.DropdownOption('solved', 'Show solved edges'),
                      ft.DropdownOption('scrambled', 'Show scrambled edges')], on_select=self._edge_changed,
-            tooltip='Solved edges include the configured buffer/helper swap when corner parity is odd. Edges move naturally during each alg.')
+            tooltip='Solved-edge preview uses UF and your chosen parity helper. Edges move naturally during each alg.')
         self.memo_text = ft.Text('Uses your selected scheme, corner buffer and saved cycle-break preferences.',
                                  size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.status = ft.Text('', size=12, color=ft.Colors.ON_SURFACE)
-        self.parity_text = ft.Text('', size=12, color=ft.Colors.TERTIARY, visible=False)
-        self.twist_text = ft.Text('', size=11, color=ft.Colors.TERTIARY, visible=False)
-        self.edge_note = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT, visible=False)
-        self.summary = ft.Column([self.memo_text, self.status, self.parity_text, self.twist_text, self.edge_note], spacing=3, tight=True)
+        self.twist_text = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT, visible=False)
+        self.detail_notes = ft.Column(spacing=6, tight=True)
+        self.summary = ft.Column([self.memo_text, self.status, self.twist_text, self.detail_notes], spacing=6, tight=True)
+        self.details = ft.ExpansionTile(title=ft.Text('Walkthrough details', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            expanded=False, maintain_state=True, dense=True, min_tile_height=34, tile_padding=0,
+            controls_padding=ft.Padding.only(top=4, bottom=6),
+            expanded_cross_axis_alignment=ft.CrossAxisAlignment.START, controls=[self.summary],
+            on_change=self._details_changed)
+        self.feedback = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.actions = ft.Row([self.play_all_button, self.previous_button, self.next_button,
                                self.restart_button, self.edge_view], spacing=6, run_spacing=6, wrap=True)
         self.input_area = ft.Container()
@@ -90,9 +95,9 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
         self.memo_text.tooltip = self.memo_text.value
         self.play_all_button.disabled = self.previous_button.disabled = self.next_button.disabled = self.restart_button.disabled = True
         self.status.value, self.status.color = message, ft.Colors.ERROR if error else ft.Colors.ON_SURFACE_VARIANT
-        self.parity_text.visible = False
-        self.twist_text.visible = self.edge_note.visible = False
-        self.step_controls = [ft.Text('Corner algorithms will appear here.', size=13, color=ft.Colors.ON_SURFACE_VARIANT)]
+        self.feedback.value, self.feedback.color = self.status.value, self.status.color
+        self.twist_text.visible = False
+        self.step_controls = [self.feedback]
         if hasattr(self, 'input_area'): self.set_viewport(*self._viewport)
         if update: self._update()
 
@@ -118,17 +123,10 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
         self.memo_text.tooltip = self.memo_text.value
         moves, _, rotations = move_statistics(plan.algorithm.moves)
         total = f'{moves} moves' + (f' + {rotations} cube rotations' if rotations else '')
-        self.status.value = (f'{len(plan.steps)} algorithms · {total} · buffer {plan.buffer} · '
-                             + ('pairs solved; parity remains' if plan.parity_target else
-                                'permutation solved; twists remain' if plan.remaining_twists else 'corners solved at the end'))
+        self.status.value = f'{len(plan.steps)} algorithms · {total} · buffer {plan.buffer}'
         self.status.color = ft.Colors.ON_SURFACE
-        self.parity_text.visible = plan.parity_target is not None
-        if plan.parity_target:
-            letter = scheme.corners.stickers.get(plan.parity_target, '')
-            target = f'{letter} ({plan.parity_target})' if letter and letter != 'BUFFER' else plan.parity_target
-            self.parity_text.value = f'Parity required · unmatched final target {target} remains for your separate parity algorithm.'
         self.twist_text.visible = bool(plan.remaining_twists)
-        self.twist_text.value = 'Twists left untouched · ' + ', '.join(plan.remaining_twists)
+        self.twist_text.value = 'Corner twists · ' + ', '.join(plan.remaining_twists)
         self.play_all_button.disabled = self.previous_button.disabled = self.next_button.disabled = self.restart_button.disabled = not bool(plan.algorithm.moves)
         self._build_step_controls()
         self._load_viewer()
@@ -177,14 +175,16 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
                     on_click=lambda e, selected=part: self._open_step_case(selected)),
             ], spacing=5, tight=True), padding=10))
         if not self.plan.steps:
-            controls.append(ft.Text('No paired corner algorithms are needed.' if self.plan.parity_target else
-                                    'Only corner twists remain; no twist algorithms are added.' if self.plan.remaining_twists else 'Corners are already solved.',
+            controls.append(ft.Text('No paired corner algorithms for this scramble.',
                                     size=14, color=ft.Colors.PRIMARY))
+        notes = []
         if self.plan.trace.corner_cycle_breaks:
             choices = ', '.join(info.chosen_sticker for info in self.plan.trace.corner_cycle_breaks)
-            controls.append(ft.Text('Cycle breaks · ' + choices, size=11, color=ft.Colors.ON_SURFACE_VARIANT))
-        controls.append(ft.Text('Uses your saved preferred algorithms. Built-in recommendations may not be optimal.',
+            notes.append(ft.Text('Cycle breaks · ' + choices, size=11, color=ft.Colors.ON_SURFACE_VARIANT))
+        notes.append(ft.Text('Uses your saved preferred algorithms. Built-in recommendations may not be optimal.',
                                 size=11, color=ft.Colors.ON_SURFACE_VARIANT))
+        self.detail_notes.controls = notes
+        controls.append(self.details)
         self.step_controls = controls
 
     def _load_viewer(self, index=0, boundary=None):
@@ -192,10 +192,6 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
         initial = walkthrough_initial(plan, self.edge_view.value)
         self.viewer.edge_colors = self.edge_view.value != 'hidden'
         scheme = LetterScheme.from_dict(plan.scheme_name, plan.scheme_snapshot)
-        pair = edge_parity_pair(scheme)
-        self.edge_note.visible = self.edge_view.value == 'solved' and plan.parity_target is not None
-        self.edge_note.value = ('Edge display · ' + ' ↔ '.join(pair) + ' swapped for parity' if pair else
-            'Set an edge buffer and a different parity helper in Letter Schemes to show the parity edge swap.')
         targets = {stage.label: (step.first, step.second)
                    for stage, step in zip(plan.algorithm.stages, plan.steps)}
         self.viewer.visible = True
@@ -207,6 +203,9 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
         self.viewer._boundary_stage = boundary
         self.viewer.play_button.disabled = not bool(plan.algorithm.moves)
         self.viewer._redraw(update=False)
+
+    def _details_changed(self, e):
+        self.details.expanded = e.data is True or str(e.data).lower() == 'true'
 
     def _open_step_case(self, part):
         self.viewer.stop(update=False)
@@ -264,33 +263,29 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
     def set_viewport(self, width, height):
         width, height = max(240, width), max(60, height)
         self._viewport = self.width, self.height = width, height
-        wide = width >= 980 and height >= 560
+        wide = width >= 980 and height >= 360
         self.scramble.expand = wide
         self.input_area.content = (ft.Row([self.scramble, self.generate_button], spacing=10)
                                    if wide else ft.Column([self.scramble, self.generate_button], spacing=8, tight=True))
         self.input_area.height = 62 if wide else None
-        rows = 2 + sum(bool(c.visible) for c in (self.parity_text, self.twist_text, self.edge_note))
-        self.summary.height = rows * 20 + 4 if wide else None
-        self.memo_text.max_lines = 1 if wide else 3
-        self.memo_text.overflow = ft.TextOverflow.ELLIPSIS
         self.edge_view.width = min(220, width - 24)
         if wide:
-            available = max(100, height - self.input_area.height - self.summary.height - 42 - 24)
+            available = height - self.input_area.height - 42 - self.spacing * 2
             left_width = round((width - 10) * .54)
             right_width = width - left_width - 10
-            self.viewer.set_viewport(left_width - 24, min(320, max(140, available - 230)))
+            self.viewer.set_viewport(left_width - 24, min(360, max(140, round(available * .62))))
             cube_scroll = ft.ListView([self.viewer], spacing=4, height=available - 24, scroll=ft.ScrollMode.AUTO,
                                       build_controls_on_demand=False)
             steps_scroll = ft.ListView(self.step_controls, spacing=8, height=available - 24,
                                        scroll=ft.ScrollMode.AUTO, build_controls_on_demand=False)
             self.actions.height = 42
-            self.controls = [self.input_area, self.summary, self.actions, ft.Row([
+            self.controls = [self.input_area, self.actions, ft.Row([
                 panel(cube_scroll, width=left_width, height=available, padding=12),
                 panel(steps_scroll, width=right_width, height=available, padding=12),
             ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START)]
         else:
             self.actions.height = None
-            self.viewer.set_viewport(width - 24, min(280, max(140, height * .35)))
-            self.controls = [ft.ListView([self.input_area, self.summary, self.actions, self.viewer,
+            self.viewer.set_viewport(width - 24, min(320, max(160, height * .5)))
+            self.controls = [ft.ListView([self.input_area, self.actions, self.viewer,
                 ft.Column(self.step_controls, spacing=8, tight=True)], height=height,
                 spacing=10, scroll=ft.ScrollMode.AUTO, build_controls_on_demand=False)]

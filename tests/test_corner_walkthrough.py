@@ -184,7 +184,7 @@ def test_walkthrough_layout_edge_views_and_full_stage_playback_are_bounded_and_r
         w.edge_view.value = mode
         w._edge_changed()
         assert w.viewer.index == last
-        expected_edges = (_memo_swap_edge_identities(SOLVED, 'DF', 'UR') if w.plan.parity_target else SOLVED) if mode == 'solved' else w.plan.initial
+        expected_edges = (_memo_swap_edge_identities(SOLVED, 'UF', 'UR') if w.plan.parity_target else SOLVED) if mode == 'solved' else w.plan.initial
         assert all(_at(w.viewer.states[last], s) == _at(expected_edges, s) for s in EDGE_STICKER_ORDER)
         assert w.viewer.edge_colors == (mode != 'hidden')
     w._select_step(0)

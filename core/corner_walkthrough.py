@@ -213,13 +213,11 @@ def build_corner_plan(scramble, scheme, records=None, corner_cycle_break_overrid
 
 
 def edge_parity_pair(scheme):
-    """The configured physical edges, independent of their buffer sticker face."""
-    buffer = scheme.edges.buffer_sticker or scheme.edges.buffer_piece
-    piece = find_piece_for_sticker(buffer, EDGE_PIECES) if buffer else None
-    helper = scheme.edge_parity_partner or 'UR'
-    if piece in EDGE_PIECES and helper in EDGE_PIECES and piece != helper:
-        return piece, helper
-    return None
+    """Display parity at UF; the tracing buffer is deliberately independent."""
+    helper = find_piece_for_sticker(scheme.edge_parity_partner or 'UR', EDGE_PIECES)
+    # UF cannot be swapped with itself. Keep a legal preview even when the
+    # chosen tracing helper is UF or an older import contains an invalid value.
+    return 'UF', helper if helper and helper != 'UF' else 'UR'
 
 
 def walkthrough_initial(plan, edge_view='scrambled'):

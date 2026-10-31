@@ -128,10 +128,10 @@ def test_switching_edge_modes_retains_the_completed_stage_and_stale_tasks_cannot
 
 
 @pytest.mark.parametrize('edge_buffer', EDGE_STICKER_ORDER)
-def test_solved_edge_display_swaps_the_configured_physical_buffer_and_helper_only_for_odd_corner_parity(edge_buffer):
+def test_solved_edge_display_always_swaps_uf_with_the_helper_regardless_of_edge_buffer(edge_buffer):
     scheme = scheme_for()
     piece = next(p for p, stickers in EDGE_PIECES.items() if edge_buffer in stickers)
-    helper = 'UR' if piece != 'UR' else 'DF'
+    helper = 'UR'
     scheme.edges.buffer_piece, scheme.edges.buffer_sticker = piece, edge_buffer
     scheme.edge_parity_partner = helper
     snapshot = deepcopy(scheme.to_dict())
@@ -139,7 +139,7 @@ def test_solved_edge_display_swaps_the_configured_physical_buffer_and_helper_onl
         plan = build_corner_plan(source, scheme)
         initial = deepcopy(plan.initial)
         display = walkthrough_initial(plan, 'solved')
-        expected = {piece: helper, piece[::-1]: helper[::-1], helper: piece, helper[::-1]: piece[::-1]}
+        expected = {'UF': helper, 'FU': helper[::-1], helper: 'UF', helper[::-1]: 'FU'}
         for sticker in EDGE_STICKER_ORDER:
             assert _at(display, sticker) == (expected.get(sticker, sticker) if odd else sticker)
         assert all(_at(display, s) == _at(initial, s) for s in CORNER_STICKER_ORDER + list('ULFRBD'))
@@ -147,17 +147,19 @@ def test_solved_edge_display_swaps_the_configured_physical_buffer_and_helper_onl
         assert plan.initial == initial and scheme.to_dict() == snapshot
 
 
-def test_missing_or_conflicting_edge_configuration_does_not_block_corner_only_training_and_explains_the_display():
+def test_preview_works_without_an_edge_buffer_and_a_uf_helper_uses_ur_without_changing_settings():
     repo, _, w = open_walkthrough(ODD)
     scheme = repo.data.schemes[w.scheme_name]
-    for edges, helper in ((CategoryScheme(), 'UR'), (scheme_for().edges, 'DF')):
+    for edges, helper in ((CategoryScheme(), 'UR'), (scheme_for().edges, 'UF')):
         scheme.edges, scheme.edge_parity_partner = edges, helper
+        before = deepcopy(scheme.to_dict())
         w.generate()
         assert w.plan and w.plan.parity_target
         w.edge_view.value = 'solved'
         w._edge_changed()
-        assert w.edge_note.visible and 'Set an edge buffer' in w.edge_note.value
-        assert all(_at(w.viewer.states[0], s) == s for s in EDGE_STICKER_ORDER)
+        assert _at(w.viewer.states[0], 'UF') == 'UR' and _at(w.viewer.states[0], 'UR') == 'UF'
+        assert _at(w.viewer.states[0], 'DF') == 'DF' and scheme.to_dict() == before
+        assert not any('parity' in str(t).lower() for t in text_values(w))
 
 
 @pytest.mark.parametrize('memo_mode', ['visual', 'trace'])
@@ -243,6 +245,8 @@ def test_names_and_twist_status_are_clear_and_the_pause_switch_is_always_availab
     assert view.section_buttons['walkthrough'].content == 'Scramble walkthrough'
     assert not any('Corner walkthrough' in str(t) for t in text_values(view))
     assert w.twist_text.visible and not w.plan.steps and w.play_all_button.disabled
-    assert 'twists remain' in w.status.value and 'Only corner twists remain' in ' '.join(text_values(w))
+    assert w.details.controls == [w.summary] and not w.details.expanded
+    assert w.twist_text in w.summary.controls and 'Corner twists' in w.twist_text.value
+    assert 'No paired corner algorithms' in ' '.join(text_values(w))
     assert w.pause_switch in w.viewer.display_switches.controls and w.pause_switch.value
     assert w.viewer.pause_after_stage and not w.viewer.continue_button.visible
