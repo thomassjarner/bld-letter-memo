@@ -33,14 +33,16 @@ def test_home_and_top_level_navigation_open_the_same_method_library_without_load
 
 
 @pytest.mark.parametrize('label,mode', [('Open corner cases', 'library'),
-                                      ('Open Playground', 'explorer')])
+                                      ('Open Playground', 'explorer'), ('Open walkthrough', 'walkthrough')])
 def test_overview_actions_open_the_correct_workspace_and_overview_is_always_accessible(label, mode):
     page, repo = mount()
     view = click_nav(page, 'Method Library')
     before = deepcopy(repo.data.to_dict())
     button = next(c for c in walk(view) if isinstance(c, ft.TextButton) and c.content == label)
     button.on_click(None)
-    assert view.mode == mode and view.viewer.algorithm is not None
+    assert view.mode == mode
+    if mode == 'walkthrough': assert view.walkthrough is not None and view.walkthrough.plan is None and view._cases is None
+    else: assert view.viewer.algorithm is not None
     view.section_buttons['overview'].on_click(None)
     assert view.mode == 'overview'
     assert view.section_buttons['overview'].style.bgcolor != view.section_buttons[mode].style.bgcolor
@@ -52,7 +54,7 @@ def test_subsets_are_selected_inside_the_case_library_and_the_lesson_remains_acc
     view = click_nav(page, 'Method Library')
     before = deepcopy(repo.data.to_dict())
     actions = [c for c in walk(view.body) if isinstance(c, ft.TextButton)]
-    assert [c.content for c in actions] == ['Open corner cases', 'Open Playground']
+    assert [c.content for c in actions] == ['Open corner cases', 'Open Playground', 'Open walkthrough']
     actions[0].on_click(None)
     for subset, count in (('U/U', 54), ('U/D', 108), ('D/U', 108), ('D/D', 108)):
         view.subset.value = subset
@@ -113,7 +115,7 @@ def test_overview_and_its_navigation_fit_the_viewport_with_a_scrollable_body(wid
     assert view.body.controls[0].height == view.body.height
     assert view.scheme_picker.width <= width
     assert not any(isinstance(c, AlgorithmCube) for c in walk(view))
-    assert len(view.section_buttons) == 4
+    assert len(view.section_buttons) == 5
 
 
 def test_overview_progress_refreshes_from_saved_records_and_navigation_cancels_playback():

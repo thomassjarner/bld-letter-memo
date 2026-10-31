@@ -27,7 +27,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.36.1"
+    page.title = "BLD Letter Memo · 2.37.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -66,9 +66,14 @@ async def main(page: ft.Page):
         if scramble_page.page is not None:
             scramble_page.update()
 
+    def open_corner_walkthrough_from_timer(scramble):
+        method_page.open_corner_walkthrough(scramble, state.data.active_scheme)
+        navigate_to(METHOD_INDEX)
+
     # Preserve 2.20.2's separate control instances and asynchronous focus.
     timer_page = PracticePage(data=state)
     timer_page.open_memo_callback = open_scramble_from_practice
+    timer_page.open_corner_walkthrough_callback = open_corner_walkthrough_from_timer
     timer_page.open_practice_callback = lambda: navigate_to(PRACTICE_INDEX)
     timer_page.show_timer(update=False)
     practice_page = PracticeHubPage(data=state)
@@ -106,7 +111,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
-                ft.Text("TRAINING WORKSPACE · v2.36.1", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
+                ft.Text("TRAINING WORKSPACE · v2.37.0", size=8, color=ft.Colors.ON_SURFACE_VARIANT,
                         style=ft.TextStyle(letter_spacing=1.2)),
             ], spacing=1)]),
         ], spacing=9, tight=True)

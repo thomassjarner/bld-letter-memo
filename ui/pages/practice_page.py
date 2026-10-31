@@ -80,6 +80,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         return self.data
 
     open_memo_callback = None
+    open_corner_walkthrough_callback = None
     open_timer_callback = None
     open_practice_callback = None
 
@@ -166,6 +167,13 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.new_scramble_button = ft.IconButton(
             ft.Icons.CHEVRON_RIGHT, tooltip="Next scramble", on_click=self._new_scramble,
         )
+        self.corner_walkthrough_button = ft.IconButton(ft.Icons.VIEW_IN_AR_OUTLINED,
+            tooltip="Corner walkthrough · current scramble", width=32, height=32, padding=4,
+            icon_size=20, disabled=not self.current_scramble or bool(self._scramble_error),
+            on_click=lambda e: self._open_corner_walkthrough(self.current_scramble))
+        for button in (self.previous_scramble_button, self.new_scramble_button):
+            button.width = button.height = 32
+            button.padding = 4
         self.success_button = ft.OutlinedButton(
             "Success", icon=ft.Icons.CHECK_CIRCLE, on_click=lambda e: self._mark_last("ok"), disabled=True
         )
@@ -245,7 +253,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.scramble_text.expand = True
         self._scramble_panel = panel(ft.Row([
             self.scramble_text,
-            ft.Row([self.previous_scramble_button, self.new_scramble_button], spacing=0, tight=True),
+            ft.Row([self.previous_scramble_button, self.new_scramble_button, self.corner_walkthrough_button], spacing=0, tight=True),
         ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=12)
         self._timer_hint = ft.Text("Hold Space to arm · Release to start · Any key to stop",
                                   size=11, color=ft.Colors.ON_SURFACE_VARIANT,
@@ -651,6 +659,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
     def _safe_update(self):
+        self.corner_walkthrough_button.disabled = self.running or self.holding_space or not self.current_scramble or bool(self._scramble_error)
         self._adjust_timer_font()
         if self.page is not None:
             self.update()
@@ -759,6 +768,10 @@ class PracticePage(ThemeAwarePage, ft.Column):
         if self.open_memo_callback:
             self.open_memo_callback(scramble)
 
+    def _open_corner_walkthrough(self, scramble: str):
+        if not self.running and not self.holding_space and scramble and self.open_corner_walkthrough_callback:
+            self.open_corner_walkthrough_callback(scramble)
+
     # ---- statistics/history ---------------------------------------------
 
     def _refresh_stats_and_history(self, update=True):
@@ -818,9 +831,12 @@ class PracticePage(ThemeAwarePage, ft.Column):
                                 padding=ft.Padding.symmetric(vertical=4),
                                 on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
                             ),
-                            ft.IconButton(ft.Icons.SHUFFLE, icon_size=17, tooltip="Take to Scramble Memo",
+                            ft.IconButton(ft.Icons.SHUFFLE, icon_size=17, width=32, height=32, padding=4, tooltip="Take to Scramble Memo",
                                           on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
-                            ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, tooltip="Delete solve",
+                            ft.IconButton(ft.Icons.VIEW_IN_AR_OUTLINED, icon_size=17, width=32, height=32, padding=4,
+                                          tooltip="Corner walkthrough · saved solve",
+                                          on_click=lambda e, s=solve.scramble: self._open_corner_walkthrough(s)),
+                            ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, width=32, height=32, padding=4, tooltip="Delete solve",
                                           on_click=lambda e, i=idx: self._delete_solve(i)),
                         ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                         ft.GestureDetector(

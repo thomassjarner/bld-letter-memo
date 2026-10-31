@@ -1,3 +1,91 @@
+# BLD Letter Memo Web 2.37.0
+
+## Corner walkthrough from a scramble
+
+Open **Method Library → Corner walkthrough**, choose a scheme, paste a real
+scramble and press **Generate walkthrough**. **Play all** animates the corner
+algorithms from that scrambled cube. The list shows each pair's letters,
+physical target stickers, actual moves and algorithm provenance. Click a pair
+to inspect its starting state, or use its play button to watch only that alg.
+Previous/next algorithm and restart controls are also available.
+
+The walkthrough uses the original scramble simulation and corner tracing:
+selected memo orientation, own-orientation mode, exact buffer sticker, cycle-
+break priorities and preferred cycle-break stickers are honored. Original
+memo is shown separately from any visual-twist corrections. Letters and
+piece highlighting remain independent switches directly below the cube.
+The saved simultaneous-moves playback setting also applies.
+
+Saved preferred case algorithms are used when their full sticker effect can
+be verified. Otherwise the built-in recommendation is used with a warning;
+the saved choice is retained for repair. Algorithms with a final cube rotation
+receive an explicit orientation reset for the sequence. The UFR library stays
+fixed to UFR; other scheme buffers use a verified whole-cube setup around the
+corresponding UFR algorithm. No buffer preference or saved algorithm is changed.
+
+Two targets on the same physical corner are handled through two verified
+three-cycles using a helper. Visual twists get additional verified correction
+steps, so an even-target plan ends with every corner solved. Each step is
+checked against its intended oriented corner effect and restores edges and
+centers at its boundary.
+
+### Parity
+
+An odd target count leaves the final unmatched oriented target pending for
+your separate parity algorithm. No single-target parity alg is executed.
+The final corner state is verified as exactly the corresponding buffer/target
+swap, including after visual-twist corrections. A parity-only scramble can
+therefore have zero paired algorithms. The status explicitly shows parity
+remaining; the walkthrough does not claim the whole cube is solved.
+
+### Edge display
+
+The Edges selector has three modes:
+
+- **Hide edge colors**: neutral edges with their letters hidden, for corner focus.
+- **Show solved edges**: edges start solved and move naturally during each alg.
+- **Show scrambled edges**: use the physical edges from that exact scramble.
+
+These are visualization choices. They do not rewrite the physical scramble,
+trace, corner plan, preferences or saved data. Edge display changes retain the
+current move position. Preferred edge buffers and virtual edge parity memo
+swaps are not required to generate this corner-only walkthrough.
+
+### Timer shortcuts
+
+The cube icon next to the Timer's previous/next scramble buttons opens the
+**current scramble**. Each saved solve's history row also has a cube icon for
+that solve's exact scramble. The compact icon group keeps the existing timer
+layout. Shortcuts do not start, save or cancel a solve; they are blocked while
+the timer is running or Space is held. The existing Timer instance, keyboard
+listener, sessions/history and result actions are preserved.
+
+Generated plans use a scheme/algorithm snapshot. Editing the scramble or
+changing the selected scheme or case algorithms clears a stale plan and asks
+you to generate it again. Generation and playback never save or replace case
+algorithms. Data version remains 18; existing storage keys, imports/exports,
+training logic, histories, algorithms and preferences retain their behavior.
+No new dependency or manual migration is required.
+
+**443 automated tests pass**, including all prior checks. New coverage
+executes the gold scrambles with all 24 corner-buffer stickers and both twist
+memo modes, all memo-frame/own-orientation combinations, saved and temporary
+cycle-break stickers, preferred/fallback algorithms, visual twists, exact
+unmatched-target parity residues, restored edges/centers, edge masking and
+solved-edge visualization. UI checks cover bounded layouts, stale-plan handling,
+light/dark colors, Timer/current/history shortcuts and unchanged saved data.
+
+The Flet web Python runtime also verified Timer-to-walkthrough routing, complete
+corner playback, parity reservation, edge modes and immutable saved data at six
+screen sizes. Prior camera dragging, simultaneous playback, case comparison,
+conversion, persistence/backups and themes also passed. Live browser client
+rendering remains unverified; no live deployment was performed.
+
+Patching is unchanged: copy every release file into the existing project,
+then commit and push. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.36.1
 
 ## More responsive cube dragging

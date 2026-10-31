@@ -10,6 +10,7 @@ from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, 
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
 from ui.components.algorithm_converter import AlgorithmConverter
+from ui.components.corner_walkthrough import CornerWalkthrough
 from ui.design import activity_card, panel
 from ui.theme_colors import ThemeAwarePage, apply_palette
 
@@ -97,6 +98,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._loaded_playground_record = None
         self._playground_analysis_source = None
         self._analysis = None
+        self.walkthrough = None
         self.playground_saved = dropdown(label='Saved playground algorithms', value='', height=38, dense=True,
             options=[ft.DropdownOption('', 'Unsaved playground')], on_select=self._choose_playground)
         self.playground_name = field(label='Name', value='', height=38, dense=True)
@@ -132,7 +134,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.section_buttons = {
             key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
             for key, label in (('overview', 'Overview'), ('library', '3-style corner cases'),
-                               ('explorer', 'Playground'), ('lesson', 'Commutator Lesson'))
+                               ('explorer', 'Playground'), ('walkthrough', 'Corner walkthrough'), ('lesson', 'Commutator Lesson'))
         }
         self.section_nav = ft.Row(list(self.section_buttons.values()), spacing=2, height=36,
                                   scroll=ft.ScrollMode.AUTO)
@@ -149,9 +151,12 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 'Paste moves or a commutator, see what happens to the cube and save your alg. '
                 'No case or buffer required.',
                 ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'FREE EXPLORATION'),
+            activity_card('Corner walkthrough',
+                'Paste a scramble and watch the corner algorithms solve it using your scheme and cycle breaks. Parity is left for your separate alg.',
+                ft.Icons.PLAY_CIRCLE_OUTLINE, 'Open walkthrough', lambda e: self._set_mode('walkthrough'), 'FROM A SCRAMBLE'),
         ]
         for card in cards:
-            card.col = {'xs': 12, 'md': 6}
+            card.col = {'xs': 12, 'md': 4}
         records = list(self.state.data.corner_case_library.values())
         self.overview_controls = [
             ft.Column([
@@ -767,14 +772,27 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.playground_converter.cancel_pending()
         self._navigation_token += 1
         self.viewer.stop(update=False)
+        if self.walkthrough is not None: self.walkthrough.set_active(False)
         self.mode = mode
         self._loaded_key = None
         self.error.value = self.notice.value = ''
         if mode == 'overview': self._render_overview()
         elif mode == 'library': self._render_library()
         elif mode == 'explorer': self._render_explorer()
+        elif mode == 'walkthrough': self._render_walkthrough()
         else: self._render_lesson()
         self._update()
+
+    def _render_walkthrough(self):
+        if self.walkthrough is None:
+            self.walkthrough = CornerWalkthrough(data=self.state)
+        self.walkthrough.refresh(self.label_scheme, update=False)
+        self._layout()
+
+    def open_corner_walkthrough(self, scramble, scheme_name=None):
+        if scheme_name in self.state.data.schemes: self.label_scheme = scheme_name
+        self._set_mode('walkthrough')
+        self.walkthrough.open_scramble(scramble, self.label_scheme)
 
     def _choose_scheme(self, e):
         self.label_scheme = e.control.value or None
@@ -782,6 +800,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _layout(self):
         width, height = self._viewport
+        self.scheme_picker.label = 'Scheme' if self.mode == 'walkthrough' else 'Letter labels'
+        self.scheme_picker.tooltip = ('Uses this scheme\'s corner buffer, orientation, letters and cycle-break preferences.'
+                                      if self.mode == 'walkthrough' else None)
         self.title.size = 18 if width < 440 else 20
         self.scheme_picker.width = min(200, max(108, width * .38))
         self.scheme_picker.height = 38
@@ -806,6 +827,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         available = max(60, height - self.header.height - self.spacing)
         self.body.width, self.body.height = width, available
         self.detail_scrolls = []
+        if self.mode == 'walkthrough':
+            self.walkthrough.set_viewport(width, available)
+            self.body.controls = [self.walkthrough]
+            return
         if self.mode == 'overview':
             self.body.controls = [ft.ListView(controls=self.overview_controls, spacing=12,
                 height=available, scroll=ft.ScrollMode.AUTO)]
@@ -930,6 +955,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         if self.mode == 'overview': self._render_overview()
         elif self.mode == 'library': self._render_library()
         elif self.mode == 'lesson': self._render_lesson()
+        elif self.mode == 'walkthrough': self._render_walkthrough()
         else:
             record = next((a for a in self.state.data.playground_algorithms if a.id == self.selected_playground), None)
             if record is not None and (record.id, record.name, record.alg, record.notes) != self._loaded_playground_record:
@@ -950,3 +976,4 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self.case_converter.cancel_pending()
             self.playground_converter.cancel_pending()
             self.viewer.stop(update=False)
+            if self.walkthrough is not None: self.walkthrough.set_active(False)

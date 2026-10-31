@@ -1,0 +1,240 @@
+"""A bounded corner-solve workspace driven by verified scramble plans."""
+import json
+
+import flet as ft
+
+from core.corner_walkthrough import build_corner_plan
+from core.tracer import _solved
+from data.models import LetterScheme
+from ui.components.algorithm_cube import AlgorithmCube
+from ui.design import panel
+from ui.theme_colors import ThemeAwarePage, apply_palette
+
+
+@ft.control
+class CornerWalkthrough(ThemeAwarePage, ft.Column):
+    @property
+    def state(self): return self.data
+
+    def init(self):
+        self.spacing = 8
+        self.plan = None
+        self.scheme_name = self.state.data.active_scheme
+        self._fingerprint = None
+        self._viewport = (1200, 650)
+        self.viewer = AlgorithmCube()
+        self.scramble = ft.TextField(label='Scramble', hint_text="Paste a real 3×3 scramble",
+            multiline=True, min_lines=1, max_lines=3, text_size=13, color=ft.Colors.ON_SURFACE,
+            label_style=ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            hint_style=ft.TextStyle(size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            on_change=self._input_changed, on_submit=self.generate)
+        self.generate_button = ft.FilledButton('Generate walkthrough', on_click=self.generate)
+        self.play_all_button = ft.FilledButton('Play all', icon=ft.Icons.PLAY_ARROW,
+                                             disabled=True, on_click=self._play_all)
+        self.previous_button = ft.IconButton(ft.Icons.SKIP_PREVIOUS, tooltip='Previous algorithm',
+            width=32, height=32, icon_size=20, padding=4, on_click=lambda e: self._jump(-1))
+        self.next_button = ft.IconButton(ft.Icons.SKIP_NEXT, tooltip='Next algorithm',
+            width=32, height=32, icon_size=20, padding=4, on_click=lambda e: self._jump(1))
+        self.restart_button = ft.IconButton(ft.Icons.RESTART_ALT, tooltip='Restart walkthrough',
+            width=32, height=32, icon_size=20, padding=4, on_click=lambda e: self.viewer.seek(0))
+        self.edge_view = ft.Dropdown(label='Edges', value='scrambled', width=220, height=42, dense=True,
+            text_size=12, color=ft.Colors.ON_SURFACE,
+            label_style=ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            options=[ft.DropdownOption('hidden', 'Hide edge colors'),
+                     ft.DropdownOption('solved', 'Show solved edges'),
+                     ft.DropdownOption('scrambled', 'Show scrambled edges')], on_select=self._edge_changed,
+            tooltip='Hide edge colors masks edge colors and letters. Solved edges start solved and move with the algorithms.')
+        self.memo_text = ft.Text('Uses your selected scheme, corner buffer and saved cycle-break preferences.',
+                                 size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.status = ft.Text('', size=12, color=ft.Colors.ON_SURFACE)
+        self.parity_text = ft.Text('', size=12, color=ft.Colors.TERTIARY, visible=False)
+        self.summary = ft.Column([self.memo_text, self.status, self.parity_text], spacing=3, tight=True)
+        self.actions = ft.Row([self.play_all_button, self.previous_button, self.next_button,
+                               self.restart_button, self.edge_view], spacing=6, run_spacing=6, wrap=True)
+        self.input_area = ft.Container()
+        self.step_controls = []
+        self._clear('Paste a scramble and generate its corner walkthrough.', update=False)
+        self.set_viewport(*self._viewport)
+
+    def _page(self):
+        try: return self.page
+        except RuntimeError: return None
+
+    def _update(self):
+        apply_palette(self, self.state.data.dark_mode)
+        if self._page() is not None: self.update()
+
+    def _current_fingerprint(self):
+        scheme = self.state.data.schemes.get(self.scheme_name)
+        records = {key: (record.preferred_algorithm, [(a.id, a.name, a.alg) for a in record.algorithms])
+                   for key, record in self.state.data.corner_case_library.items()
+                   if record.preferred_algorithm or record.algorithms}
+        return json.dumps([self.scheme_name, scheme.to_dict() if scheme else None, records],
+                          sort_keys=True, ensure_ascii=False)
+
+    def _clear(self, message, *, error=False, update=True):
+        self.viewer.stop(update=False)
+        self.plan = None
+        self.viewer.visible = False
+        self.memo_text.value = 'Uses your selected scheme, corner buffer and saved cycle-break preferences.'
+        self.memo_text.tooltip = self.memo_text.value
+        self.play_all_button.disabled = self.previous_button.disabled = self.next_button.disabled = self.restart_button.disabled = True
+        self.status.value, self.status.color = message, ft.Colors.ERROR if error else ft.Colors.ON_SURFACE_VARIANT
+        self.parity_text.visible = False
+        self.step_controls = [ft.Text('Corner algorithms will appear here.', size=13, color=ft.Colors.ON_SURFACE_VARIANT)]
+        if hasattr(self, 'input_area'): self.set_viewport(*self._viewport)
+        if update: self._update()
+
+    def _input_changed(self, e=None):
+        if self.plan and (self.scramble.value or '').strip() != self.plan.scramble:
+            self._clear('Scramble changed. Generate a new walkthrough.')
+
+    def generate(self, e=None):
+        self.viewer.stop(update=False)
+        source = (self.scramble.value or '').strip()
+        scheme = self.state.data.schemes.get(self.scheme_name)
+        try:
+            if len(source) > 8000 or len(source.split()) > 600:
+                raise ValueError('Use at most 600 scramble moves.')
+            plan = build_corner_plan(source, scheme, self.state.data.corner_case_library)
+        except ValueError as ex:
+            self._clear(str(ex), error=True)
+            return
+        self.plan, self._fingerprint = plan, self._current_fingerprint()
+        self.memo_text.value = 'Corner memo · ' + (plan.trace.corner_memo or 'No corner targets')
+        self.memo_text.tooltip = self.memo_text.value
+        self.status.value = (f'{len(plan.steps)} algorithms · {len(plan.algorithm.moves)} moves · buffer {plan.buffer} · '
+                             + ('corners solved at the end' if not plan.parity_target else 'pairs solved; parity remains'))
+        self.status.color = ft.Colors.ON_SURFACE
+        self.parity_text.visible = plan.parity_target is not None
+        if plan.parity_target:
+            letter = scheme.corners.stickers.get(plan.parity_target, '')
+            target = f'{letter} ({plan.parity_target})' if letter and letter != 'BUFFER' else plan.parity_target
+            self.parity_text.value = f'Parity required · unmatched final target {target} remains for your separate parity algorithm.'
+        self.play_all_button.disabled = self.previous_button.disabled = self.next_button.disabled = self.restart_button.disabled = not bool(plan.algorithm.moves)
+        self._build_step_controls()
+        self._load_viewer()
+        self.set_viewport(*self._viewport)
+        self._update()
+
+    def _build_step_controls(self):
+        controls = []
+        for warning in self.plan.warnings:
+            controls.append(ft.Text(warning, size=11, color=ft.Colors.ERROR))
+        for i, step in enumerate(self.plan.steps):
+            pair = self.state.get_pair_display(step.letters) if '?' not in step.letters else f'{step.first} / {step.second}'
+            title = f'{i + 1} · {pair}' + (' · twist correction' if step.correction else '')
+            provenance = ' + '.join(part.name for part in step.parts)
+            setup = next((part.setup for part in step.parts if part.setup), ())
+            if setup: provenance += ' · buffer setup ' + ' '.join(setup)
+            controls.append(panel(ft.Column([
+                ft.Row([ft.TextButton(title, on_click=lambda e, index=i: self._select_step(index)),
+                        ft.Container(expand=True),
+                        ft.IconButton(ft.Icons.PLAY_ARROW, tooltip='Play this algorithm', icon_size=20,
+                            width=32, height=32, padding=4, on_click=lambda e, index=i: self._select_step(index, play=True))], spacing=4),
+                ft.Text(f'{self.plan.buffer} → {step.first} → {step.second}', size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(' '.join(step.moves), size=12, selectable=True, font_family='monospace', color=ft.Colors.ON_SURFACE),
+                ft.Text(provenance, size=10, color=ft.Colors.ON_SURFACE_VARIANT, max_lines=2, tooltip=provenance),
+            ], spacing=5, tight=True), padding=10))
+        if not self.plan.steps:
+            controls.append(ft.Text('No paired corner algorithms are needed.' if self.plan.parity_target else 'Corners are already solved.',
+                                    size=14, color=ft.Colors.PRIMARY))
+        if self.plan.trace.corner_cycle_breaks:
+            choices = ', '.join(info.chosen_sticker for info in self.plan.trace.corner_cycle_breaks)
+            controls.append(ft.Text('Cycle breaks · ' + choices, size=11, color=ft.Colors.ON_SURFACE_VARIANT))
+        controls.append(ft.Text('Uses your saved preferred algorithms. Built-in recommendations may not be optimal.',
+                                size=11, color=ft.Colors.ON_SURFACE_VARIANT))
+        self.step_controls = controls
+
+    def _load_viewer(self, index=0):
+        plan = self.plan
+        initial = dict(plan.initial)
+        if self.edge_view.value == 'solved':
+            for position, home in _solved().items():
+                if len(home) == 2: initial[position] = home
+        self.viewer.edge_colors = self.edge_view.value != 'hidden'
+        scheme = LetterScheme.from_dict(plan.scheme_name, plan.scheme_snapshot)
+        targets = {stage.label: (step.first, step.second)
+                   for stage, step in zip(plan.algorithm.stages, plan.steps)}
+        self.viewer.visible = True
+        self.viewer.load(plan.algorithm, initial=initial, scheme=scheme, preserve_stages=True,
+                         stage_targets=targets, buffer=plan.buffer)
+        self.viewer.index = min(index, len(plan.algorithm.moves))
+        self.viewer.dark_mode = self.state.data.dark_mode
+        self.viewer.set_simultaneous_moves(self.state.data.simultaneous_moves)
+        self.viewer.play_button.disabled = not bool(plan.algorithm.moves)
+        self.viewer._redraw(update=False)
+
+    def _edge_changed(self, e=None):
+        if self.plan: self._load_viewer(self.viewer.index)
+        self._update()
+
+    def _select_step(self, index, *, play=False):
+        if not self.plan: return
+        step = self.plan.steps[index]
+        self.viewer.seek(step.start)
+        if play: self.viewer.play_to(step.end)
+
+    def _play_all(self, e=None):
+        if self.plan and self.plan.algorithm.moves:
+            self.viewer.seek(0)
+            self.viewer.play_to(len(self.plan.algorithm.moves))
+
+    def _jump(self, direction):
+        if not self.plan: return
+        if direction > 0:
+            index = next((s.start for s in self.plan.steps if s.start > self.viewer.index), len(self.plan.algorithm.moves))
+        else:
+            index = next((s.start for s in reversed(self.plan.steps) if s.start < self.viewer.index), 0)
+        self.viewer.seek(index)
+
+    def refresh(self, scheme_name, *, update=True):
+        self.scheme_name = scheme_name
+        self.viewer.dark_mode = self.state.data.dark_mode
+        self.viewer.set_simultaneous_moves(self.state.data.simultaneous_moves)
+        if self.plan and self._fingerprint != self._current_fingerprint():
+            self._clear('Scheme or case algorithms changed. Generate again to use the current choices.', update=False)
+        elif self.plan:
+            self.viewer._redraw(update=False)
+        if update: self._update()
+
+    def open_scramble(self, source, scheme_name):
+        self.scheme_name = scheme_name
+        self.scramble.value = source
+        self.generate()
+
+    def set_active(self, active):
+        if not active: self.viewer.stop(update=False)
+
+    def set_viewport(self, width, height):
+        width, height = max(240, width), max(60, height)
+        self._viewport = self.width, self.height = width, height
+        wide = width >= 980 and height >= 560
+        self.scramble.expand = wide
+        self.input_area.content = (ft.Row([self.scramble, self.generate_button], spacing=10)
+                                   if wide else ft.Column([self.scramble, self.generate_button], spacing=8, tight=True))
+        self.input_area.height = 62 if wide else None
+        self.summary.height = (68 if self.parity_text.visible else 42) if wide else None
+        self.memo_text.max_lines = 1 if wide else 3
+        self.memo_text.overflow = ft.TextOverflow.ELLIPSIS
+        self.edge_view.width = min(220, width - 24)
+        if wide:
+            available = max(100, height - self.input_area.height - self.summary.height - 42 - 24)
+            left_width = round((width - 10) * .54)
+            right_width = width - left_width - 10
+            self.viewer.set_viewport(left_width - 24, min(320, max(140, available - 210)))
+            cube_scroll = ft.ListView([self.viewer], height=available - 24, scroll=ft.ScrollMode.AUTO,
+                                      build_controls_on_demand=False)
+            steps_scroll = ft.ListView(self.step_controls, spacing=8, height=available - 24,
+                                       scroll=ft.ScrollMode.AUTO, build_controls_on_demand=False)
+            self.actions.height = 42
+            self.controls = [self.input_area, self.summary, self.actions, ft.Row([
+                panel(cube_scroll, width=left_width, height=available, padding=12),
+                panel(steps_scroll, width=right_width, height=available, padding=12),
+            ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START)]
+        else:
+            self.actions.height = None
+            self.viewer.set_viewport(width - 24, min(280, max(140, height * .35)))
+            self.controls = [ft.ListView([self.input_area, self.summary, self.actions, self.viewer,
+                ft.Column(self.step_controls, spacing=8, tight=True)], height=height,
+                spacing=10, scroll=ft.ScrollMode.AUTO, build_controls_on_demand=False)]

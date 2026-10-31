@@ -19,7 +19,7 @@ def test_desktop_has_large_timer_and_bounded_scrollable_history():
     assert timer.history.height + 100 == timer.history_panel.height
     row = timer._scramble_panel.content
     assert timer.scramble_text in row.controls
-    assert row.controls[1].controls == [timer.previous_scramble_button, timer.new_scramble_button]
+    assert row.controls[1].controls == [timer.previous_scramble_button, timer.new_scramble_button, timer.corner_walkthrough_button]
 
 
 def test_resize_keeps_listener_history_and_active_solve():

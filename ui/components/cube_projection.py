@@ -30,11 +30,11 @@ def _rotate(v, axis, angle):
     return _rotate_coefficients(v, axis, math.cos(angle), math.sin(angle))
 
 
-def _label(home, scheme, letters):
+def _label(home, scheme, letters, buffer='UFR'):
     if len(home) == 1 or not letters:
         return ''
-    if set(home) == set('UFR'):
-        return '★' if home == 'UFR' else '●'
+    if set(home) == set(buffer):
+        return '★' if home == buffer else '●'
     if scheme:
         cat = scheme.corners if len(home) == 3 else scheme.edges
         value = cat.stickers.get(home, '')
@@ -55,10 +55,15 @@ def _style(home, scheme, involved, focus):
 
 
 def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitch=.45,
-                 letters=True, focus=True, targets=(), affected=None, moving=None, fraction=0):
+                 letters=True, focus=True, targets=(), affected=None, moving=None, fraction=0,
+                 edge_colors=True, buffer='UFR'):
     involved = ({frozenset(s) for s in affected} if affected is not None else
-                {frozenset(s) for s in ('UFR', *targets)} if targets else set())
-    highlights = {s: color for s, color in zip(('UFR', *targets), ('#80CFC1', '#6DD8C3', '#FFD08A'))} if focus else {}
+                {frozenset(s) for s in (buffer, *targets)} if targets else set())
+    highlights = {s: color for s, color in zip((buffer, *targets), ('#80CFC1', '#6DD8C3', '#FFD08A'))} if focus else {}
+    def appearance(home):
+        return ('#35403C', '#F0F4F3') if not edge_colors and len(home) == 2 else _style(home, scheme, involved, focus)
+    def label(home):
+        return _label(home, scheme, letters and (edge_colors or len(home) != 2), buffer)
     if mode == '2D':
         corners, edges = dict(face_groups('corners')), dict(face_groups('edges'))
         positions = {f: (corners[f][0], edges[f][0], corners[f][1], edges[f][3], f,
@@ -72,10 +77,10 @@ def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitc
                 home = _at(state, sticker)
                 x = left + col * (3 * size + gap) + (i % 3) * size
                 y = top + row * (3 * size + gap) + (i // 3) * size
-                color, fg = _style(home, scheme, involved, focus)
+                color, fg = appearance(home)
                 tiles.append(Tile(((x + 1, y + 1), (x + size - 1, y + 1),
                                   (x + size - 1, y + size - 1), (x + 1, y + size - 1)),
-                                  color, _label(home, scheme, letters), fg, highlights.get(home, '#0A0F0D')))
+                                  color, label(home), fg, highlights.get(home, '#0A0F0D')))
         return tiles
 
     moves = moving if isinstance(moving, tuple) else (moving,) if moving else ()
@@ -122,7 +127,7 @@ def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitc
     for (p, normal), home in state.items():
         geometry = face(p, normal, .293, True)
         if geometry:
-            color, fg = _style(home, scheme, involved, focus)
-            painted.append((geometry[0] + .002, Tile(geometry[1], color, _label(home, scheme, letters), fg,
+            color, fg = appearance(home)
+            painted.append((geometry[0] + .002, Tile(geometry[1], color, label(home), fg,
                                                    highlights.get(home, '#0A0F0D'))))
     return [tile for depth, tile in sorted(painted, key=lambda item: item[0])]
