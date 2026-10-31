@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.38.1**.
+or as a desktop app. Current version: **2.39.0**.
 
 ## Workspaces
 
@@ -59,6 +59,30 @@ In the solved-edge preview, UF swaps with your configured helper when needed,
 regardless of the edge buffer. A UF/self or invalid helper uses UR for this
 preview. These display choices do not change tracing preferences or the scramble.
 Timer cube icons open the current scramble or a saved solve in this workspace.
+
+## Algorithm playback
+
+Every Method Library cube can show commutator notation beneath the move list.
+A and B use distinct colours; the current written move is underlined and
+highlighted in sync with the expanded moves. During an undo section, the
+highlight points to the written move being undone, while the move list shows
+the actual inverse turn. A small label identifies the current component.
+
+Choose **Components** beside the speed selector to pause after Setup, A, B,
+Undo A, Undo B and Undo setup. Nested setups are separate components too.
+**Continue** advances to the next complete component. Simultaneous opposite
+turns stay within their component. This works in corner cases, Playground,
+Commutator Lesson and Scramble walkthrough.
+
+**Full alg** uses normal playback. Component mode follows the written notation,
+so turns that combine at component boundaries in normal playback remain
+separate for study. The move counter follows the selected view. Switching modes
+restarts the current algorithm. Both views finish at the same cube state and
+retain the saved algorithm source.
+
+If a raw algorithm has a recoverable commutator, its verified notation is used.
+An unavailable form is kept as moves; another algorithm for the same case is
+never substituted to provide a commutator display.
 
 ## Saved data
 

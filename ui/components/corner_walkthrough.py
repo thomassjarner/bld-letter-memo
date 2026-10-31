@@ -187,21 +187,24 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
         controls.append(self.details)
         self.step_controls = controls
 
-    def _load_viewer(self, index=0, boundary=None):
+    def _load_viewer(self, index=0, boundary=None, component_boundary=None):
         plan = self.plan
         initial = walkthrough_initial(plan, self.edge_view.value)
         self.viewer.edge_colors = self.edge_view.value != 'hidden'
         scheme = LetterScheme.from_dict(plan.scheme_name, plan.scheme_snapshot)
         targets = {stage.label: (step.first, step.second)
                    for stage, step in zip(plan.algorithm.stages, plan.steps)}
+        notations = {stage.label: step_commutator(step)
+                     for stage, step in zip(plan.algorithm.stages, plan.steps)}
         self.viewer.visible = True
         self.viewer.load(plan.algorithm, initial=initial, scheme=scheme, preserve_stages=True,
-                         stage_targets=targets, buffer=plan.buffer)
-        self.viewer.index = min(index, len(plan.algorithm.moves))
+                         stage_targets=targets, stage_notations=notations, buffer=plan.buffer)
+        self.viewer.index = min(index, len(self.viewer.algorithm.moves))
         self.viewer.dark_mode = self.state.data.dark_mode
         self.viewer.set_simultaneous_moves(self.state.data.simultaneous_moves)
         self.viewer._boundary_stage = boundary
-        self.viewer.play_button.disabled = not bool(plan.algorithm.moves)
+        self.viewer._boundary_component = component_boundary if self.viewer.component_mode else None
+        self.viewer.play_button.disabled = not bool(self.viewer.algorithm.moves)
         self.viewer._redraw(update=False)
 
     def _details_changed(self, e):
@@ -217,27 +220,27 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
         self._update()
 
     def _edge_changed(self, e=None):
-        if self.plan: self._load_viewer(self.viewer.index, self.viewer._boundary_stage)
+        if self.plan: self._load_viewer(self.viewer.index, self.viewer._boundary_stage, self.viewer._boundary_component)
         self.set_viewport(*self._viewport)
         self._update()
 
     def _select_step(self, index, *, play=False):
         if not self.plan: return
-        step = self.plan.steps[index]
+        step = self.viewer.algorithm.stages[index]
         self.viewer.seek(step.start)
         if play: self.viewer.play_to(step.end)
 
     def _play_all(self, e=None):
         if self.plan and self.plan.algorithm.moves:
             self.viewer.seek(0)
-            self.viewer.play_to(len(self.plan.algorithm.moves))
+            self.viewer.play_to(len(self.viewer.algorithm.moves))
 
     def _jump(self, direction):
         if not self.plan: return
         if direction > 0:
-            index = next((s.start for s in self.plan.steps if s.start > self.viewer.index), len(self.plan.algorithm.moves))
+            index = next((s.start for s in self.viewer.algorithm.stages if s.start > self.viewer.index), len(self.viewer.algorithm.moves))
         else:
-            index = next((s.start for s in reversed(self.plan.steps) if s.start < self.viewer.index), 0)
+            index = next((s.start for s in reversed(self.viewer.algorithm.stages) if s.start < self.viewer.index), 0)
         self.viewer.seek(index)
 
     def refresh(self, scheme_name, *, update=True):

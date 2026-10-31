@@ -6,8 +6,9 @@ import time
 import flet as ft
 import flet.canvas as cv
 
-from core.algorithms import algorithm_states, changed_stickers, normalized_state, parse_algorithm, simplified_algorithm
+from core.algorithms import Algorithm, Stage, algorithm_states, changed_stickers, normalized_state, parse_algorithm, simplified_algorithm
 from core.algorithm_playback import playback_steps
+from core.commutator_playback import align_notation, commutator_study
 from core.tracer import _key, _orient, _solved
 from ui.components.cube_projection import project_cube
 from ui.theme_colors import apply_palette
@@ -27,6 +28,11 @@ class AlgorithmCube(ft.Column):
         self._stage_targets = {}
         self._stage_focus = {}
         self._boundary_stage = None
+        self._boundary_component = None
+        self._studies = {}
+        self._notation_views = []
+        self._components = []
+        self._requested_component_mode = False
         self.pause_after_stage = False
         self._initial = None
         self.states = [_solved()]
@@ -75,7 +81,15 @@ class AlgorithmCube(ft.Column):
         self.speed = ft.Dropdown(value='.6', width=88, height=34, dense=True, text_size=12,
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('.3', 'Fast'), ft.DropdownOption('.6', 'Normal'), ft.DropdownOption('1.2', 'Slow')])
+        self.playback_mode = ft.Dropdown(value='full', width=145, height=34, dense=True, text_size=12,
+            color=ft.Colors.ON_SURFACE, visible=False,
+            options=[ft.DropdownOption('full', 'Full alg'), ft.DropdownOption('components', 'Components')],
+            tooltip='Components pauses after each written commutator part. Switching mode restarts the current alg.',
+            on_select=self._change_playback_mode)
         self.move_text = ft.Text('', size=13, font_family='monospace', color=ft.Colors.ON_SURFACE)
+        self.notation_text = ft.Text('', size=13, font_family='monospace', selectable=True,
+                                    color=ft.Colors.ON_SURFACE, visible=False)
+        self.component_status = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT, visible=False)
         self.stage_buttons = ft.Row(spacing=2, wrap=True)
         self.stage_text = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.current_stage = ft.Text('', size=12, weight=ft.FontWeight.W_600,
@@ -100,8 +114,8 @@ class AlgorithmCube(ft.Column):
                     self.play_button,
                     icon_button(ft.Icons.CHEVRON_RIGHT, 'Next move', lambda e: self._step(1)),
                     icon_button(ft.Icons.LAST_PAGE, 'Last move', lambda e: self.seek(len(self.states) - 1)),
-                    self.counter, self.speed], spacing=2, run_spacing=2, wrap=True),
-            self.move_text, self.view_options,
+                    self.counter, self.speed, self.playback_mode], spacing=2, run_spacing=2, wrap=True),
+            self.move_text, self.notation_text, self.component_status, self.view_options,
         ]
         self._redraw(update=False)
 
@@ -124,11 +138,14 @@ class AlgorithmCube(ft.Column):
         apply_palette(self.stage_text, self.dark_mode)
         apply_palette(self.counter, self.dark_mode)
         apply_palette(self.current_stage, self.dark_mode)
+        apply_palette(self.notation_text, self.dark_mode)
+        apply_palette(self.component_status, self.dark_mode)
+        apply_palette(self.continue_button, self.dark_mode)
         if self._page() is not None:
             self.update()
 
     def load(self, algorithm, *, initial=None, scheme=None, targets=(), preserve_stages=False,
-             stage_targets=None, buffer='UFR'):
+             stage_targets=None, stage_notations=None, buffer='UFR'):
         self.stop(update=False)
         self.original_algorithm = parse_algorithm(algorithm) if isinstance(algorithm, str) else algorithm
         self._initial = dict(initial) if initial is not None else None
@@ -138,15 +155,60 @@ class AlgorithmCube(ft.Column):
         self.buffer = buffer
         self.structure_switch.visible = not preserve_stages
         self.scheme, self.targets = scheme, tuple(targets)
+        parents = self.original_algorithm.stages if preserve_stages else (Stage('Algorithm', 0, len(self.original_algorithm.moves)),)
+        self._studies = {}
+        for parent in parents:
+            moves = self.original_algorithm.moves[parent.start:parent.end]
+            source = ((stage_notations or {}).get(parent.label) if stage_notations is not None else ' '.join(moves)) if preserve_stages else self.original_algorithm.source
+            study = commutator_study(source) if source else None
+            self._studies[parent.label] = study if align_notation(study, moves) is not None else None
+        available = any(self._studies.values()) and sum(
+            len(self._studies[p.label].moves) if self._studies.get(p.label) else p.end - p.start for p in parents) <= 4800
+        self.playback_mode.disabled = not available
+        self.playback_mode.visible = bool(available)
+        self.playback_mode.value = 'components' if available and self._requested_component_mode else 'full'
         self._set_playback_algorithm()
+
+    @property
+    def component_mode(self): return self.playback_mode.value == 'components'
+
+    def _rebuild_steps(self):
+        grouping = self.algorithm
+        if grouping is not None and self.component_mode:
+            grouping = Algorithm(grouping.source, grouping.moves,
+                                 grouping.stages + tuple(c[0] for c in self._components))
+        self._steps = playback_steps(grouping, self.simultaneous_moves) if grouping is not None else ()
 
     def _set_playback_algorithm(self):
         self.stop(update=False)
-        self.algorithm = self.original_algorithm if self.structure_switch.value or self._preserve_stages else simplified_algorithm(self.original_algorithm)
+        base = self.original_algorithm if self.structure_switch.value or self._preserve_stages else simplified_algorithm(self.original_algorithm)
+        parents = base.stages if self._preserve_stages else (Stage('Algorithm', 0, len(base.moves)),)
+        self._notation_views, self._components = [], []
+        moves, stages = [], []
+        for parent in parents:
+            study = self._studies.get(parent.label)
+            local = study.moves if self.component_mode and study else base.moves[parent.start:parent.end]
+            start = len(moves) if self.component_mode else parent.start
+            if self.component_mode:
+                moves.extend(local)
+                stages.append(Stage(parent.label, start, len(moves)))
+            view_index = len(self._notation_views)
+            self._notation_views.append(dict(label=parent.label, start=start, end=start + len(local),
+                                            study=study, tracking=align_notation(study, local)))
+            if self.component_mode:
+                components = study.components if study else (Stage('Algorithm', 0, len(local)),)
+                self._components.extend((Stage(c.label, start + c.start, start + c.end), view_index, i)
+                                        for i, c in enumerate(components) if c.end > c.start)
+        if self.component_mode:
+            self.algorithm = Algorithm(self.original_algorithm.source, tuple(moves),
+                tuple(stages) if self._preserve_stages else tuple(c[0] for c in self._components))
+        else: self.algorithm = base
+        self.structure_switch.visible = not self._preserve_stages and not self.component_mode
         self.states = algorithm_states(self.algorithm, self._initial)
-        self._steps = playback_steps(self.algorithm, self.simultaneous_moves)
+        self._rebuild_steps()
         self._caption_key, self.index = None, 0
         self._boundary_stage = None
+        self._boundary_component = None
         self.affected = (set() if self._preserve_stages else
                          {frozenset(s) for s in changed_stickers(normalized_state(self.original_algorithm)) if len(s) > 1})
         self._stage_focus = {}
@@ -169,6 +231,16 @@ class AlgorithmCube(ft.Column):
                                       for s in self.algorithm.stages] if len(self.algorithm.stages) > 1 else []
         self._redraw(update=False)
 
+    def _change_playback_mode(self, e=None):
+        self._requested_component_mode = self.component_mode
+        if self.original_algorithm is None: return
+        parent = self._active_stage() if self._preserve_stages else None
+        label = parent.label if parent else None
+        self._set_playback_algorithm()
+        if label:
+            self.index = next((s.start for s in self.algorithm.stages if s.label == label), 0)
+        self._redraw()
+
     def _change_structure(self, e=None):
         if self.original_algorithm is not None:
             self._set_playback_algorithm()
@@ -179,7 +251,7 @@ class AlgorithmCube(ft.Column):
         if enabled != self.simultaneous_moves:
             self.stop(update=False)
             self.simultaneous_moves = enabled
-            self._steps = playback_steps(self.algorithm, enabled) if self.algorithm is not None else ()
+            self._rebuild_steps()
             self._caption_key = None
             self._redraw(update=False)
 
@@ -222,7 +294,7 @@ class AlgorithmCube(ft.Column):
                     style=ft.TextStyle(color=tile.foreground, size=max(9, min(20, side * (.38 if len(tile.label) == 1 else .25))),
                                        weight=ft.FontWeight.W_600)))
         self.canvas.shapes = shapes
-        caption_key = (id(self.algorithm), self.index, self.simultaneous_moves, self._boundary_stage)
+        caption_key = (id(self.algorithm), self.index, self.simultaneous_moves, self._boundary_stage, self._boundary_component)
         if caption_key != self._caption_key:
             self._caption_key = caption_key
             self._render_caption()
@@ -235,23 +307,75 @@ class AlgorithmCube(ft.Column):
             stage = next((s.label for s in self.algorithm.stages if s.start <= self.index < s.end), 'Finished')
             self.stage_text.value = stage
             self.current_stage.visible = self._preserve_stages and bool(self.algorithm.stages)
-            self.stage_status.visible = self.current_stage.visible
             self.current_stage.value = ('Completed · ' + self._boundary_stage.label if self._boundary_stage else
                 'Current algorithm · ' + stage if stage != 'Finished' else 'Sequence complete')
-            self.continue_button.visible = (self._preserve_stages and self._boundary_stage is not None
+            self.continue_button.visible = ((self._boundary_stage is not None or self._boundary_component is not None)
                                             and self.index < len(self.states) - 1)
+            self.stage_status.visible = self.current_stage.visible or self.continue_button.visible
+            following = next((c[0] for c in self._components if c[0].start == self.index), None)
+            self.continue_button.content = ('Continue to next alg' if self._boundary_stage is not None else
+                'Continue · ' + following.label if following is not None else 'Continue')
             active_stage = self._active_stage()
+            highlight = max(0, self.index - 1) if self._boundary_stage or self._boundary_component or self.index == len(self.states) - 1 else self.index
             self.move_text.spans = [ft.TextSpan(step.caption + ' ', style=ft.TextStyle(
-                weight=ft.FontWeight.BOLD if step.start <= self.index < step.end else ft.FontWeight.NORMAL,
-                decoration=ft.TextDecoration.UNDERLINE if step.start <= self.index < step.end else None,
-                bgcolor=ft.Colors.PRIMARY_CONTAINER if step.start <= self.index < step.end else None,
-                color=(ft.Colors.ON_PRIMARY_CONTAINER if step.start <= self.index < step.end else
+                weight=ft.FontWeight.BOLD if step.start <= highlight < step.end else ft.FontWeight.NORMAL,
+                decoration=ft.TextDecoration.UNDERLINE if step.start <= highlight < step.end else None,
+                bgcolor=ft.Colors.PRIMARY_CONTAINER if step.start <= highlight < step.end else None,
+                color=(ft.Colors.ON_PRIMARY_CONTAINER if step.start <= highlight < step.end else
                        next((ft.Colors.PRIMARY if s.label in ('A', 'Undo A') else
                              ft.Colors.TERTIARY if s.label in ('B', 'Undo B') else
                              ft.Colors.ON_SURFACE_VARIANT if 'setup' in s.label.lower() else ft.Colors.ON_SURFACE
                              for s in self.algorithm.stages if s.start <= step.start < s.end), ft.Colors.ON_SURFACE))))
                 for step in self._steps if not self._preserve_stages or active_stage is not None
                 and active_stage.start <= step.start < active_stage.end]
+            self._render_notation(highlight)
+
+    def _render_notation(self, highlight):
+        parent = self._active_stage() if self._preserve_stages else None
+        view = (next((v for v in self._notation_views if v['label'] == parent.label), None) if parent else
+                self._notation_views[0] if self._notation_views else None)
+        study = view['study'] if view else None
+        tracking = view['tracking'] if view else None
+        self.component_status.color = ft.Colors.ON_SURFACE_VARIANT
+        self.notation_text.visible = study is not None
+        self.component_status.visible = study is not None or self.component_mode and view is not None
+        self.notation_text.spans = []
+        if study is None or tracking is None:
+            self.component_status.value = 'Algorithm · moves only' if self.component_mode else ''
+            return
+        if not tracking:
+            self.notation_text.spans = [ft.TextSpan(t.text, style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
+                                        for t in study.tokens]
+            self.component_status.value = 'Identity · no moves'
+            return
+        local = min(max(0, highlight - view['start']), len(tracking) - 1)
+        beat = next((s for s in self._steps if s.start <= highlight < s.end), None)
+        finish = min(len(tracking), (beat.end - view['start']) if beat else local + 1)
+        current = tracking[local:max(local + 1, finish)]
+        refs = frozenset().union(*(m.references for m in current))
+        owners = frozenset().union(*(m.components for m in current))
+        active_refs = frozenset().union(*(m.references for i in owners
+            for m in study.tracked[study.components[i].start:study.components[i].end]))
+        labels = ' + '.join(study.components[i].label for i in sorted(owners)) or 'Execution move'
+        def part_color(label):
+            role = label.removeprefix('Undo ').split(' · ')[0]
+            return ft.Colors.PRIMARY if role == 'A' else ft.Colors.TERTIARY if role == 'B' else ft.Colors.ON_SURFACE_VARIANT
+        colors = {ref: part_color(c.label) for c in study.components
+                  for m in study.tracked[c.start:c.end] for ref in m.references}
+        if len(owners) == 1: self.component_status.color = part_color(study.components[next(iter(owners))].label)
+        completed = self._boundary_component is not None or self._boundary_stage is not None or self.index == len(self.states) - 1
+        self.component_status.value = labels + (' complete' if completed else '')
+        if self.component_mode and len(owners) == 1 and not completed:
+            component = study.components[next(iter(owners))]
+            self.component_status.value += f' · {local - component.start + 1}/{component.end - component.start}'
+        self.notation_text.spans = [ft.TextSpan(token.text, style=ft.TextStyle(
+            weight=ft.FontWeight.BOLD if token.reference in refs else ft.FontWeight.NORMAL,
+            decoration=ft.TextDecoration.UNDERLINE if token.reference in refs else None,
+            bgcolor=ft.Colors.PRIMARY_CONTAINER if token.reference in refs else None,
+            color=ft.Colors.ON_PRIMARY_CONTAINER if token.reference in refs else
+                  ft.Colors.ON_SURFACE if token.reference in active_refs and colors.get(token.reference) == ft.Colors.ON_SURFACE_VARIANT else
+                  colors.get(token.reference, ft.Colors.ON_SURFACE_VARIANT)))
+            for token in study.tokens]
 
     def _drag_start(self, e):
         self._cancel_drag()
@@ -345,6 +469,7 @@ class AlgorithmCube(ft.Column):
     def seek(self, index):
         self.stop(update=False)
         self._boundary_stage = None
+        self._boundary_component = None
         self.index = max(0, min(index, len(self.states) - 1))
         self._redraw()
 
@@ -380,6 +505,7 @@ class AlgorithmCube(ft.Column):
     def play_to(self, end):
         self.stop(update=False)
         self._boundary_stage = None
+        self._boundary_component = None
         if self._page() is None:
             return
         self._redraw(update=False)
@@ -395,7 +521,11 @@ class AlgorithmCube(ft.Column):
     async def _play(self, token, end):
         if token != self._token: return
         self._boundary_stage = None
-        if self._preserve_stages and self.pause_after_stage:
+        self._boundary_component = None
+        if self.component_mode:
+            component = next((c[0] for c in self._components if c[0].start <= self.index < c[0].end), None)
+            if component is not None: end = min(end, component.end)
+        elif self._preserve_stages and self.pause_after_stage:
             stage = self._active_stage()
             if stage is not None: end = min(end, stage.end)
         while self.index < min(end, len(self.states) - 1) and token == self._token:
@@ -426,6 +556,8 @@ class AlgorithmCube(ft.Column):
             self._moving, self._fraction = None, 0
             if self._preserve_stages and finish == end:
                 self._boundary_stage = next((s for s in self.algorithm.stages if s.end == finish), None)
+            if self.component_mode and finish == end:
+                self._boundary_component = next((c for c in self._components if c[0].end == finish), None)
             self._redraw()
         if token == self._token:
             self.stop(keep_drag=True)

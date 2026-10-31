@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.39.0
+
+- Added **Components** playback next to the speed selector in Method Library
+  cube viewers. It pauses after each complete setup/A/B/undo component and
+  continues when requested, including nested setup layers.
+- Added synchronized commutator notation below the expanded move tracker.
+  A/B colours, current-move highlights and component labels also explain undo
+  phases. Normal cleaned execution tracks combined turns back to their written
+  contributors; Components follows the written form to preserve each boundary.
+- Walkthrough jumps, algorithm selection, edge-view changes and editor return
+  retain correct offsets in either playback view. Simultaneous turns do not
+  cross component boundaries.
+- Validation: 532 automated tests and web Python runtime checks at six viewport
+  sizes pass. Actual browser-client rendering is not measured here.
+- Saved sources, case preferences, BLD tracing, UF edge preview, remaining twists,
+  timer/practice data, persistence format and update/deployment steps are unchanged.
+
 ## 2.38.1
 
 - In the solved-edge preview, odd corner parity swaps **UF** with the chosen
