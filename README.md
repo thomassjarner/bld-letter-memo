@@ -1,3 +1,46 @@
+# BLD Letter Memo Web 2.36.1
+
+## More responsive cube dragging
+
+Camera dragging now keeps one pending frame and paints only the newest pointer
+position. It updates the canvas directly, without repeatedly updating the full
+viewer and controls. Frames share a 60 Hz maximum scheduling rate; busy devices
+skip intermediate pointer positions instead of replaying a queue of old frames.
+Actual rendering speed still depends on the device and browser.
+
+Drag tracking uses absolute pointer positions between events, so native/client
+throttling does not lose movement or accumulate a cumulative delta repeatedly.
+The final pointer position is included on release. Late events from a finished
+or cancelled gesture are ignored. Reset camera, 2D mode, case changes, seeking
+and unmounting invalidate pending drag frames. During algorithm playback, the
+existing animation loop paints camera changes without starting another loop;
+dragging can continue when the last turn finishes.
+
+The projection also reuses camera/turn trigonometry within each frame. This
+retains exactly the same geometry, colors, labels and highlights while reducing
+CPU work. Drawing/stepping, simultaneous moves, case browsing, Playground
+comparison, all training logic and saved data retain their behavior. Data
+version remains 18; dependencies and deployment are unchanged.
+
+PC Chrome latency cannot be measured here. The change addresses the event and
+redraw bottlenecks in the current implementation; real-device confirmation is
+still needed after deployment.
+
+**375 automated tests pass.** Drag regressions cover burst coalescing,
+frame-rate scheduling across separate tasks, final pointer positions,
+canvas-only updates, cancellation, replacement gestures, playback and 2D/
+unmounted behavior. A separate comparison confirmed exact drawing output
+against 2.36.0 for 160 camera/view/turn samples. The Flet web Python runtime
+also checked burst/live dragging, final positions, stale-frame cancellation,
+prior simultaneous playback, case browsing/comparison, conversion, saving,
+backups and themes at six screen sizes. PC Chrome rendering latency was not
+measured; no live deployment was performed.
+
+Patching is unchanged: copy all release contents into the existing project,
+then commit and push. See PATCHING.md.
+
+---
+
 # BLD Letter Memo Web 2.36.0
 
 ## Optional simultaneous turns

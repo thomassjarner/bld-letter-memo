@@ -19,12 +19,15 @@ class Tile:
     outline: str = '#0A0F0D'
 
 
-def _rotate(v, axis, angle):
-    c, s = math.cos(angle), math.sin(angle)
+def _rotate_coefficients(v, axis, c, s):
     x, y, z = v
     if axis == 'x': return x, c * y - s * z, s * y + c * z
     if axis == 'y': return c * x + s * z, y, -s * x + c * z
     return c * x - s * y, s * x + c * y, z
+
+
+def _rotate(v, axis, angle):
+    return _rotate_coefficients(v, axis, math.cos(angle), math.sin(angle))
 
 
 def _label(home, scheme, letters):
@@ -80,15 +83,20 @@ def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitc
         raise ValueError('Simultaneous playback needs two opposite outer-face turns.')
     rotations = [(axis, 'xyz'.index(axis), layers, quarter * math.pi / 2 * fraction)
                  for axis, layers, quarter in map(move_spec, moves)]
+    rotations = [(axis, index, layers, math.cos(angle), math.sin(angle))
+                 for axis, index, layers, angle in rotations]
     scale = min(width, height) * .285
+    yc, ys, pc, ps = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
 
     def view(v):
-        return _rotate(_rotate(v, 'y', yaw), 'x', pitch)
+        x, y, z = v
+        rx, rz = yc * x + ys * z, -ys * x + yc * z
+        return rx, pc * y - ps * rz, ps * y + pc * rz
 
     def transform(v, p):
-        for axis, index, layers, angle in rotations:
+        for axis, index, layers, c, s in rotations:
             if p[index] in layers:
-                return view(_rotate(v, axis, angle))
+                return view(_rotate_coefficients(v, axis, c, s))
         return view(v)
 
     def face(p, normal, half, sticker=False):

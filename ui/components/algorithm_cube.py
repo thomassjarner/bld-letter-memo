@@ -35,11 +35,17 @@ class AlgorithmCube(ft.Column):
         self._token = 0
         self._caption_key = None
         self._moving, self._fraction = None, 0
+        self._drag_revision = 0
+        self._drag_pending = False
+        self._drag_dirty = False
+        self._drag_position = None
+        self._drag_active = False
+        self._drag_last_paint = float('-inf')
         self._viewport = (460, 300)
         self.mode_picker = ft.Dropdown(value='3D', width=94, height=36, dense=True,
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('3D'), ft.DropdownOption('2D')],
-            on_select=lambda e: self._redraw())
+            on_select=self._change_view_mode)
         self.letter_switch = ft.Switch(label='Show letters', value=True,
             label_text_style=ft.TextStyle(size=11), on_change=lambda e: self._redraw())
         self.focus_switch = ft.Switch(label='Highlight pieces', value=True,
@@ -51,7 +57,9 @@ class AlgorithmCube(ft.Column):
         self.canvas = cv.Canvas(width=460, height=300)
         self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT,
                                       tooltip='Drag the 3D cube to rotate the view.')
-        self.canvas.content = ft.GestureDetector(content=self.drag_area, on_pan_update=self._drag, drag_interval=16)
+        self.canvas.content = ft.GestureDetector(content=self.drag_area,
+            on_pan_start=self._drag_start, on_pan_update=self._drag,
+            on_pan_end=self._drag_end, on_pan_cancel=self._drag_end, drag_interval=16)
         def icon_button(icon, tooltip, callback):
             return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
                                  icon_size=19, width=32, height=32, padding=4)
@@ -185,16 +193,92 @@ class AlgorithmCube(ft.Column):
                              for s in self.algorithm.stages if s.start <= step.start < s.end), ft.Colors.ON_SURFACE))))
                 for step in self._steps]
 
+    def _drag_start(self, e):
+        self._cancel_drag()
+        if self.mode_picker.value == '3D':
+            self._drag_active = True
+            self._drag_position = getattr(e, 'local_position', None)
+
     def _drag(self, e):
-        if self.mode_picker.value != '3D':
+        if not self._drag_active or self.mode_picker.value != '3D':
             return
-        delta = e.local_delta
-        if delta:
-            self.yaw += delta.x * .01
-            self.pitch = min(1.2, max(-1.2, self.pitch + delta.y * .01))
-            self._redraw()
+        position = getattr(e, 'local_position', None)
+        if position is not None and self._drag_position is not None:
+            dx, dy = position.x - self._drag_position.x, position.y - self._drag_position.y
+        else:
+            delta = getattr(e, 'local_delta', None)
+            dx, dy = (delta.x, delta.y) if delta is not None else (0, 0)
+        self._drag_position = position
+        if dx or dy:
+            self.yaw += dx * .01
+            self.pitch = min(1.2, max(-1.2, self.pitch + dy * .01))
+            self._drag_dirty = True
+            self._queue_drag_frame()
+
+    def _drag_end(self, e):
+        # End events carry the final position even if the last throttled update
+        # was omitted. Do not replay a stream of old pointer deltas after release.
+        if not self._drag_active:
+            return
+        if self._drag_position is not None:
+            self._drag(e)
+        self._drag_active = False
+        self._drag_position = None
+        if self._drag_dirty:
+            self._queue_drag_frame()
+
+    def _queue_drag_frame(self):
+        if self._drag_pending or self.playing:
+            return  # Playback already paints the latest camera every frame.
+        page = self._page()
+        if page is None:
+            self._drag_dirty = False
+            self._redraw(update=False)
+            return
+        self._drag_pending = True
+        try:
+            page.run_task(self._draw_drag_frames, self._drag_revision)
+        except RuntimeError:
+            self._drag_pending = False  # The viewer may have just detached.
+
+    async def _draw_drag_frames(self, revision):
+        deadline = self._drag_last_paint + 1 / TARGET_FPS
+        try:
+            while revision == self._drag_revision and self._drag_dirty:
+                await asyncio.sleep(max(0, deadline - time.perf_counter()))
+                if revision != self._drag_revision or not self._drag_dirty:
+                    return
+                page = self._page()
+                if page is None or self.mode_picker.value != '3D':
+                    return
+                started = time.perf_counter()
+                self._drag_last_paint = started
+                self._drag_dirty = False
+                self._redraw(update=False)
+                if revision != self._drag_revision or self._page() is None:
+                    return
+                self.canvas.update()
+                deadline = started + 1 / TARGET_FPS
+        finally:
+            if revision == self._drag_revision:
+                self._drag_pending = False
+                # A native handler can deliver one more event as this task exits.
+                if self._drag_dirty and self._page() is not None and self.mode_picker.value == '3D':
+                    self._queue_drag_frame()
+
+    def _cancel_drag(self):
+        self._drag_revision += 1
+        self._drag_pending = self._drag_dirty = False
+        self._drag_position = None
+        self._drag_active = False
+        self._drag_last_paint = float('-inf')
+
+    def _change_view_mode(self, e=None):
+        self._cancel_drag()
+        self._redraw()
 
     def _reset_camera(self, e=None):
+        self._cancel_drag()
         self.yaw, self.pitch = -.62, .45
         self._redraw()
 
@@ -210,13 +294,19 @@ class AlgorithmCube(ft.Column):
             index = next((step.start for step in reversed(self._steps) if step.start < self.index), self.index)
         self.seek(index)
 
-    def stop(self, update=True):
+    def stop(self, update=True, *, keep_drag=False):
+        if not keep_drag:
+            self._cancel_drag()
         self._token += 1
         self.playing = False
         self._moving, self._fraction = None, 0
         self.play_button.icon = ft.Icons.PLAY_ARROW
         if update:
             self._redraw()
+
+    def will_unmount(self):
+        self.stop(update=False)
+        super().will_unmount()
 
     def _toggle(self, e=None):
         if self.playing:
@@ -269,4 +359,4 @@ class AlgorithmCube(ft.Column):
             self._moving, self._fraction = None, 0
             self._redraw()
         if token == self._token:
-            self.stop()
+            self.stop(keep_drag=True)
