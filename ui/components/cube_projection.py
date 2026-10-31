@@ -56,10 +56,12 @@ def _style(home, scheme, involved, focus):
 
 def project_cube(state, width, height, *, scheme=None, mode='3D', yaw=-.62, pitch=.45,
                  letters=True, focus=True, targets=(), affected=None, moving=None, fraction=0,
-                 edge_colors=True, buffer='UFR'):
+                 edge_colors=True, buffer='UFR', highlight_stickers=None):
     involved = ({frozenset(s) for s in affected} if affected is not None else
                 {frozenset(s) for s in (buffer, *targets)} if targets else set())
-    highlights = {s: color for s, color in zip((buffer, *targets), ('#80CFC1', '#6DD8C3', '#FFD08A'))} if focus else {}
+    highlights = ((highlight_stickers if highlight_stickers is not None else
+                   {s: color for s, color in zip((buffer, *targets), ('#80CFC1', '#6DD8C3', '#FFD08A'))})
+                  if focus else {})
     def appearance(home):
         return ('#35403C', '#F0F4F3') if not edge_colors and len(home) == 2 else _style(home, scheme, involved, focus)
     def label(home):

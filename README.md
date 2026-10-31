@@ -1,88 +1,92 @@
-# BLD Letter Memo Web 2.37.0
+# BLD Letter Memo Web 2.38.0
 
-## Corner walkthrough from a scramble
+## Scramble walkthrough
 
-Open **Method Library → Corner walkthrough**, choose a scheme, paste a real
-scramble and press **Generate walkthrough**. **Play all** animates the corner
-algorithms from that scrambled cube. The list shows each pair's letters,
-physical target stickers, actual moves and algorithm provenance. Click a pair
-to inspect its starting state, or use its play button to watch only that alg.
-Previous/next algorithm and restart controls are also available.
+Open **Method Library → Scramble walkthrough**, choose a scheme, paste a real
+scramble and select **Generate walkthrough**. The walkthrough executes corner
+permutation pairs using your exact corner buffer, memo orientation, own-
+orientation mode and saved cycle-break priorities/stickers. Saved preferred
+algorithms are used after full-sticker verification, with a warning and a
+verified built-in fallback when a saved choice is invalid. Other buffers use
+whole-cube setups around the fixed UFR case library.
 
-The walkthrough uses the original scramble simulation and corner tracing:
-selected memo orientation, own-orientation mode, exact buffer sticker, cycle-
-break priorities and preferred cycle-break stickers are honored. Original
-memo is shown separately from any visual-twist corrections. Letters and
-piece highlighting remain independent switches directly below the cube.
-The saved simultaneous-moves playback setting also applies.
+### Follow each algorithm
 
-Saved preferred case algorithms are used when their full sticker effect can
-be verified. Otherwise the built-in recommendation is used with a warning;
-the saved choice is retained for repair. Algorithms with a final cube rotation
-receive an explicit orientation reset for the sequence. The UFR library stays
-fixed to UFR; other scheme buffers use a verified whole-cube setup around the
-corresponding UFR algorithm. No buffer preference or saved algorithm is changed.
+**Play walkthrough** starts at the first pair. **Pause between algs** is on by
+default: playback stops after each complete algorithm and shows **Continue to
+next alg**. The finished algorithm and its affected pieces stay in view until
+you continue. Turn the switch off for continuous playback. Each card also has
+jump-to-start and play-this-algorithm controls. Previous/next and restart remain.
+The simultaneous-moves preference in Settings still applies.
 
-Two targets on the same physical corner are handled through two verified
-three-cycles using a helper. Visual twists get additional verified correction
-steps, so an even-target plan ends with every corner solved. Each step is
-checked against its intended oriented corner effect and restores edges and
-centers at its boundary.
+Highlighting follows the three actual corner pieces affected by the current
+algorithm, throughout its turns. It does not keep the original buffer piece
+highlighted after it has moved somewhere unrelated. Show letters, Highlight
+pieces and Pause between algs are switches directly below the cube.
 
-### Parity
+### Algorithm cards and editing
 
-An odd target count leaves the final unmatched oriented target pending for
-your separate parity algorithm. No single-target parity alg is executed.
-The final corner state is verified as exactly the corresponding buffer/target
-swap, including after visual-twist corrections. A parity-only scramble can
-therefore have zero paired algorithms. The status explicitly shows parity
-remaining; the walkthrough does not claim the whole cube is solved.
+Cards show the memo pair, physical target stickers, cleaned final moves,
+commutator notation, move statistics, subset, algorithm origin and learning
+status. Move counts treat a double turn as one move; quarter-turn counts treat
+it as two. Whole-cube rotations are counted separately. Commutator notation
+must describe the same execution, including any buffer setup. If bounded
+recovery cannot find a short form, the card says so and keeps the actual moves.
+It never substitutes another algorithm just because it solves the same case.
 
-### Edge display
+Click a pair title or **Open case & edit alg** to open the exact underlying UFR
+case and algorithm alternative. The editor remains open and supports the
+existing linked Commutator / Final alg fields. A back arrow returns to the
+walkthrough at the same move. Viewing a case does not save or replace anything.
+After changing an algorithm or scheme, regenerate the plan to use the new data.
 
-The Edges selector has three modes:
+### Twists and parity
 
-- **Hide edge colors**: neutral edges with their letters hidden, for corner focus.
-- **Show solved edges**: edges start solved and move naturally during each alg.
-- **Show scrambled edges**: use the physical edges from that exact scramble.
+No corner-twist algorithms are added. In-place twists are left alone whether
+your scheme memos them visually or as letters. Twist-only letter targets are
+removed before execution pairs are formed; the ordinary memo engine and
+practice modes retain their existing behavior. The final state is verified
+against the corner permutation, and remaining twists are listed explicitly.
 
-These are visualization choices. They do not rewrite the physical scramble,
-trace, corner plan, preferences or saved data. Edge display changes retain the
-current move position. Preferred edge buffers and virtual edge parity memo
-swaps are not required to generate this corner-only walkthrough.
+For odd permutation parity, the final unmatched ordinary target remains for
+your separate parity algorithm. It is never paired with a twist target or
+executed by itself. The status distinguishes solved corners, remaining twists,
+and remaining parity. A scramble containing only twists or one parity target
+can have zero paired algorithms.
 
-### Timer shortcuts
+### Edge display and Timer shortcuts
 
-The cube icon next to the Timer's previous/next scramble buttons opens the
-**current scramble**. Each saved solve's history row also has a cube icon for
-that solve's exact scramble. The compact icon group keeps the existing timer
-layout. Shortcuts do not start, save or cancel a solve; they are blocked while
-the timer is running or Space is held. The existing Timer instance, keyboard
-listener, sessions/history and result actions are preserved.
+- **Hide edge colors** masks edge colors and letters.
+- **Show solved edges** starts with solved edges. When corner parity is odd,
+  the configured physical edge buffer and parity helper are swapped so the
+  displayed permutation has matching parity. A note identifies the two edges.
+  Missing or conflicting edge settings produce a clear configuration note;
+  corner-only training still works.
+- **Show scrambled edges** uses the physical edges of the original scramble.
 
-Generated plans use a scheme/algorithm snapshot. Editing the scramble or
-changing the selected scheme or case algorithms clears a stale plan and asks
-you to generate it again. Generation and playback never save or replace case
-algorithms. Data version remains 18; existing storage keys, imports/exports,
-training logic, histories, algorithms and preferences retain their behavior.
-No new dependency or manual migration is required.
+Edges move naturally during an algorithm and return to their initial display
+state at each algorithm boundary. These modes only change the visualization;
+the source scramble, trace, plan and saved preferences remain unchanged.
+Changing edge view preserves the move and any completed-algorithm pause.
 
-**443 automated tests pass**, including all prior checks. New coverage
-executes the gold scrambles with all 24 corner-buffer stickers and both twist
-memo modes, all memo-frame/own-orientation combinations, saved and temporary
-cycle-break stickers, preferred/fallback algorithms, visual twists, exact
-unmatched-target parity residues, restored edges/centers, edge masking and
-solved-edge visualization. UI checks cover bounded layouts, stale-plan handling,
-light/dark colors, Timer/current/history shortcuts and unchanged saved data.
+Cube-icon shortcuts on the Timer open the current scramble or a saved solve's
+exact scramble. Timer sessions, history, layout and keyboard handling are
+preserved. These shortcuts remain blocked during a solve or a held Space key.
 
-The Flet web Python runtime also verified Timer-to-walkthrough routing, complete
-corner playback, parity reservation, edge modes and immutable saved data at six
-screen sizes. Prior camera dragging, simultaneous playback, case comparison,
-conversion, persistence/backups and themes also passed. Live browser client
-rendering remains unverified; no live deployment was performed.
+Data version remains **18**. Existing letter schemes, pairs, aliases, ratings,
+case algorithms, timer/practice history, browser storage and import/export
+remain compatible. No dependency, storage reset or manual migration is needed.
+Update by copying every release file into the existing project, then commit
+and push. See **PATCHING.md**.
 
-Patching is unchanged: copy every release file into the existing project,
-then commit and push. See PATCHING.md.
+**485 automated tests pass**, including the original BLD gold tests. Coverage
+includes all 24 corner-buffer stickers in both twist memo modes, memo frames,
+cycle-break preferences and temporary overrides, exact oriented execution,
+untouched twists, parity edge displays for all 24 edge-buffer stickers,
+three-piece highlighting, paused/continuous playback, stale tasks, editor
+navigation and unchanged saved data. The Flet web Python runtime additionally
+checks these flows and both themes at six viewport sizes. Actual browser-client
+rendering is not measured here; no live deployment is performed.
 
 ---
 

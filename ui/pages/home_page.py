@@ -38,7 +38,7 @@ def build_home(navigate, data=None):
                 "Trace a scramble using your scheme. Inspect memo targets and explore temporary cycle-break choices.",
                 ft.Icons.SHUFFLE, "Open scramble memo", lambda e: navigate("Scramble Memo"), "04 / UNDERSTANDING"),
             activity_card("Method Library",
-                "Study 3-style cases, explore your own algs, or watch a scramble's corner walkthrough. Save algorithms and track your progress.",
+                "Study 3-style cases, explore your own algs, or watch a scramble's scramble walkthrough. Save algorithms and track your progress.",
                 ft.Icons.SCHOOL_OUTLINED, "Open Method Library", lambda e: navigate("Method Library"), "05 / METHODS"),
         ], spacing=12, run_spacing=12),
         panel(ft.Row([

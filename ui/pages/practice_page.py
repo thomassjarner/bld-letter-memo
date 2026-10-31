@@ -168,7 +168,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             ft.Icons.CHEVRON_RIGHT, tooltip="Next scramble", on_click=self._new_scramble,
         )
         self.corner_walkthrough_button = ft.IconButton(ft.Icons.VIEW_IN_AR_OUTLINED,
-            tooltip="Corner walkthrough · current scramble", width=32, height=32, padding=4,
+            tooltip="Scramble walkthrough · current scramble", width=32, height=32, padding=4,
             icon_size=20, disabled=not self.current_scramble or bool(self._scramble_error),
             on_click=lambda e: self._open_corner_walkthrough(self.current_scramble))
         for button in (self.previous_scramble_button, self.new_scramble_button):
@@ -834,7 +834,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
                             ft.IconButton(ft.Icons.SHUFFLE, icon_size=17, width=32, height=32, padding=4, tooltip="Take to Scramble Memo",
                                           on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
                             ft.IconButton(ft.Icons.VIEW_IN_AR_OUTLINED, icon_size=17, width=32, height=32, padding=4,
-                                          tooltip="Corner walkthrough · saved solve",
+                                          tooltip="Scramble walkthrough · saved solve",
                                           on_click=lambda e, s=solve.scramble: self._open_corner_walkthrough(s)),
                             ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, width=32, height=32, padding=4, tooltip="Delete solve",
                                           on_click=lambda e, i=idx: self._delete_solve(i)),

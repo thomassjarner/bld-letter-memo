@@ -1,14 +1,15 @@
 """Verified, read-only corner execution plans using the existing tracer/library."""
 from collections import deque
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from functools import lru_cache
 
 from core.algorithms import Algorithm, Stage, apply_move, inverse_moves, inverse_state, parse_algorithm, simplify_moves
 from core.corner_algorithms import builtin_algorithms
-from core.cube_definitions import CORNER_PIECES, CORNER_STICKER_ORDER, EDGE_STICKER_ORDER, find_piece_for_sticker
+from core.cube_definitions import CORNER_PIECES, CORNER_STICKER_ORDER, EDGE_PIECES, EDGE_STICKER_ORDER, find_piece_for_sticker
 from core.tracer import (TraceResult, STANDARD_CORNER_PRIORITY, STANDARD_CORNER_STICKER,
-                         _at, _key, _physical_correct, _solved, _trace_category, simulate)
+                         _at, _key, _memo_swap_edge_identities, _physical_correct, _solved, _trace_category, simulate)
+from data.models import LetterScheme
 
 MAX_WALKTHROUGH_MOVES = 2400
 SOLVED = _solved()
@@ -113,6 +114,7 @@ class CornerPlan:
     algorithm: Algorithm
     parity_target: str | None
     warnings: tuple[str, ...]
+    remaining_twists: tuple[str, ...] = ()
 
 
 def target_letter(scheme, sticker):
@@ -164,44 +166,34 @@ def build_corner_plan(scramble, scheme, records=None, corner_cycle_break_overrid
                 warnings.append(f'{key.replace(":", " / ")}: saved choice could not be verified; using the built-in recommendation.')
         raise ValueError('Could not verify an algorithm for ' + first + ' / ' + second)
 
-    def resolve(first, second):
-        if first == second: return (), ()
-        if set(first) != set(second): return resolve_distinct(first, second)
-        preferred = dict(STANDARD_CORNER_STICKER, **scheme.corners.cycle_break_stickers)
-        order = list(scheme.corners.cycle_break_priority or STANDARD_CORNER_PRIORITY) + list(CORNER_PIECES)
-        helper_piece = next(p for p in order if p in CORNER_PIECES and set(p) not in (set(buffer), set(first)))
-        helper = preferred.get(helper_piece, helper_piece)
-        if helper not in CORNER_PIECES[helper_piece]: helper = helper_piece
-        left, lp = resolve_distinct(first, helper)
-        right, rp = resolve_distinct(helper, second)
-        moves = simplify_moves(left + right)
-        if apply_moves(SOLVED, moves) != _pair_effect(buffer, first, second):
-            raise ValueError('Could not verify a corner twist correction.')
-        return moves, lp + rp
-
     current = initial
-    def add_pair(first, second, correction=False):
+    def add_pair(first, second):
         nonlocal current
-        moves, parts = resolve(first, second)
-        if not moves: return
+        if first == second: return
+        if set(first) == set(second):
+            raise ValueError('Twist targets cannot be used as a permutation pair.')
+        moves, parts = resolve_distinct(first, second)
         if len(all_moves) + len(moves) > MAX_WALKTHROUGH_MOVES:
             raise ValueError('This walkthrough exceeds 2400 moves. Choose shorter case algorithms first.')
         letters = target_letter(scheme, first) + target_letter(scheme, second)
         start = len(all_moves)
         all_moves.extend(moves)
-        step = CornerStep(first, second, letters, moves, parts, start, len(all_moves), correction)
+        step = CornerStep(first, second, letters, moves, parts, start, len(all_moves))
         steps.append(step)
         label = f'{len(steps)} · {letters if "?" not in letters else first + " / " + second}'
-        if correction: label += ' · twist correction'
         stages.append(Stage(label, start, len(all_moves)))
         current = apply_moves(current, moves)
 
-    targets = trace.corner_targets
+    # Orientation targets are deliberately omitted before pairing. With odd
+    # permutation parity, pairing the final permutation target with a twist
+    # target would execute a different case and reserve the wrong parity shot.
+    targets = [target for target, orientation_target in zip(trace.corner_targets, flags)
+               if not orientation_target]
     parity = targets[-1] if len(targets) % 2 else None
     for i in range(0, len(targets) - 1, 2): add_pair(targets[i], targets[i + 1])
 
-    # Visual twists are not ordinary memo targets. Correct their exact residual
-    # effect while retaining the same unmatched oriented parity target.
+    # Verify permutation against the reserved parity shot, but leave all
+    # residual orientation alone. No twist algorithms are synthesized.
     expected = corner_shot(SOLVED, buffer, parity) if parity else SOLVED
     reverse = inverse_state(expected)
     delta = dict(SOLVED)
@@ -210,18 +202,34 @@ def build_corner_plan(scramble, scheme, records=None, corner_cycle_break_overrid
         delta[position] = reverse[_key(current[position])]
     if not all(_physical_correct(delta, piece, CORNER_STICKER_ORDER) for piece in CORNER_PIECES):
         raise ValueError('The corner target sequence could not be verified.')
-    correction_targets, _, _, _, _ = _trace_category(delta,
-        replace(scheme.corners, orientation_memo='trace'), CORNER_STICKER_ORDER, CORNER_PIECES,
-        STANDARD_CORNER_PRIORITY, STANDARD_CORNER_STICKER)
-    if len(correction_targets) % 2:
-        raise ValueError('Could not pair the remaining corner twists.')
-    for i in range(0, len(correction_targets), 2):
-        add_pair(correction_targets[i], correction_targets[i + 1], True)
-    if any(_at(current, s) != _at(expected, s) for s in CORNER_STICKER_ORDER):
-        raise ValueError('The final corner state could not be verified.')
+    twists = tuple(piece for piece, stickers in CORNER_PIECES.items()
+                   if any(_at(delta, sticker) != sticker for sticker in stickers))
     if any(_at(current, s) != _at(initial, s) for s in EDGE_STICKER_ORDER + list('ULFRBD')):
         raise ValueError('The corner algorithms unexpectedly changed edges or centers.')
     moves = tuple(all_moves)
     algorithm = Algorithm(' '.join(moves), moves, tuple(stages))
     return CornerPlan(scramble.strip(), scheme.name, snapshot, buffer, trace, initial, current,
-                      tuple(steps), algorithm, parity, tuple(dict.fromkeys(warnings)))
+                      tuple(steps), algorithm, parity, tuple(dict.fromkeys(warnings)), twists)
+
+
+def edge_parity_pair(scheme):
+    """The configured physical edges, independent of their buffer sticker face."""
+    buffer = scheme.edges.buffer_sticker or scheme.edges.buffer_piece
+    piece = find_piece_for_sticker(buffer, EDGE_PIECES) if buffer else None
+    helper = scheme.edge_parity_partner or 'UR'
+    if piece in EDGE_PIECES and helper in EDGE_PIECES and piece != helper:
+        return piece, helper
+    return None
+
+
+def walkthrough_initial(plan, edge_view='scrambled'):
+    """A display-only state; never modify the scramble or the saved scheme."""
+    initial = dict(plan.initial)
+    if edge_view == 'solved':
+        for position, home in SOLVED.items():
+            if len(home) == 2: initial[position] = home
+        scheme = LetterScheme.from_dict(plan.scheme_name, plan.scheme_snapshot)
+        pair = edge_parity_pair(scheme)
+        if plan.parity_target and pair:
+            initial = _memo_swap_edge_identities(initial, *pair)
+    return initial

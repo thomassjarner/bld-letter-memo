@@ -99,6 +99,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._playground_analysis_source = None
         self._analysis = None
         self.walkthrough = None
+        self._walkthrough_return = False
         self.playground_saved = dropdown(label='Saved playground algorithms', value='', height=38, dense=True,
             options=[ft.DropdownOption('', 'Unsaved playground')], on_select=self._choose_playground)
         self.playground_name = field(label='Name', value='', height=38, dense=True)
@@ -134,7 +135,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.section_buttons = {
             key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
             for key, label in (('overview', 'Overview'), ('library', '3-style corner cases'),
-                               ('explorer', 'Playground'), ('walkthrough', 'Corner walkthrough'), ('lesson', 'Commutator Lesson'))
+                               ('explorer', 'Playground'), ('walkthrough', 'Scramble walkthrough'), ('lesson', 'Commutator Lesson'))
         }
         self.section_nav = ft.Row(list(self.section_buttons.values()), spacing=2, height=36,
                                   scroll=ft.ScrollMode.AUTO)
@@ -151,8 +152,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 'Paste moves or a commutator, see what happens to the cube and save your alg. '
                 'No case or buffer required.',
                 ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'FREE EXPLORATION'),
-            activity_card('Corner walkthrough',
-                'Paste a scramble and watch the corner algorithms solve it using your scheme and cycle breaks. Parity is left for your separate alg.',
+            activity_card('Scramble walkthrough',
+                'Watch the corner target pairs from a scramble using your scheme and cycle breaks. Twists and parity are left untouched.',
                 ft.Icons.PLAY_CIRCLE_OUTLINE, 'Open walkthrough', lambda e: self._set_mode('walkthrough'), 'FROM A SCRAMBLE'),
         ]
         for card in cards:
@@ -256,10 +257,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.case_list.controls = rows or [ft.Text('No cases match these filters.', color=ft.Colors.ON_SURFACE_VARIANT)]
         self.more_button.visible = len(matches) > self.limit
 
-    def select_case(self, key, *, edit=False):
+    def select_case(self, key, *, edit=False, algorithm_id=None):
         self.viewer.stop(update=False)
         self.selected_case = key
-        self.selected_algorithm = self.record().preferred_algorithm
+        self.selected_algorithm = self.record().preferred_algorithm if algorithm_id is None else algorithm_id
         self.hidden = False
         self.notes_open = False
         self.case_converter.cancel_pending()
@@ -384,7 +385,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         def small_icon(icon, tooltip, callback, disabled=False):
             return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
                 icon_size=19, width=32, height=32, padding=4, disabled=disabled)
+        back = small_icon(ft.Icons.ARROW_BACK, 'Return to scramble walkthrough', lambda e: self._set_mode('walkthrough'))
+        back.visible = self._walkthrough_return
         self.case_toolbar = ft.Row([
+            back,
             ft.Column([
                 ft.Text(self._label(case), size=20, weight=ft.FontWeight.W_600, max_lines=1,
                         overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE),
@@ -719,7 +723,11 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def _open_matching_case(self, e=None):
         if not self._identified:
             return
-        key = self._identified
+        self._open_library_case(self._identified)
+
+    def _open_library_case(self, key, algorithm_id=None):
+        if self.walkthrough is not None: self.walkthrough.set_active(False)
+        self.playground_converter.cancel_pending()
         matches = self.filtered_cases()
         if not any(case.id == key for case in matches):
             self.search.value = ''
@@ -730,7 +738,11 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.limit = max(self.limit, min(len(matches), (index // 50 + 1) * 50))
         self.mode = 'library'
         self._loaded_key = self._editor_key = None
-        self.select_case(key, edit=True)
+        self.select_case(key, edit=True, algorithm_id=algorithm_id)
+
+    def _open_walkthrough_case(self, part):
+        self._walkthrough_return = True
+        self._open_library_case(part.case_id, part.algorithm_id)
 
     def _render_lesson(self):
         alg = parse_algorithm(BASE_ALG)
@@ -774,6 +786,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.viewer.stop(update=False)
         if self.walkthrough is not None: self.walkthrough.set_active(False)
         self.mode = mode
+        if mode != 'library': self._walkthrough_return = False
         self._loaded_key = None
         self.error.value = self.notice.value = ''
         if mode == 'overview': self._render_overview()
@@ -786,6 +799,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def _render_walkthrough(self):
         if self.walkthrough is None:
             self.walkthrough = CornerWalkthrough(data=self.state)
+            self.walkthrough.open_case_callback = self._open_walkthrough_case
         self.walkthrough.refresh(self.label_scheme, update=False)
         self._layout()
 

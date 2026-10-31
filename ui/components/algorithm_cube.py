@@ -8,7 +8,7 @@ import flet.canvas as cv
 
 from core.algorithms import algorithm_states, changed_stickers, normalized_state, parse_algorithm, simplified_algorithm
 from core.algorithm_playback import playback_steps
-from core.tracer import _orient, _solved
+from core.tracer import _key, _orient, _solved
 from ui.components.cube_projection import project_cube
 from ui.theme_colors import apply_palette
 
@@ -25,6 +25,9 @@ class AlgorithmCube(ft.Column):
         self._steps = ()
         self._preserve_stages = False
         self._stage_targets = {}
+        self._stage_focus = {}
+        self._boundary_stage = None
+        self.pause_after_stage = False
         self._initial = None
         self.states = [_solved()]
         self.index = 0
@@ -77,6 +80,11 @@ class AlgorithmCube(ft.Column):
         self.stage_text = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.current_stage = ft.Text('', size=12, weight=ft.FontWeight.W_600,
                                      color=ft.Colors.PRIMARY, visible=False, max_lines=2)
+        self.continue_button = ft.FilledTonalButton('Continue to next alg',
+            icon=ft.Icons.PLAY_ARROW, visible=False, on_click=self._toggle,
+            style=ft.ButtonStyle(color=ft.Colors.ON_PRIMARY_CONTAINER, bgcolor=ft.Colors.PRIMARY_CONTAINER))
+        self.stage_status = ft.Row([self.current_stage, self.continue_button],
+                                   spacing=8, run_spacing=4, wrap=True, visible=False)
         self.view_options = ft.ExpansionTile(title=ft.Text('View options & stages', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             dense=True, min_tile_height=34, tile_padding=0, controls_padding=ft.Padding.only(bottom=4),
             maintain_state=True, expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
@@ -86,7 +94,7 @@ class AlgorithmCube(ft.Column):
         self.controls = [
             self.canvas,
             self.display_switches,
-            self.current_stage,
+            self.stage_status,
             ft.Row([icon_button(ft.Icons.FIRST_PAGE, 'First move', lambda e: self.seek(0)),
                     icon_button(ft.Icons.CHEVRON_LEFT, 'Previous move', lambda e: self._step(-1)),
                     self.play_button,
@@ -138,8 +146,25 @@ class AlgorithmCube(ft.Column):
         self.states = algorithm_states(self.algorithm, self._initial)
         self._steps = playback_steps(self.algorithm, self.simultaneous_moves)
         self._caption_key, self.index = None, 0
+        self._boundary_stage = None
         self.affected = (set() if self._preserve_stages else
                          {frozenset(s) for s in changed_stickers(normalized_state(self.original_algorithm)) if len(s) > 1})
+        self._stage_focus = {}
+        if self._preserve_stages:
+            for stage in self.algorithm.stages:
+                before, after = self.states[stage.start], self.states[stage.end]
+                # Highlight the occupants actually moved by this alg. Home
+                # identities at the buffer/targets can differ after every pair.
+                affected = {frozenset(home) for position, home in before.items()
+                            if len(home) > 1 and home != after[position]}
+                colors = {}
+                for sticker, color in zip((self.buffer, *self._stage_targets.get(stage.label, ())),
+                                          ('#80CFC1', '#6DD8C3', '#FFD08A')):
+                    piece = frozenset(before[_key(sticker)])
+                    if piece in affected: colors[piece] = color
+                highlights = {home: colors.get(frozenset(home), '#6DD8C3')
+                              for home in before.values() if frozenset(home) in affected}
+                self._stage_focus[stage.label] = affected, highlights
         self.stage_buttons.controls = [ft.TextButton(s.label, on_click=lambda e, stage=s: self.play_stage(stage))
                                       for s in self.algorithm.stages] if len(self.algorithm.stages) > 1 else []
         self._redraw(update=False)
@@ -165,16 +190,24 @@ class AlgorithmCube(ft.Column):
         self.canvas.height = self.drag_area.height = height
         self._redraw(update=False)
 
+    def _active_stage(self):
+        if self._boundary_stage is not None and self.index == self._boundary_stage.end:
+            return self._boundary_stage
+        if self.algorithm is None: return None
+        return next((s for s in self.algorithm.stages if s.start <= self.index < s.end),
+                    self.algorithm.stages[-1] if self.algorithm.stages else None)
+
     def _redraw(self, update=True):
-        if self._preserve_stages and self._stage_targets and self.algorithm.stages:
-            stage = next((s for s in self.algorithm.stages if s.start <= self.index < s.end), self.algorithm.stages[-1])
+        highlights = None
+        if self._preserve_stages and self.algorithm.stages:
+            stage = self._active_stage()
             self.targets = self._stage_targets.get(stage.label, ())
-            self.affected = {frozenset(s) for s in (self.buffer, *self.targets)}
+            self.affected, highlights = self._stage_focus[stage.label]
         tiles = project_cube(self.states[self.index], *self._viewport, scheme=self.scheme,
             mode=self.mode_picker.value, yaw=self.yaw, pitch=self.pitch,
             letters=self.letter_switch.value, focus=self.focus_switch.value,
             targets=self.targets, affected=self.affected, moving=self._moving, fraction=self._fraction,
-            edge_colors=self.edge_colors, buffer=self.buffer)
+            edge_colors=self.edge_colors, buffer=self.buffer, highlight_stickers=highlights)
         shapes = []
         for tile in tiles:
             elements = [cv.Path.MoveTo(*tile.points[0]), *[cv.Path.LineTo(*p) for p in tile.points[1:]], cv.Path.Close()]
@@ -189,7 +222,7 @@ class AlgorithmCube(ft.Column):
                     style=ft.TextStyle(color=tile.foreground, size=max(9, min(20, side * (.38 if len(tile.label) == 1 else .25))),
                                        weight=ft.FontWeight.W_600)))
         self.canvas.shapes = shapes
-        caption_key = (id(self.algorithm), self.index, self.simultaneous_moves)
+        caption_key = (id(self.algorithm), self.index, self.simultaneous_moves, self._boundary_stage)
         if caption_key != self._caption_key:
             self._caption_key = caption_key
             self._render_caption()
@@ -202,9 +235,12 @@ class AlgorithmCube(ft.Column):
             stage = next((s.label for s in self.algorithm.stages if s.start <= self.index < s.end), 'Finished')
             self.stage_text.value = stage
             self.current_stage.visible = self._preserve_stages and bool(self.algorithm.stages)
-            self.current_stage.value = 'Current algorithm · ' + stage if stage != 'Finished' else 'Corner sequence complete'
-            active_stage = next((s for s in self.algorithm.stages if s.start <= self.index < s.end),
-                                self.algorithm.stages[-1] if self.algorithm.stages else None)
+            self.stage_status.visible = self.current_stage.visible
+            self.current_stage.value = ('Completed · ' + self._boundary_stage.label if self._boundary_stage else
+                'Current algorithm · ' + stage if stage != 'Finished' else 'Sequence complete')
+            self.continue_button.visible = (self._preserve_stages and self._boundary_stage is not None
+                                            and self.index < len(self.states) - 1)
+            active_stage = self._active_stage()
             self.move_text.spans = [ft.TextSpan(step.caption + ' ', style=ft.TextStyle(
                 weight=ft.FontWeight.BOLD if step.start <= self.index < step.end else ft.FontWeight.NORMAL,
                 decoration=ft.TextDecoration.UNDERLINE if step.start <= self.index < step.end else None,
@@ -308,6 +344,7 @@ class AlgorithmCube(ft.Column):
 
     def seek(self, index):
         self.stop(update=False)
+        self._boundary_stage = None
         self.index = max(0, min(index, len(self.states) - 1))
         self._redraw()
 
@@ -342,6 +379,7 @@ class AlgorithmCube(ft.Column):
 
     def play_to(self, end):
         self.stop(update=False)
+        self._boundary_stage = None
         if self._page() is None:
             return
         self._redraw(update=False)
@@ -355,6 +393,11 @@ class AlgorithmCube(ft.Column):
         self.play_to(stage.end)
 
     async def _play(self, token, end):
+        if token != self._token: return
+        self._boundary_stage = None
+        if self._preserve_stages and self.pause_after_stage:
+            stage = self._active_stage()
+            if stage is not None: end = min(end, stage.end)
         while self.index < min(end, len(self.states) - 1) and token == self._token:
             finish = min(end, next(step.end for step in self._steps if step.start <= self.index < step.end))
             moves = self.algorithm.moves[self.index:finish]
@@ -381,6 +424,8 @@ class AlgorithmCube(ft.Column):
                 return
             self.index = finish
             self._moving, self._fraction = None, 0
+            if self._preserve_stages and finish == end:
+                self._boundary_stage = next((s for s in self.algorithm.stages if s.end == finish), None)
             self._redraw()
         if token == self._token:
             self.stop(keep_drag=True)
