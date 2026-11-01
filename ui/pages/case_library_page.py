@@ -129,31 +129,32 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         return self._cases
 
     def _make_header(self):
-        self.title = ft.Text('Method Library', size=20, weight=ft.FontWeight.W_600,
+        self.title = ft.Text('Method Library', size=24, weight=ft.FontWeight.W_600,
                              max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.ON_SURFACE)
         self.header_top = ft.Container()
         self.section_buttons = {
-            key: ft.TextButton(label, on_click=lambda e, m=key: self._set_mode(m))
+            key: ft.TextButton(label, height=36, on_click=lambda e, m=key: self._set_mode(m))
             for key, label in (('overview', 'Overview'), ('library', '3-style corner cases'),
                                ('explorer', 'Playground'), ('walkthrough', 'Scramble walkthrough'), ('lesson', 'Commutator Lesson'))
         }
         self.section_nav = ft.Row(list(self.section_buttons.values()), spacing=2, height=36,
                                   scroll=ft.ScrollMode.AUTO)
+        self.section_menu = dropdown(label='Workspace', value=self.mode, height=38, dense=True,
+            options=[ft.DropdownOption(key, button.content) for key, button in self.section_buttons.items()],
+            on_select=lambda e: self._set_mode(e.control.value))
         self.header = ft.Column(spacing=4)
         self.controls = [self.header, self.body]
 
     def _render_overview(self):
         cards = [
             activity_card('3-style corner cases',
-                'Find an algorithm for two target stickers, edit it and track your progress. '
-                '378 cases with UFR as the buffer; subsets and filters are inside.',
+                'Choose two target stickers, compare algorithms, and track progress. 378 cases with UFR as the buffer.',
                 ft.Icons.GRID_VIEW, 'Open corner cases', lambda e: self._set_mode('library'), 'CASE LIBRARY'),
             activity_card('Algorithm Playground',
-                'Paste moves or a commutator, see what happens to the cube and save your alg. '
-                'No case or buffer required.',
+                'Paste moves or a commutator, inspect its effect, and save your own algorithm.',
                 ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'FREE EXPLORATION'),
             activity_card('Scramble walkthrough',
-                'Watch the corner target pairs from a scramble using your scheme and cycle breaks. Twists and parity are left untouched.',
+                'Watch the corner target pairs from a scramble using your scheme and cycle breaks.',
                 ft.Icons.PLAY_CIRCLE_OUTLINE, 'Open walkthrough', lambda e: self._set_mode('walkthrough'), 'FROM A SCRAMBLE'),
         ]
         for card in cards:
@@ -161,7 +162,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         records = list(self.state.data.corner_case_library.values())
         self.overview_controls = [
             ft.Column([
-                ft.Text('Choose a workspace.', size=23, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text('Choose a workspace.', size=18, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                 ft.Text('Study a corner case, or test an algorithm of your own. '
                         'Your selected letter scheme supplies the sticker labels.',
                         size=13, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -384,7 +385,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             f'Supplied algorithm · {selected_builtin.position}' if selected_builtin.origin == 'supplied' else 'Generated fallback')
         def small_icon(icon, tooltip, callback, disabled=False):
             return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
-                icon_size=19, width=32, height=32, padding=4, disabled=disabled)
+                icon_size=18, width=32, height=32, padding=4, disabled=disabled)
         back = small_icon(ft.Icons.ARROW_BACK, 'Return to scramble walkthrough', lambda e: self._set_mode('walkthrough'))
         back.visible = self._walkthrough_return
         self.case_toolbar = ft.Row([
@@ -817,7 +818,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.scheme_picker.label = 'Scheme' if self.mode == 'walkthrough' else 'Letter labels'
         self.scheme_picker.tooltip = ('Uses this scheme\'s corner buffer, orientation, letters and cycle-break preferences.'
                                       if self.mode == 'walkthrough' else None)
-        self.title.size = 18 if width < 440 else 20
+        self.title.size = 20 if width < 760 else 24
+        self.section_menu.value = self.mode
+        self.section_menu.width = width
         self.scheme_picker.width = min(200, max(108, width * .38))
         self.scheme_picker.height = 38
         self.header_top.height = 42
@@ -829,14 +832,14 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         else:
             self.section_nav.expand = False
             self.header_top.content = ft.Row([ft.Container(self.title, expand=True), self.scheme_picker], spacing=8)
-            self.header.controls = [self.header_top, self.section_nav]
+            self.header.controls = [self.header_top, self.section_menu if width < 760 else self.section_nav]
             self.header.height = 82
         for key, button in self.section_buttons.items():
             selected = key == self.mode
             button.style = ft.ButtonStyle(
                 color=ft.Colors.ON_PRIMARY_CONTAINER if selected else ft.Colors.ON_SURFACE_VARIANT,
                 bgcolor=ft.Colors.PRIMARY_CONTAINER if selected else ft.Colors.TRANSPARENT,
-                text_style=ft.TextStyle(size=12), shape=ft.RoundedRectangleBorder(radius=7),
+                text_style=ft.TextStyle(size=13), shape=ft.RoundedRectangleBorder(radius=8),
                 padding=ft.Padding.symmetric(horizontal=9, vertical=6))
         available = max(60, height - self.header.height - self.spacing)
         self.body.width, self.body.height = width, available

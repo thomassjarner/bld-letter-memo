@@ -3,7 +3,7 @@ from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from core.cube_definitions import CATEGORY_PIECES, CATEGORY_STICKER_ORDER
 from core.tracer import CycleBreakOverride, ScrambleTracer, ScrambleError
-from ui.design import page_heading, panel, eyebrow
+from ui.design import action_button, page_heading, panel, section_title
 
 
 # Chosen for legibility in both themes. The dark palette is intentionally
@@ -19,6 +19,7 @@ DARK_ORIENTATION_COLOR = "#42A5F5"
 
 @ft.control
 class ScrambleMemoPage(ThemeAwarePage, ft.Column):
+    open_scheme_callback = None
     @property
     def state(self):
         # BaseControl.data is a Flet skip_field(), so Python-only AppState
@@ -33,8 +34,8 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         self.scramble = ft.TextField(
             label="Scramble",
             multiline=True,
-            min_lines=2,
-            max_lines=4,
+            min_lines=1,
+            max_lines=3, dense=True, text_size=13,
             hint_text="Paste a 3x3 scramble here",
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.error = ft.Text("", color=ft.Colors.ERROR)
@@ -48,34 +49,37 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         self.corner_break_overrides: dict[int, CycleBreakOverride] = {}
         self.edge_break_overrides: dict[int, CycleBreakOverride] = {}
         self.last_trace_input_key = None
-        self.toggle_button = ft.OutlinedButton("Show words", icon=ft.Icons.TRANSLATE, on_click=self._toggle_words)
+        self.scheme_context = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.setup_scheme_button = action_button("Set up a letter scheme", icon=ft.Icons.GRID_VIEW,
+            on_click=lambda e: self.open_scheme_callback() if self.open_scheme_callback else None)
+        self.toggle_button = action_button("Show words", icon=ft.Icons.TRANSLATE, on_click=self._toggle_words)
         self.reset_breaks_button = ft.OutlinedButton(
             "Reset to priority",
             icon=ft.Icons.RESTART_ALT,
             on_click=self._reset_cycle_breaks,
-            visible=False,
+            visible=False, height=36,
         )
+        self.trace_diagnostics = ft.ExpansionTile(title=ft.Text("Diagnostic trace", size=13, color=ft.Colors.ON_SURFACE), controls=[self.details])
 
         self.controls = [
-            page_heading("Scramble Memo", "Trace a real scramble through your own letter scheme.", "04 / Understanding"),
+            page_heading("Scramble Memo", "Trace a real scramble through your own letter scheme."),
             panel(ft.Column([
-                eyebrow("Scramble input"),
-                ft.Text("Uses White-top / Green-front unless your scheme enables its own orientation.",
-                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.scheme_context,
+                self.setup_scheme_button,
                 self.scramble,
                 ft.Row([
-                    ft.FilledButton("Generate memo", icon=ft.Icons.PLAY_ARROW, on_click=self.generate),
+                    action_button("Generate memo", primary=True, icon=ft.Icons.PLAY_ARROW, on_click=self.generate),
                     self.toggle_button, self.reset_breaks_button,
-                ], wrap=True),
+                ], wrap=True, spacing=8),
                 self.error,
-            ], spacing=12)),
+            ], spacing=10)),
             panel(ft.Column([
-                eyebrow("Memo output"),
-                ft.Text("Click an underlined cycle-break target to choose another piece or sticker for this scramble. Your saved preferences stay unchanged.",
+                section_title("Memo", ft.Icons.NOTES),
+                ft.Text("Underlined targets open temporary cycle-break choices.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.result_area,
-            ], spacing=12)),
-            ft.ExpansionTile(title=ft.Text("Diagnostic trace", size=13, color=ft.Colors.ON_SURFACE), controls=[self.details]),
+            ], spacing=10)),
+            self.trace_diagnostics,
         ]
         self._render_result()
 
@@ -186,7 +190,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
 
     def _toggle_words(self, e):
         self.show_words = not self.show_words
-        self.toggle_button.text = "Show letters" if self.show_words else "Show words"
+        self.toggle_button.content = "Show letters" if self.show_words else "Show words"
         self._render_result()
         self.update()
 
@@ -348,6 +352,14 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         return ft.Text(spans=spans, size=18, selectable=True, color=ft.Colors.ON_SURFACE)
 
     def _render_result(self):
+        scheme = self.state.active_scheme
+        colors = {'W':'White','Y':'Yellow','G':'Green','B':'Blue','R':'Red','O':'Orange'}
+        self.scheme_context.value = (f'{scheme.name} · {colors.get(scheme.memo_up, scheme.memo_up)} up / '
+            f'{colors.get(scheme.memo_front, scheme.memo_front)} front' + (' · own orientation' if scheme.scramble_from_own_orientation else '')
+            if scheme else 'Choose a letter scheme to generate memo.')
+        self.setup_scheme_button.visible = scheme is None
+        self.error.visible = bool(self.error.value)
+        self.trace_diagnostics.visible = bool(self.details.value)
         if self.last_result is None:
             order = "EC"
         else:

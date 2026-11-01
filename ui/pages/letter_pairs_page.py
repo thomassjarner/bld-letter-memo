@@ -17,6 +17,8 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         self._viewport = (1400.0, 760.0)
         self._table_columns = 2
         self._compact_cells = False
+        self._filters_dialog = None
+        self._filter_summary = None
         self.selected_view = "dictionary"
         # Stats sub-sort: mnemonic length defaults to longest -> shortest.
         self.word_length_sort = "length_desc"
@@ -61,7 +63,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             width=154, height=42, dense=True, value="all", label="Status", options=[], on_select=self._on_search_change
         , color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.grade_sort = ft.Dropdown(
-            width=164, height=42, dense=True, value="default", label="Sort by grade", options=[], on_select=self._on_search_change
+            width=164, height=42, dense=True, value="default", label="Sort by rating", options=[], on_select=self._on_search_change
         , color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.progress_text = ft.Text(size=11, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE)
         self.duplicate_warning = ft.Text(size=11, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.TERTIARY)
@@ -92,6 +94,9 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             ft.Icon(ft.Icons.INFO_OUTLINE, size=16, color=ft.Colors.ON_SURFACE_VARIANT,
                     tooltip="Double-click a pair label to edit its display alias (for example AB → ØB)."),
         ], spacing=12, height=22)
+        self._summary_info = self.summary_line.controls[-1]
+        self.filter_button = ft.OutlinedButton("Filters", icon=ft.Icons.TUNE, height=36, visible=False,
+                                               on_click=self._open_filters)
         self.filters_area = ft.Column(spacing=6)
         self.filters_panel = panel(self.filters_area, padding=10)
         self.table_header = ft.Row(spacing=16, height=28)
@@ -104,8 +109,9 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
                                            size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.heading = ft.Container(ft.Row([
             ft.Text("Letter Pairs", size=24, weight=ft.FontWeight.W_600,
-                    color=ft.Colors.ON_SURFACE, expand=True),
+                    color=ft.Colors.ON_SURFACE, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
             self.heading_description,
+            self.filter_button,
         ], spacing=16), height=42)
         self.controls = [self.heading, self.tabbar, self.content_area]
         self._layout_viewport()
@@ -126,6 +132,12 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         self.width = width
         self.heading.width = width
         self.heading_description.visible = width >= 800
+        self.filter_button.visible = width < 800
+        active = sum((self.scheme_filter.value != '__all__', self.status_filter.value != 'all', self.grade_sort.value != 'default'))
+        self.filter_button.tooltip = f'{active} filter{"s" if active != 1 else ""} active' if active else 'Filter schemes, status and ratings'
+        self.filter_button.style = ft.ButtonStyle(
+            bgcolor=ft.Colors.PRIMARY_CONTAINER if active else ft.Colors.TRANSPARENT,
+            color=ft.Colors.ON_PRIMARY_CONTAINER if active else ft.Colors.PRIMARY)
         self.tabbar.width = width
         self.content_area.width = width
         self.content_area.height = height - 98
@@ -137,6 +149,9 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
         for control in (self.scheme_filter, self.status_filter, self.grade_sort):
             control.expand = False
         if width >= 800:
+            self.filter_average_text.expand = self.overall_average_text.expand = True
+            self.summary_line.controls = [self.filter_average_text, self.overall_average_text, self._summary_info]
+            self.summary_line.height = 22
             self.scheme_filter.width, self.status_filter.width, self.grade_sort.width = 210, 154, 164
             self.filters_area.controls = [
                 ft.Row([self.search_field, self.scheme_filter, self.status_filter, self.grade_sort],
@@ -147,14 +162,18 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             filter_height = 128
         else:
             self.progress_line.expand = False
-            for control in (self.scheme_filter, self.status_filter, self.grade_sort):
-                control.width = (inner - 16) / 3
+            self.filter_average_text.expand = self.overall_average_text.expand = False
+            self.summary_line.controls = [ft.Column([self.filter_average_text, self.overall_average_text],
+                                                   spacing=2, expand=True, tight=True), self._summary_info]
+            self.summary_line.height = 34
             self.filters_area.controls = [
                 ft.Row([self.search_field], height=42),
-                ft.Row([self.scheme_filter, self.status_filter, self.grade_sort], spacing=8, height=42),
-                self.search_modes, self.progress_line, self.summary_line,
+                self.search_modes,
             ]
-            filter_height = 204
+            filter_height = 100
+            if height >= 480:
+                self.filters_area.controls += [self.progress_line, self.summary_line]
+                filter_height = 168
         self.duplicate_warning.visible = bool(self.duplicate_warning.value)
         if self.duplicate_warning.visible:
             self.filters_area.controls.append(self.duplicate_warning)
@@ -176,6 +195,43 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             self.content_area.controls = [self.stats_scroll]
         else:
             self.content_area.controls = [self.filters_panel, self.group_controls, self.table_header, self.rows_view]
+
+    def _open_filters(self, e=None):
+        controls = []
+        for target in (self.scheme_filter, self.status_filter, self.grade_sort):
+            controls.append(ft.Dropdown(label=target.label, value=target.value, height=42, dense=True, text_size=13,
+                color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                options=[ft.DropdownOption(o.key, o.text) for o in target.options],
+                on_select=lambda event, field=target: self._filter_selected(field, event.control.value)))
+        self._filter_summary = ft.Column([
+            ft.Text(self.progress_text.value, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(self.filter_average_text.value, size=12, color=ft.Colors.ON_SURFACE),
+            ft.Text(self.overall_average_text.value, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+        ], spacing=6, tight=True)
+        self._filters_dialog = ft.AlertDialog(modal=True, scrollable=True, title=ft.Text("Letter pair filters"),
+            content=ft.Container(ft.Column([*controls, self._filter_summary], spacing=12, tight=True), width=300),
+            actions=[ft.TextButton("Reset filters", on_click=self._reset_filters),
+                     ft.FilledButton("Done", on_click=self._close_filters)])
+        show_themed_dialog(self.page, self._filters_dialog, self.state.data.dark_mode)
+
+    def _filter_selected(self, field, value):
+        field.value = value
+        self._on_search_change(None)
+        if self._filter_summary is not None:
+            for text, source in zip(self._filter_summary.controls,
+                                    (self.progress_text, self.filter_average_text, self.overall_average_text)):
+                text.value = source.value
+            if self._filter_summary.page is not None: self._filter_summary.update()
+
+    def _close_filters(self, e=None):
+        if self._filters_dialog is not None:
+            self.page.pop_dialog()
+            self._filters_dialog = None
+
+    def _reset_filters(self, e=None):
+        self.scheme_filter.value, self.status_filter.value, self.grade_sort.value = '__all__', 'all', 'default'
+        self._close_filters()
+        self._on_search_change(None)
 
     def _compact_header(self):
         if self._compact_cells:

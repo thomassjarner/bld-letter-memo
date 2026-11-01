@@ -7,7 +7,7 @@ from ui.components.buffer_picker import build_buffer_picker
 from ui.components.sticker_grid import build_sticker_grid
 from ui.components.cube_net import CUBE_STICKER_ORDER, build_cube_net
 from ui.state import AppState
-from ui.design import page_heading, eyebrow
+from ui.design import icon_action, page_heading, eyebrow
 
 
 COLOR_LABELS = {
@@ -76,9 +76,11 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._sticker_fields = {}
         self._sticker_order = []
         self._focused_sticker = None
+        self._rename_dialog = None
+        self.rename_field.on_submit = self._confirm_rename
         self._standard_heading = page_heading("Letter Schemes", "Map stickers to letters and tune the way you trace a cube.", "01 / Foundation")
         self._editor_heading = ft.Container(
-            ft.Text("Letter Schemes", size=22, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+            ft.Text("Letter Schemes", size=24, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
             height=38, padding=ft.Padding.only(bottom=6),
         )
         self._buffer_pickers = {}
@@ -184,10 +186,8 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                     content=ft.Row(
                         [
                             ft.Text(name, weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL, expand=True, color=ft.Colors.ON_SURFACE),
-                            ft.IconButton(ft.Icons.CONTENT_COPY, icon_size=16, tooltip="Duplicate",
-                                          on_click=lambda e, n=name: self._duplicate_scheme(n)),
-                            ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=16, tooltip="Delete",
-                                          on_click=lambda e, n=name: self._delete_scheme(n)),
+                            icon_action(ft.Icons.CONTENT_COPY, "Duplicate scheme", lambda e, n=name: self._duplicate_scheme(n), size=32),
+                            icon_action(ft.Icons.DELETE_OUTLINE, "Delete scheme", lambda e, n=name: self._delete_scheme(n), size=32),
                         ],
                         spacing=0,
                     ),
@@ -247,9 +247,8 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                     ft.Text(scheme.name, size=16, weight=ft.FontWeight.BOLD,
                             color=ft.Colors.ON_SURFACE, expand=True,
                             max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, tooltip=scheme.name),
-                    self.rename_field,
-                    ft.IconButton(ft.Icons.CHECK, tooltip="Rename", on_click=self._rename_scheme,
-                                  width=36, height=36),
+                    ft.TextButton("Rename", icon=ft.Icons.EDIT_OUTLINED, height=32,
+                                  on_click=self._open_rename),
                 ], height=36
             ),
             tabs,
@@ -571,6 +570,43 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._focused_sticker = None
         field.value = ""
         self.refresh()
+
+    def _open_rename(self, e=None):
+        scheme = self.state.active_scheme
+        if scheme is None: return
+        self._focused_sticker = None
+        self.rename_field.label = "Scheme name"
+        self.rename_field.value = scheme.name
+        self.rename_field.error_text = None
+        self.rename_field.width, self.rename_field.height = 280, 42
+        self._rename_dialog = ft.AlertDialog(modal=True, title=ft.Text("Rename scheme"),
+            content=self.rename_field, actions=[
+                ft.TextButton("Cancel", on_click=self._close_rename),
+                ft.FilledButton("Save name", on_click=self._confirm_rename),
+            ])
+        show_themed_dialog(self.page, self._rename_dialog, self.state.data.dark_mode)
+
+    def _close_rename(self, e=None):
+        if self._rename_dialog is not None:
+            self.page.pop_dialog()
+            self._rename_dialog = None
+        self.rename_field.value = ""
+        self.rename_field.error_text = None
+
+    def _confirm_rename(self, e=None):
+        if self._rename_dialog is None: return self._rename_scheme(e)
+        name = (self.rename_field.value or "").strip()
+        active = self.state.active_scheme
+        error = "Enter a scheme name." if not name else (
+            "That scheme name already exists." if name in self.state.scheme_names and active and name != active.name else None)
+        if error:
+            self.rename_field.error_text = error
+            self.rename_field.update()
+            return
+        self.page.pop_dialog()
+        self._rename_dialog = None
+        self.rename_field.error_text = None
+        self._rename_scheme(e)
 
     def _rename_scheme(self, e):
         scheme = self.state.active_scheme

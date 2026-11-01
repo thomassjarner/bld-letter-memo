@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.40.0
+
+- General UI pass: consistent headings, button/icon sizes, tighter action groups
+  and shorter supporting copy. Existing training logic and data format are unchanged.
+- Compact navigation uses a complete page menu and a visible current-page name.
+  Sidebar labels are single-line with Settings anchored outside its scrolling list.
+  Dismissing navigation restores keyboard focus to the active training tool.
+- Home adds Timer/Method Library shortcuts and balanced cards; Practice separates
+  ready activities from collapsed planned modes.
+- Letter Schemes moves renaming into a dialog. Letter Pairs puts phone filters
+  in a readable dialog, keeps more list space, and labels rating sorting explicitly.
+- Scramble Memo shows the active scheme/orientation and first-time setup route;
+  the words/letters button now labels the displayed mode correctly.
+- Method Library adds a compact workspace selector and clearer overview cards.
+  Cube-hover help moves into View options and speed text has more room.
+- Settings uses grouped, responsive panels with backups earlier and compact
+  colour/rating fields. The Timer's layout and keyboard handling are preserved.
+- Validation: all 550 tests and web Python runtime checks at six viewport sizes,
+  all navigation styles and both themes pass. Actual browser-client rendering
+  is not measured here; no deployment was performed.
+
 ## 2.39.0
 
 - Added **Components** playback next to the speed selector in Method Library

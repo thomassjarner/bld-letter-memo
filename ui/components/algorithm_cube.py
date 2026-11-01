@@ -68,20 +68,20 @@ class AlgorithmCube(ft.Column):
             visual_density=ft.VisualDensity.COMPACT, label_style=ft.TextStyle(size=11),
             tooltip='Study the original setup and A/B stages. Clean execution is the default.', on_change=self._change_structure)
         self.canvas = cv.Canvas(width=460, height=300)
-        self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT,
-                                      tooltip='Drag the 3D cube to rotate the view.')
+        self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT)
         self.canvas.content = ft.GestureDetector(content=self.drag_area,
             on_pan_start=self._drag_start, on_pan_update=self._drag,
             on_pan_end=self._drag_end, on_pan_cancel=self._drag_end, drag_interval=16)
         def icon_button(icon, tooltip, callback):
             return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
-                                 icon_size=19, width=32, height=32, padding=4)
+                                 icon_size=18, width=32, height=32, padding=4)
         self.play_button = icon_button(ft.Icons.PLAY_ARROW, 'Play / pause', self._toggle)
         self.counter = ft.Text('0 / 0', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.speed = ft.Dropdown(value='.6', width=88, height=34, dense=True, text_size=12,
+        self.speed = ft.Dropdown(value='.6', width=108, height=36, dense=True, text_size=12,
+            tooltip='Playback speed',
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('.3', 'Fast'), ft.DropdownOption('.6', 'Normal'), ft.DropdownOption('1.2', 'Slow')])
-        self.playback_mode = ft.Dropdown(value='full', width=145, height=34, dense=True, text_size=12,
+        self.playback_mode = ft.Dropdown(value='full', width=145, height=36, dense=True, text_size=12,
             color=ft.Colors.ON_SURFACE, visible=False,
             options=[ft.DropdownOption('full', 'Full alg'), ft.DropdownOption('components', 'Components')],
             tooltip='Components pauses after each written commutator part. Switching mode restarts the current alg.',
@@ -104,6 +104,7 @@ class AlgorithmCube(ft.Column):
             maintain_state=True, expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
             controls=[ft.Row([self.mode_picker,
                     icon_button(ft.Icons.RESTART_ALT, 'Reset camera', self._reset_camera)], spacing=4, wrap=True),
+                      ft.Text('Drag the 3D cube to rotate the view.', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                       ft.Row([self.structure_switch], tight=True), self.stage_text, self.stage_buttons])
         self.controls = [
             self.canvas,

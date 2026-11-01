@@ -31,8 +31,9 @@ class CornerWalkthrough(ThemeAwarePage, ft.Column):
             label_style=ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT),
             hint_style=ft.TextStyle(size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             on_change=self._input_changed, on_submit=self.generate)
-        self.generate_button = ft.FilledButton('Generate walkthrough', on_click=self.generate)
+        self.generate_button = ft.FilledButton('Generate walkthrough', height=36, on_click=self.generate)
         self.play_all_button = ft.FilledButton('Play walkthrough', icon=ft.Icons.PLAY_ARROW,
+            height=36,
             tooltip='Restart at the first algorithm. Pause between algs lets you continue at your own pace.',
             disabled=True, on_click=self._play_all)
         self.previous_button = ft.IconButton(ft.Icons.SKIP_PREVIOUS, tooltip='Previous algorithm',

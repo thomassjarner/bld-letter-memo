@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.39.0**.
+or as a desktop app. Current version: **2.40.0**.
 
 ## Workspaces
 
@@ -23,6 +23,33 @@ or as a desktop app. Current version: **2.39.0**.
   full-cube, edges-only and corners-only training.
 - **Settings** — themes, playback preferences, browser-data management and
   backup import/export.
+
+## Finding your way around
+
+Desktop tabs keep all eight workspaces together. On compact screens, the header
+shows your current page and **Open navigation** opens the complete page menu.
+Sidebar and pop-out navigation remain available in Settings; their saved
+preferences are retained across screen sizes.
+
+Home has quick **Timer** and **Method Library** shortcuts plus compact cards for
+the setup and training workflow. Practice shows the available activities first;
+planned modes are grouped under **More practice modes**.
+
+- **Letter Schemes:** use **Rename** beside the active scheme to edit its name
+  in a dialog. Face cards, 2D cube entry order and buffer controls are unchanged.
+- **Letter Pairs:** on smaller screens, **Filters** opens full-width scheme,
+  status and rating controls. The main page keeps search and the pair list in
+  view. Rating summaries remain explicit, and short screens put them in Filters.
+- **Scramble Memo:** the input identifies the active scheme and orientation.
+  First-time users get a direct setup link. Empty diagnostics stay out of the
+  way until there is a trace to inspect.
+- **Method Library:** compact screens use a **Workspace** selector so every
+  section is reachable. Cube help lives under View options rather than hovering
+  over the cube; playback controls have clearer, consistent sizes.
+- **Settings:** appearance/playback and backups are grouped together, with a
+  compact rating-colour editor below.
+
+See [UI_CHANGES.md](UI_CHANGES.md) for the page-by-page UI review.
 
 ## Run locally
 

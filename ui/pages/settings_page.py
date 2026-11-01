@@ -6,7 +6,7 @@ from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from data.models import AppData
 from ui.state import AppState
-from ui.design import page_heading, panel, eyebrow
+from ui.design import action_button, page_heading, panel, section_title
 
 
 @ft.control
@@ -32,16 +32,18 @@ class SettingsPage(ThemeAwarePage, ft.Column):
 
         self.dark_mode_switch = ft.Switch(
             label="Dark mode",
+            label_text_style=ft.TextStyle(size=13),
             value=bool(self.state.data.dark_mode),
             on_change=self._dark_mode_changed,
         )
         self.simultaneous_moves_switch = ft.Switch(
             label="Simultaneous moves", value=self.state.data.simultaneous_moves,
+            label_text_style=ft.TextStyle(size=13),
             on_change=lambda e: self.state.set_simultaneous_moves(e.control.value),
         )
         self.navigation_style_dropdown = ft.Dropdown(
             label="Navigation style",
-            width=220,
+            width=220, height=42, dense=True, text_size=13,
             value=self.state.data.navigation_style,
             options=[
                 ft.DropdownOption("top_tabs", "Top tabs"),
@@ -53,7 +55,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
 
         self.rating_mode_dropdown = ft.Dropdown(
             label="Rating system",
-            width=190,
+            width=190, height=42, dense=True, text_size=13,
             value=self.state.data.letter_pair_rating_mode,
             options=[
                 ft.DropdownOption("numeric", "Numerical (1–5)"),
@@ -63,48 +65,54 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             on_select=self._rating_mode_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.rating_levels_dropdown = ft.Dropdown(
-            label="Color levels", width=125, value=str(self.state.data.rating_color_levels),
+            label="Color levels", width=125, height=42, dense=True, text_size=13, value=str(self.state.data.rating_color_levels),
             options=[ft.DropdownOption(str(x), str(x)) for x in (3, 4, 5)],
             on_select=self._rating_levels_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
-        self.rating_palette_area = ft.Column(spacing=6)
+        self.rating_palette_area = ft.ResponsiveRow(spacing=10, run_spacing=10)
         self._rebuild_rating_palette()
 
-        self.controls = [
-            page_heading("Settings", "Make the workspace yours. Manage appearance, playback, ratings, and backups."),
-            panel(ft.Column([
-                eyebrow("Appearance"),
+        appearance = panel(ft.Column([
+                section_title("Appearance", ft.Icons.PALETTE_OUTLINED),
                 ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=18, wrap=True),
                 ft.Text("Light and dark themes share the same quiet surfaces and teal accent.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ], spacing=12)),
-            panel(ft.Column([
-                eyebrow("Algorithm playback"),
+            ], spacing=10, tight=True))
+        playback = panel(ft.Column([
+                section_title("Algorithm playback", ft.Icons.SLOW_MOTION_VIDEO),
                 self.simultaneous_moves_switch,
                 ft.Text("Play consecutive opposite-face turns together, shown as (U D'). "
                         "Applies to U/D, R/L and F/B, including primes and doubles. "
                         "Saved algorithms and move counts stay the same.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ], spacing=8)),
-            panel(ft.Column([
-                eyebrow("Letter pair ratings"),
+            ], spacing=8, tight=True))
+        ratings = panel(ft.Column([
+                section_title("Letter pair ratings", ft.Icons.STAR_OUTLINE),
                 ft.Row([self.rating_mode_dropdown, self.rating_levels_dropdown], wrap=True, spacing=10),
                 ft.Text("Ratings stay on a common 1–5 scale. Changing the color scale never rewrites old grades; review those pairs with the Update grades filter.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.rating_palette_area,
-            ], spacing=12)),
-            panel(ft.Column([
-                eyebrow("Backup & data"),
-                ft.Text("Saved in this browser", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Schemes, pair words, ratings, aliases, timer sessions, Progressive Memo history, case algorithms/progress, saved playground algorithms, and preferences save automatically and survive updates on the same site.", color=ft.Colors.ON_SURFACE),
+            ], spacing=10, tight=True))
+        backup = panel(ft.Column([
+                section_title("Backup & data", ft.Icons.SAVE_OUTLINED),
+                ft.Text("Saved in this browser", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text("Your schemes, dictionary, algorithms, training history, and preferences save automatically. Export a backup to keep a copy or move devices.",
+                        size=13, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Row([
-                    ft.FilledButton("Export backup", icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
-                    ft.OutlinedButton("Import backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
-                ], wrap=True),
+                    action_button("Export backup", primary=True, icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
+                    action_button("Import backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
+                ], wrap=True, spacing=8),
                 ft.Text("Import replaces the current schemes, letter-pair data, timer sessions, Progressive Memo history, case library, saved playground algorithms, and settings.",
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.status_text,
-            ], spacing=12)),
+            ], spacing=10, tight=True), col={"xs":12,"lg":6})
+        self.controls = [
+            page_heading("Settings", "Appearance, playback, ratings, and backups."),
+            ft.ResponsiveRow([
+                ft.Column([appearance, playback], spacing=12, tight=True, col={"xs":12,"lg":6}),
+                backup,
+            ], spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.START),
+            ratings,
         ]
 
     def _dark_mode_changed(self, e):
@@ -138,19 +146,20 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         grades = list(self.state.data.rating_color_grades)
         for i, (color, grade) in enumerate(zip(colors, grades)):
             color_field = ft.TextField(
-                label=f"Level {i+1} color", value=color, width=150, dense=True,
+                label=f"Level {i+1} color", value=color, expand=True, height=40, text_size=13, dense=True,
                 on_blur=lambda e, idx=i: self._save_rating_color(idx, e.control),
                 on_submit=lambda e, idx=i: self._save_rating_color(idx, e.control),
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             grade_field = ft.TextField(
-                label="Grade", value=(f"{grade:.2f}".rstrip("0").rstrip(".")), width=90, dense=True,
+                label="Rating", value=(f"{grade:.2f}".rstrip("0").rstrip(".")), width=72, height=40, text_size=13, dense=True,
                 on_blur=lambda e, idx=i: self._save_rating_grade(idx, e.control),
                 on_submit=lambda e, idx=i: self._save_rating_grade(idx, e.control),
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
-            rows.append(ft.Row([
+            rows.append(panel(ft.Row([
                 ft.Container(width=22, height=22, bgcolor=color, border_radius=11),
                 color_field, grade_field,
-            ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER))
+            ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=10,
+                col={"xs":12,"sm":6,"lg":4}))
         self.rating_palette_area.controls = rows
 
     def _save_rating_color(self, index, control):

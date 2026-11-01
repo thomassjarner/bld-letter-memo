@@ -1,6 +1,12 @@
 """Shared presentation tokens. No training or persistence logic lives here."""
 import flet as ft
 
+PAGE_TITLE = 24
+SECTION_TITLE = 16
+BODY_TEXT = 13
+SECONDARY_TEXT = 12
+ICON_SIZE = 18
+ACTION_HEIGHT = 36
 
 TEXT_ROLES = (
     "body_large", "body_medium", "body_small",
@@ -38,8 +44,9 @@ def build_theme(dark=False):
         tertiary="#FFD08A" if dark else "#825000",
     )
     button = ft.ButtonStyle(
-        shape=ft.RoundedRectangleBorder(radius=7),
-        padding=ft.Padding.symmetric(horizontal=14, vertical=10),
+        shape=ft.RoundedRectangleBorder(radius=8),
+        padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+        icon_size=ICON_SIZE,
         text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
     )
     return ft.Theme(
@@ -55,23 +62,25 @@ def build_theme(dark=False):
         outlined_button_theme=ft.OutlinedButtonTheme(style=button),
         text_button_theme=ft.TextButtonTheme(style=button),
         filled_button_theme=ft.FilledButtonTheme(style=button),
+        icon_button_theme=ft.IconButtonTheme(style=ft.ButtonStyle(
+            icon_size=ICON_SIZE, padding=6, shape=ft.RoundedRectangleBorder(radius=8))),
         scrollbar_theme=ft.ScrollbarTheme(thickness=5, radius=4),
     )
 
 
 def eyebrow(text):
-    return ft.Text(text.upper(), size=10, weight=ft.FontWeight.BOLD,
-                   color=ft.Colors.PRIMARY, style=ft.TextStyle(letter_spacing=1.4))
+    return ft.Text(text.upper(), size=11, weight=ft.FontWeight.W_600,
+                   color=ft.Colors.PRIMARY, style=ft.TextStyle(letter_spacing=.7))
 
 
 def page_heading(title, description, label=None):
     return ft.Container(
         ft.Column([
             *([eyebrow(label)] if label else []),
-            ft.Text(title, size=25, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+            ft.Text(title, size=PAGE_TITLE, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
             ft.Text(description, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
         ], spacing=4),
-        padding=ft.Padding.only(bottom=14),
+        padding=ft.Padding.only(bottom=8),
     )
 
 
@@ -87,13 +96,35 @@ def activity_card(title, description, icon, action, on_click=None, number=None, 
     """Keyboard-accessible destination button; cards never mount tool controls."""
     return panel(ft.Column([
         ft.Row([
-            ft.Container(ft.Icon(icon, size=21, color=ft.Colors.PRIMARY),
-                         padding=9, bgcolor=ft.Colors.PRIMARY_CONTAINER, border_radius=8),
-            ft.Text(number or ("READY" if enabled else "PLANNED"), size=10,
-                    color=ft.Colors.ON_SURFACE_VARIANT, weight=ft.FontWeight.W_600),
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        ft.Text(title, size=19, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-        ft.Text(description, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Container(ft.Icon(icon, size=20, color=ft.Colors.PRIMARY if enabled else ft.Colors.ON_SURFACE_VARIANT),
+                         padding=8, bgcolor=ft.Colors.PRIMARY_CONTAINER if enabled else ft.Colors.SURFACE_CONTAINER_HIGH,
+                         border_radius=8),
+            ft.Column([
+                ft.Text(title, size=17, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE,
+                        max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
+                ft.Text(number or ("Ready" if enabled else "Planned"), size=11,
+                        color=ft.Colors.ON_SURFACE_VARIANT),
+            ], spacing=2, expand=True),
+        ], spacing=10, height=52),
+        ft.Text(description, size=BODY_TEXT, color=ft.Colors.ON_SURFACE_VARIANT,
+                height=52, max_lines=3, overflow=ft.TextOverflow.ELLIPSIS, tooltip=description),
         ft.TextButton(action, icon=ft.Icons.ARROW_FORWARD,
-                      disabled=not enabled, on_click=on_click),
-    ], spacing=10), col={"xs": 12, "md": 6}, padding=18)
+                      height=ACTION_HEIGHT, disabled=not enabled, on_click=on_click),
+    ], spacing=8, tight=True), col={"xs": 12, "md": 6}, padding=14)
+
+
+def section_title(title, icon=None):
+    return ft.Row([
+        *([ft.Icon(icon, size=ICON_SIZE, color=ft.Colors.PRIMARY)] if icon else []),
+        ft.Text(title, size=SECTION_TITLE, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+    ], spacing=8, height=24)
+
+
+def action_button(label, *, primary=False, icon=None, on_click=None, **kwargs):
+    cls = ft.FilledButton if primary else ft.OutlinedButton
+    return cls(label, icon=icon, height=ACTION_HEIGHT, on_click=on_click, **kwargs)
+
+
+def icon_action(icon, tooltip, on_click, *, size=36, **kwargs):
+    return ft.IconButton(icon, tooltip=tooltip, on_click=on_click, icon_size=ICON_SIZE,
+                         width=size, height=size, padding=6, **kwargs)
