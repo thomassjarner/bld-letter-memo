@@ -1,4 +1,25 @@
-# UI review — 2.40.0
+# Light color themes — 2.41.0
+
+Settings → Appearance now includes a **Light color theme** selector with a small
+preview. Classic Teal retains the original light appearance; Cobalt Blue,
+Lavender, Warm Sand and Rose provide coordinated alternatives for surfaces,
+text, accents and controls. Your choice applies immediately and is saved with
+your browser data and backups. Dark mode retains its own palette.
+
+Theme selection also reaches navigation, newly opened dialogs and text rebuilt
+during algorithm playback. Cube sticker colors and user-selected rating colors
+keep their existing meanings. See README for usage and PATCHING for the
+unchanged update workflow.
+
+Validation: all **566 tests pass**, including the 550 existing tests and 16 new
+palette, persistence, import, contrast and control-update checks. Main semantic
+text colors meet at least 4.5:1 contrast on all six surface levels in each light
+palette. Web Python runtime checks pass at 1440×900 (top tabs), 1080×800
+(sidebar), 390×700 (pop-out) and 280×400 (top tabs), with all five palettes,
+dark/light switching, playback, walkthrough state and saved-data preservation.
+Actual browser-client rendering was not measured here; no deployment was made.
+
+# Previous UI review — 2.40.0
 
 The review focused on finding tools quickly, keeping secondary controls out of
 the working area, and using a consistent visual scale.

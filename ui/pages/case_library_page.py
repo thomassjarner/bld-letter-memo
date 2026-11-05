@@ -186,7 +186,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.error.visible = bool(self.error.value)
         self.notice.visible = bool(self.notice.value)
         self.viewer.dark_mode = self.state.data.dark_mode
-        apply_palette(self, self.state.data.dark_mode)
+        apply_palette(self, self.state.data.dark_mode, self.state.data.light_theme)
         if self._page() is not None:
             self.update()
 

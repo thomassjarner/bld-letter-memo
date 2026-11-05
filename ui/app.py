@@ -27,7 +27,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.40.0"
+    page.title = "BLD Letter Memo · 2.41.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -35,6 +35,7 @@ async def main(page: ft.Page):
 
     repository = await SharedPreferencesAppDataRepository.create(page)
     state = AppState(repository)
+    page.theme = build_theme(light_theme=state.data.light_theme)
     page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
     current_index = HOME_INDEX
     popout_open = False
@@ -87,8 +88,10 @@ async def main(page: ft.Page):
     content_area.content = home_page
 
     def apply_dark_mode(enabled):
+        page.theme = build_theme(light_theme=state.data.light_theme)
         page.theme_mode = ft.ThemeMode.DARK if enabled else ft.ThemeMode.LIGHT
         settings_page.dark_mode_switch.value = enabled
+        settings_page.refresh_appearance()
         # Memo spans use computed cycle colors rather than semantic color tokens.
         scramble_page.refresh(update=False)
         practice_page.refresh(update=False)
@@ -96,6 +99,12 @@ async def main(page: ft.Page):
         rebuild_navigation(update=False)
         page.update()
     settings_page.theme_callback = apply_dark_mode
+
+    def apply_light_theme():
+        page.theme = build_theme(light_theme=state.data.light_theme)
+        rebuild_navigation(update=False)
+        page.update()
+    settings_page.light_theme_callback = apply_light_theme
 
     def toggle_theme(e):
         enabled = not state.data.dark_mode
@@ -112,7 +121,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.40.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.41.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 
@@ -167,6 +176,7 @@ async def main(page: ft.Page):
     )
 
     def rebuild_navigation(update=True):
+        page.bgcolor = build_theme(state.data.dark_mode, state.data.light_theme).color_scheme.surface_container_low
         width = page.width or 1200
         narrow = width < 1320
         compact = width < 1100
@@ -235,9 +245,9 @@ async def main(page: ft.Page):
         method_page.set_viewport(width - content_area.left - horizontal_padding,
                                  (page.height or 800) - content_area.top - 12 - bottom_padding)
         for view in pages:
-            apply_palette(view, state.data.dark_mode)
+            apply_palette(view, state.data.dark_mode, state.data.light_theme)
         for chrome in (top_nav, sidebar_nav, popout_panel, popout_button):
-            apply_palette(chrome, state.data.dark_mode)
+            apply_palette(chrome, state.data.dark_mode, state.data.light_theme)
         if update:
             page.update()
 

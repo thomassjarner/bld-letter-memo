@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.40.0**.
+or as a desktop app. Current version: **2.41.0**.
 
 ## Workspaces
 
@@ -21,7 +21,7 @@ or as a desktop app. Current version: **2.40.0**.
   accuracy feedback and saved attempts. Blind Timer is also accessible here.
 - **Timer** — a dedicated destination with sessions, history, averages and
   full-cube, edges-only and corners-only training.
-- **Settings** — themes, playback preferences, browser-data management and
+- **Settings** — five light color themes, dark mode, playback preferences, browser-data management and
   backup import/export.
 
 ## Finding your way around
@@ -50,6 +50,20 @@ planned modes are grouped under **More practice modes**.
   compact rating-colour editor below.
 
 See [UI_CHANGES.md](UI_CHANGES.md) for the page-by-page UI review.
+
+## Light color themes
+
+Open **Settings → Appearance → Light color theme** and choose **Classic Teal**,
+**Cobalt Blue**, **Lavender**, **Warm Sand**, or **Rose**. The preview shows the
+selected palette. Each coordinates backgrounds, panels, text, accents and
+controls across the site, including dialogs and algorithm playback.
+
+The choice applies immediately in light mode and saves automatically. Dark
+mode keeps its existing palette; returning to light restores your chosen theme.
+You can also choose a light theme while dark mode is on and see it in the preview.
+Cube sticker colors, memo-cycle colors, rating colors and training data are
+unchanged. Backups include your selection. Older backups and first-time users
+default to the original **Classic Teal** appearance.
 
 ## Run locally
 

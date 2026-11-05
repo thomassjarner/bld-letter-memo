@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.41.0
+
+- Added **Light color theme** in Settings → Appearance: Classic Teal, Cobalt Blue,
+  Lavender, Warm Sand and Rose, with a compact palette preview.
+- Themes coordinate surfaces, text, accents and controls across all workspaces,
+  navigation, dialogs and playback captions. Theme changes apply immediately.
+- The choice is saved in the existing browser data and included in backups.
+  Older backups default to Classic Teal. Dark mode keeps its existing colors and
+  restores the selected light palette when switched off.
+- Cube sticker colors, memo-cycle colors, rating colors, BLD logic, algorithms,
+  timer/practice histories, storage keys and deployment steps are unchanged.
+  Data version remains 18 with one optional `light_theme` preference.
+- Validation: all 566 tests pass (550 existing and 16 new). Web Python runtime
+  checks pass for all five palettes across four screen sizes and all navigation
+  styles, including dark/light return and playback. Actual browser-client
+  rendering was not measured; no live deployment was performed.
+
 ## 2.40.0
 
 - General UI pass: consistent headings, button/icon sizes, tighter action groups

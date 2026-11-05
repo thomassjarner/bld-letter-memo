@@ -1,5 +1,6 @@
 """Shared presentation tokens. No training or persistence logic lives here."""
 import flet as ft
+from data.color_themes import DEFAULT_LIGHT_THEME, light_theme as get_light_theme
 
 PAGE_TITLE = 24
 SECTION_TITLE = 16
@@ -17,32 +18,20 @@ TEXT_ROLES = (
 )
 
 
-def build_theme(dark=False):
+def build_theme(dark=False, light_theme=DEFAULT_LIGHT_THEME):
     overrides = {
         "body_medium": {"size": 13}, "body_small": {"size": 12},
         "title_medium": {"size": 16, "weight": ft.FontWeight.W_600},
     }
     colors = dict(
-        primary="#6DD8C3" if dark else "#006B5B",
-        on_primary="#00382F" if dark else "#FFFFFF",
-        primary_container="#173F38" if dark else "#D7F0E8",
-        on_primary_container="#B7F1E2" if dark else "#094B3E",
-        secondary="#A6C9C0" if dark else "#48675E",
-        secondary_container="#273B36" if dark else "#E5EEE9",
-        on_secondary_container="#DFEDE7" if dark else "#223F35",
-        surface="#111917" if dark else "#FAFCFA",
-        on_surface="#F0F4F3" if dark else "#182B25",
-        on_surface_variant="#BACBC6" if dark else "#52685E",
-        surface_container_lowest="#0C1311" if dark else "#FFFFFF",
-        surface_container_low="#17201C" if dark else "#F3F6F2",
-        surface_container="#1C2822" if dark else "#EBF0EA",
-        surface_container_high="#24322B" if dark else "#E4EBE3",
-        surface_container_highest="#2C3B32" if dark else "#DBE5DA",
-        outline="#72867A" if dark else "#7C8F82",
-        outline_variant="#35473D" if dark else "#D7E1D5",
-        error="#FFB4AB" if dark else "#BA1A1A",
-        tertiary="#FFD08A" if dark else "#825000",
-    )
+        primary="#6DD8C3", on_primary="#00382F",
+        primary_container="#173F38", on_primary_container="#B7F1E2",
+        secondary="#A6C9C0", secondary_container="#273B36", on_secondary_container="#DFEDE7",
+        surface="#111917", on_surface="#F0F4F3", on_surface_variant="#BACBC6",
+        surface_container_lowest="#0C1311", surface_container_low="#17201C",
+        surface_container="#1C2822", surface_container_high="#24322B", surface_container_highest="#2C3B32",
+        outline="#72867A", outline_variant="#35473D", error="#FFB4AB", tertiary="#FFD08A",
+    ) if dark else dict(get_light_theme(light_theme).colors)
     button = ft.ButtonStyle(
         shape=ft.RoundedRectangleBorder(radius=8),
         padding=ft.Padding.symmetric(horizontal=12, vertical=8),

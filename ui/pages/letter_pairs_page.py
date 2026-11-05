@@ -212,7 +212,7 @@ class LetterPairsPage(ThemeAwarePage, ft.Column):
             content=ft.Container(ft.Column([*controls, self._filter_summary], spacing=12, tight=True), width=300),
             actions=[ft.TextButton("Reset filters", on_click=self._reset_filters),
                      ft.FilledButton("Done", on_click=self._close_filters)])
-        show_themed_dialog(self.page, self._filters_dialog, self.state.data.dark_mode)
+        show_themed_dialog(self.page, self._filters_dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
     def _filter_selected(self, field, value):
         field.value = value

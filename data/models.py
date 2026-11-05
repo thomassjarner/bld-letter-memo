@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+from data.color_themes import DEFAULT_LIGHT_THEME, normalize_light_theme
 
 CURRENT_VERSION = 18
 
@@ -303,6 +304,7 @@ class AppData:
     navigation_style: str = "top_tabs"  # top_tabs / compact_sidebar / popout
     letter_scheme_editor: str = "cards"  # cards / cube
     simultaneous_moves: bool = False
+    light_theme: str = DEFAULT_LIGHT_THEME
 
     def ensure_default_sessions(self) -> None:
         for name in ("Session 1", "Session 2", "Session 3"):
@@ -344,6 +346,7 @@ class AppData:
             "corner_case_library": {key: record.to_dict() for key, record in self.corner_case_library.items()},
             "playground_algorithms": [algorithm.to_dict() for algorithm in self.playground_algorithms],
             "dark_mode": bool(self.dark_mode),
+            "light_theme": normalize_light_theme(self.light_theme),
             "navigation_style": self.navigation_style,
             "letter_scheme_editor": self.letter_scheme_editor,
             "simultaneous_moves": self.simultaneous_moves,
@@ -444,6 +447,7 @@ class AppData:
                                  if isinstance(value, dict)},
             playground_algorithms=PlaygroundAlgorithm.load_many(d.get('playground_algorithms', [])),
             dark_mode=bool(d.get("dark_mode", False)),
+            light_theme=normalize_light_theme(d.get("light_theme")),
             navigation_style=(str(d.get("navigation_style", "top_tabs") or "top_tabs") if str(d.get("navigation_style", "top_tabs") or "top_tabs") in {"top_tabs", "compact_sidebar", "popout"} else "top_tabs"),
             letter_scheme_editor=d.get("letter_scheme_editor", "cards") if d.get("letter_scheme_editor", "cards") in ("cards", "cube") else "cards",
             simultaneous_moves=d.get("simultaneous_moves", False) is True,

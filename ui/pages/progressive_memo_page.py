@@ -106,7 +106,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             return None
 
     def _update(self):
-        apply_palette(self, self.state.data.dark_mode)
+        apply_palette(self, self.state.data.dark_mode, self.state.data.light_theme)
         if self._page() is not None:
             self.update()
 

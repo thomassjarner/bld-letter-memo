@@ -1,6 +1,6 @@
 """Resolve presentation colors before sending controls to the Flet client.
 
-Keep semantic roles with each UI object so repeated light/dark transitions are
+Keep semantic roles with each UI object so repeated palette/mode transitions are
 reversible. User-entered rating colors and memo-cycle colors remain untouched.
 No application data or persistent settings are traversed or changed.
 """
@@ -9,6 +9,7 @@ from enum import Enum
 
 import flet as ft
 from ui.design import build_theme
+from data.color_themes import DEFAULT_LIGHT_THEME, normalize_light_theme
 
 
 def _defaults(control):
@@ -41,8 +42,12 @@ def _defaults(control):
             }
 
 
-def apply_palette(root, dark):
-    scheme = build_theme(dark).color_scheme
+def apply_palette(root, dark, light_theme=None):
+    # Playback updates a few existing text controls between full page updates.
+    # Retain their parent's last palette so newly built spans use that palette.
+    light_theme = normalize_light_theme(light_theme if light_theme is not None else
+                                       getattr(root, '_bld_light_theme', DEFAULT_LIGHT_THEME))
+    scheme = build_theme(dark, light_theme).color_scheme
     palette = {f.name.replace('_', ''): getattr(scheme, f.name)
                for f in fields(scheme) if getattr(scheme, f.name) is not None}
     seen = set()
@@ -65,6 +70,7 @@ def apply_palette(root, dark):
             return
         seen.add(id(obj))
         if isinstance(obj, ft.Control):
+            object.__setattr__(obj, '_bld_light_theme', light_theme)
             _defaults(obj)
         roles = getattr(obj, '_bld_color_roles', None)
         if roles is None:
@@ -89,9 +95,11 @@ def apply_palette(root, dark):
 
 class ThemeAwarePage:
     def before_update(self):
-        apply_palette(self, bool(self.data and self.data.data.dark_mode))
+        settings = getattr(getattr(self, 'data', None), 'data', None)
+        apply_palette(self, bool(getattr(settings, 'dark_mode', False)),
+                      getattr(settings, 'light_theme', DEFAULT_LIGHT_THEME))
 
 
-def show_themed_dialog(page, dialog, dark):
-    apply_palette(dialog, dark)
+def show_themed_dialog(page, dialog, dark, light_theme=DEFAULT_LIGHT_THEME):
+    apply_palette(dialog, dark, light_theme)
     page.show_dialog(dialog)

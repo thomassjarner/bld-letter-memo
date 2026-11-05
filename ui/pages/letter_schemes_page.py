@@ -584,7 +584,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                 ft.TextButton("Cancel", on_click=self._close_rename),
                 ft.FilledButton("Save name", on_click=self._confirm_rename),
             ])
-        show_themed_dialog(self.page, self._rename_dialog, self.state.data.dark_mode)
+        show_themed_dialog(self.page, self._rename_dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
     def _close_rename(self, e=None):
         if self._rename_dialog is not None:

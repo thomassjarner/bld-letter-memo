@@ -280,7 +280,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
             ),
         )
         if self.page is not None:
-            show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
+            show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
     def _memo_control(self, category, letters, pairs, orientation, cycle_ids, orientation_flags, cycle_breaks):
         if not letters and not orientation:

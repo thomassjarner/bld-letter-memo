@@ -5,6 +5,7 @@ import flet as ft
 from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
 from data.models import AppData
+from data.color_themes import LIGHT_THEMES, light_theme
 from ui.state import AppState
 from ui.design import action_button, page_heading, panel, section_title
 
@@ -18,6 +19,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         return self.data
 
     theme_callback = None
+    light_theme_callback = None
     navigation_callback = None
 
 
@@ -36,6 +38,18 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             value=bool(self.state.data.dark_mode),
             on_change=self._dark_mode_changed,
         )
+        self.light_theme_dropdown = ft.Dropdown(
+            label="Light color theme", height=42, dense=True, text_size=13,
+            value=self.state.data.light_theme,
+            options=[ft.DropdownOption(key, theme.name) for key, theme in LIGHT_THEMES.items()],
+            color=ft.Colors.ON_SURFACE,
+            label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
+            on_select=self._light_theme_changed, col={"xs":12, "sm":6},
+        )
+        self.light_theme_preview = ft.Container(padding=10, border_radius=8,
+                                               height=72, col={"xs":12, "sm":6})
+        self.light_theme_hint = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.refresh_appearance()
         self.simultaneous_moves_switch = ft.Switch(
             label="Simultaneous moves", value=self.state.data.simultaneous_moves,
             label_text_style=ft.TextStyle(size=13),
@@ -75,8 +89,9 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         appearance = panel(ft.Column([
                 section_title("Appearance", ft.Icons.PALETTE_OUTLINED),
                 ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=18, wrap=True),
-                ft.Text("Light and dark themes share the same quiet surfaces and teal accent.",
-                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.ResponsiveRow([self.light_theme_dropdown, self.light_theme_preview],
+                                 spacing=10, run_spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                self.light_theme_hint,
             ], spacing=10, tight=True))
         playback = panel(ft.Column([
                 section_title("Algorithm playback", ft.Icons.SLOW_MOTION_VIDEO),
@@ -118,8 +133,40 @@ class SettingsPage(ThemeAwarePage, ft.Column):
     def _dark_mode_changed(self, e):
         enabled = bool(e.control.value)
         self.state.set_dark_mode(enabled)
+        self.refresh_appearance()
         if self.theme_callback:
             self.theme_callback(enabled)
+
+    def refresh_appearance(self):
+        theme = light_theme(self.state.data.light_theme)
+        colors = theme.colors
+        self.light_theme_dropdown.value = self.state.data.light_theme
+        self.light_theme_hint.value = theme.description + (" Saved for light mode; turn off Dark mode to apply it."
+            if self.state.data.dark_mode else " Applies immediately and saves in this browser.")
+        self.light_theme_preview.bgcolor = colors['surface_container_low']
+        self.light_theme_preview.border = ft.Border.all(1, colors['outline_variant'])
+        self.light_theme_preview.tooltip = theme.name + " light theme preview"
+        self.light_theme_preview.content = ft.Row([
+            ft.Column([ft.Container(width=24, height=6, border_radius=3, bgcolor=colors['primary']),
+                       ft.Container(width=20, height=4, border_radius=2, bgcolor=colors['on_surface_variant']),
+                       ft.Container(width=20, height=4, border_radius=2, bgcolor=colors['on_surface_variant'])],
+                      spacing=6, tight=True),
+            ft.Container(ft.Row([
+                ft.Column([ft.Container(width=52, height=5, border_radius=2, bgcolor=colors['on_surface']),
+                           ft.Container(width=40, height=4, border_radius=2, bgcolor=colors['on_surface_variant'])],
+                          spacing=7, expand=True, tight=True),
+                ft.Container(width=26, height=20, border_radius=5, bgcolor=colors['primary']),
+            ], spacing=8), expand=True, padding=10, border_radius=6,
+                bgcolor=colors['surface_container_lowest'], border=ft.Border.all(1, colors['outline_variant'])),
+        ], spacing=10)
+
+    def _light_theme_changed(self, e):
+        self.state.set_light_theme(e.control.value)
+        self.refresh_appearance()
+        if self.light_theme_callback:
+            self.light_theme_callback()
+        elif self.page is not None:
+            self.update()
 
     def _navigation_style_changed(self, e):
         style = e.control.value or "top_tabs"
@@ -235,7 +282,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         self._current_dialog = dialog
-        show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
+        show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
     def _close_dialog(self, e=None):
         if self._current_dialog is not None:
@@ -261,8 +308,11 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             self.dark_mode_switch.value = bool(imported.dark_mode)
             self.navigation_style_dropdown.value = imported.navigation_style
             self.simultaneous_moves_switch.value = imported.simultaneous_moves
+            self.refresh_appearance()
             if self.theme_callback:
                 self.theme_callback(bool(imported.dark_mode))
+            elif self.light_theme_callback:
+                self.light_theme_callback()
             if self.navigation_callback:
                 self.navigation_callback(imported.navigation_style)
             self.status_text.value = f"Imported backup: {name}"

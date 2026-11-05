@@ -7,6 +7,7 @@ can refresh when something they don't own changes.
 
 from typing import Callable, List, Optional
 
+from data.color_themes import LIGHT_THEMES
 from core.cube_definitions import CATEGORY_PIECES
 from data.models import AppData, CaseAlgorithm, CornerCaseRecord, CategoryScheme, LetterScheme, PlaygroundAlgorithm
 from data.repository import AppDataRepository
@@ -239,6 +240,14 @@ class AppState:
     def set_dark_mode(self, enabled: bool) -> None:
         self.data.dark_mode = bool(enabled)
         self._save(notify=False)
+
+    def set_light_theme(self, theme: str) -> bool:
+        if not isinstance(theme, str) or theme not in LIGHT_THEMES:
+            return False
+        if theme != self.data.light_theme:
+            self.data.light_theme = theme
+            self._save(notify=False)
+        return True
 
     def set_navigation_style(self, style: str) -> None:
         if style not in {"top_tabs", "compact_sidebar", "popout"}:

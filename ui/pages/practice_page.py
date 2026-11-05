@@ -403,7 +403,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
                             color=ft.Colors.ON_SURFACE),
             actions=[ft.TextButton("Close", on_click=lambda e: self._close_session_stats())],
         )
-        show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
+        show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
     def _close_session_stats(self):
         self.page.pop_dialog()
@@ -918,4 +918,4 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 ft.TextButton("Reset", on_click=lambda e: reset(dialog)),
             ],
         )
-        show_themed_dialog(self.page, dialog, self.state.data.dark_mode)
+        show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
