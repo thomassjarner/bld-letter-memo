@@ -27,6 +27,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
     open_scheme_callback = None
     INTRO_SECONDS = 1.0
     SPACE_KEYS = {" ", "Space", "Spacebar"}
+    LEFT_KEYS = {"ArrowLeft", "Arrow Left", "Left"}
+    RIGHT_KEYS = {"ArrowRight", "Arrow Right", "Right"}
 
     @property
     def state(self):
@@ -51,6 +53,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.result: ProgressiveMemoAttempt | None = None
         self.error = ""
         self._generation = 0
+        self._focus_revision = 0
         self._viewport = (1400.0, 760.0)
         self._space_submitted = False
         self._last_space_letters = ""
@@ -93,6 +96,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.main_region = ft.Column(spacing=12)
         self.keyboard_listener = ft.KeyboardListener(
             content=self.main_region, on_key_down=self._key_down,
+            on_key_up=self._key_up,
             on_key_repeat=lambda e: None, autofocus=True,
         )
         self.controls = [self.header, self.keyboard_listener]
@@ -180,6 +184,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             if scheme:
                 info = [ft.Text(f"Memo: {order_label(scheme.memo_order or 'CE')}", size=12),
                         ft.Text(f"Recall: {order_label(scheme.execution_order or 'EC')}", size=12),
+                        ft.Text(f"3-style edges: on · parity helper {scheme.edge_parity_partner or 'UR'} · complete pairs"
+                                if scheme.three_style_enabled else "3-style edges: off · a single final letter is possible",
+                                size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                         ft.Text(" · ".join(f"{label}: {'letters, grouped' if cat.orientation_memo == 'trace' else 'visual, omitted'}"
                                            for label, cat in (("Twists", scheme.corners), ("Flips", scheme.edges))),
                                 size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
@@ -222,17 +229,21 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         elif self.phase == "recall":
             prompt = self.run.prompt
             instruction = ("Type this flip's letter pair." if prompt.category == "edges"
-                           else "Type all twist letters together.") if prompt.kind == "orientation" else "Type the letter pair (or the single final letter)."
+                           else "Type all twist letters together.") if prompt.kind == "orientation" else (
+                               "Type the single final letter." if len(prompt.letters) == 1 else "Type the letter pair.")
+            self.recall_field.hint_text = "Type one letter" if len(prompt.letters) == 1 else "Type letters"
             self._center([
                 ft.Text(f"Recall {prompt.category.title()} · {prompt.label}", size=20, weight=ft.FontWeight.W_600),
                 ft.Text(f"Answer {self.run.recall_index + 1} / {len(self.run.plan.recall_prompts)}", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.recall_field,
                 ft.Text(instruction, size=12),
-                ft.Text("Space or Enter → confirm. Use Skip if you cannot recall it.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Row([ft.FilledButton("Confirm", on_click=self._next),
-                        ft.TextButton("Skip", on_click=lambda e: self._submit_recall(""))],
-                       alignment=ft.MainAxisAlignment.CENTER, spacing=8),
-            ], 280)
+                ft.Text("← Previous · Space / Enter to confirm · → Skip", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Row([ft.OutlinedButton("Previous", icon=ft.Icons.ARROW_BACK, height=36,
+                                         disabled=self.run.recall_index == 0, on_click=self._previous),
+                        ft.FilledButton("Confirm", height=36, on_click=self._next),
+                        ft.TextButton("Skip", icon=ft.Icons.ARROW_FORWARD, height=36, on_click=self._skip_recall)],
+                       alignment=ft.MainAxisAlignment.CENTER, spacing=8, run_spacing=6, wrap=True),
+            ], 310)
         else:
             self._render_result()
         self.set_viewport(*self._viewport)
@@ -304,10 +315,40 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             await asyncio.sleep(0.2)
 
     def _key_down(self, e):
+        if self.active and self.phase == "recall":
+            if e.key in self.LEFT_KEYS:
+                self._previous()
+            elif e.key in self.RIGHT_KEYS:
+                self._skip_recall()
+            return
         if self.active and e.key in self.SPACE_KEYS and self.phase in {"memo", "overview"}:
             self._next()
         # During recall the TextField's actual edit event submits the answer.
         # This avoids a keyboard callback reading a stale final typed letter.
+
+    def _key_up(self, e):
+        if e.key in self.SPACE_KEYS:
+            self._space_submitted = False
+            self._last_space_letters = ""
+
+    def _load_recall_input(self):
+        value = self.run.current_input if self.run and self.phase == "recall" else ""
+        self.recall_field.value = value[:len(self.run.prompt.letters)] if value else ""
+        self.recall_field.selection = None
+
+    def _previous(self, e=None):
+        if not self.active or not self.run or not self.run.previous(self.recall_field.value or ""):
+            return
+        self._focus_revision += 1
+        self._space_submitted = False
+        self._last_space_letters = ""
+        self._load_recall_input()
+        self._render_stage()
+        self._update()
+        self._focus(True, select_answer=True)
+
+    def _skip_recall(self, e=None):
+        self._submit_recall("")
 
     def _next(self, e=None):
         if not self.active or not self.run:
@@ -316,6 +357,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             self._submit_recall(self.recall_field.value or "")
             return
         if self.run.next(time.monotonic()):
+            if self.phase == "recall":
+                self._load_recall_input()
             self._render_stage()
             self._update()
             self._focus(self.phase == "recall")
@@ -332,26 +375,41 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             if letters and (not self._space_submitted or letters != self._last_space_letters):
                 self._space_submitted = True
                 self._last_space_letters = letters
-                self._submit_recall(letters)
+                self._submit_recall(letters, via_space=True)
             else:
-                self.recall_field.value = ""
+                self._load_recall_input()
                 self._update()
         else:
             self._space_submitted = False
+            self._focus_revision += 1
+            # The restored selection is one-shot. Subsequent text/theme/timer
+            # updates must not reselect the replacement while the user types.
+            self.recall_field.selection = None
+            limited = normalize_letters(raw)[:len(self.run.prompt.letters)]
+            self.recall_field.value = limited
+            self.run.remember_input(limited)
+            if limited != raw:
+                self._update()
 
     def _input_submitted(self, e):
         self._submit_recall(e.control.value or "")
 
-    def _submit_recall(self, value):
-        if not self.active or not self.run or not self.run.submit(value, time.monotonic()):
+    def _submit_recall(self, value, via_space=False):
+        if not self.active or not self.run or self.phase != "recall":
             return
-        self.recall_field.value = ""
+        value = normalize_letters(value)[:len(self.run.prompt.letters)]
+        if not self.run.submit(value, time.monotonic()): return
+        self._focus_revision += 1
+        if not via_space:
+            self._space_submitted = False
+            self._last_space_letters = ""
+        self._load_recall_input()
         if self.phase == "result":
             self._complete()
         self._render_stage()
         self._update()
         if self.phase == "recall":
-            self._focus(True)
+            self._focus(True, select_answer=bool(self.recall_field.value))
 
     def _complete(self):
         memo, recall = self.run.timings()
@@ -379,18 +437,30 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         if self.back_callback:
             self.back_callback()
 
-    def _focus(self, recall):
-        self._task(self._focus_async, recall, self._generation, self.run.recall_index if self.run else 0)
+    def _focus(self, recall, select_answer=False):
+        selected = self.recall_field.value if recall and select_answer else None
+        self._task(self._focus_async, recall, self._generation, self.run.recall_index if self.run else 0,
+                   self._focus_revision, selected)
 
-    async def _focus_async(self, recall, token, index):
+    async def _focus_async(self, recall, token, index, revision=None, selected=None):
         if not self.active or token != self._generation or not self.in_attempt:
             return
         if recall != (self.phase == "recall"):
             return
         if recall and (not self.run or self.phase != "recall" or self.run.recall_index != index):
             return
+        if revision is not None and revision != self._focus_revision:
+            return
         try:
             await (self.recall_field if recall else self.keyboard_listener).focus()
+            if (recall and selected and self.active and token == self._generation
+                    and self.phase == "recall" and self.run.recall_index == index
+                    and (revision is None or revision == self._focus_revision)
+                    and self.recall_field.value == selected):
+                # Flutter selection offsets count UTF-16 units, including letters
+                # outside the BMP. Focus first, then select the restored answer.
+                self.recall_field.selection = ft.TextSelection(0, len(selected.encode('utf-16-le')) // 2)
+                if self._page() is not None: self.recall_field.update()
         except RuntimeError:
             # Navigation can detach a control between scheduling and focus.
             pass
@@ -402,7 +472,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         description = f"Correct: {expected}" if correct else (f"Missing: {expected}" if not entered else (f"Extra: {entered}" if not expected else f"{entered} should be {expected}"))
         return ft.Container(ft.Column([
             ft.Text(entered or "—", size=19, weight=ft.FontWeight.BOLD, color=foreground),
-            ft.Text(expected or "extra", size=11, color=foreground),
+            ft.Text(expected, size=11, color=foreground),
         ], spacing=4, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
             width=40, padding=6, border_radius=6, bgcolor=background, tooltip=description)
 
@@ -413,7 +483,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             ft.Row([ft.Text(f"{result.accuracy:.1f}% accuracy", size=23, weight=ft.FontWeight.W_600),
                     ft.Text(f"Total {_format_centiseconds(result.centiseconds)}", size=20, font_family="monospace")], wrap=True, spacing=24),
             ft.Text(f"Memo {_format_centiseconds(result.memo_centiseconds)} · Recall {_format_centiseconds(result.recall_centiseconds)} · {result.correct_letters}/{result.scored_letters} scored letters correct", size=12),
-            ft.Text("Green = correct · Red = incorrect, missing or extra. Each tile shows your answer above the correct letter. Accuracy counts letters; extra letters reduce the score.",
+            ft.Text("Green = correct · Red = incorrect or missing. Each tile shows your answer above the correct letter. Additional typed letters are listed separately and still reduce the score.",
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
         for category in ("corners" if letter == "C" else "edges" for letter in result.execution_order):
@@ -428,11 +498,15 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                 if category == "edges" and item.kind == "orientation" and len(normalize_letters(item.expected)) <= 2:
                     flip_index += 1
                     label = f"Flip {flip_index}"
+                aligned = align_letters(item.expected, item.entered)
                 controls.append(ft.Row([
                     ft.Text(label, size=12, width=72),
-                    ft.Row([self._result_letter(*letter) for letter in align_letters(item.expected, item.entered)],
+                    ft.Row([self._result_letter(*letter) for letter in aligned if letter[0]],
                            spacing=4, wrap=True, expand=True),
                 ], spacing=10))
+                additional = ''.join(entered for expected, entered, _ in aligned if not expected)
+                if additional:
+                    controls.append(ft.Text(f"{label} · Additional input: {additional}", size=12, color=ft.Colors.ERROR))
         controls += [ft.Divider(),
                      ft.Text(f"Saved · {result.scheme_name} · Memo {result.memo_order} / Exec {result.execution_order}", size=12),
                      ft.Text(result.scramble, size=12, font_family="monospace", selectable=True),

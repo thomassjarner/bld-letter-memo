@@ -1,3 +1,28 @@
+# Progressive Memo corrections — 2.43.0
+
+Recall has Previous / Confirm / Skip in that order, with Left Arrow and Right
+Arrow shortcuts. Going back restores and selects the previous input. Confirm
+overwrites that answer in place, while later answers/drafts remain available.
+Selection tasks are tied to the current prompt revision to avoid selecting a
+newly typed draft after a delayed focus event.
+
+Single-letter prompts accept only one letter. Results no longer show an Extra
+tile beside that expected letter. Genuine additional input in older saved
+attempts is reported as text, with their existing scores preserved.
+
+The ready view explicitly shows the scheme's 3-style status. The original
+tracer's configured buffer/helper parity swap is retained, with a complete-pair
+check in Progressive Memo. Corners and non-3-style edges can retain their final
+single letter. No targets are fabricated or discarded to adjust parity.
+
+Validation: **610 tests pass**, including 20 new checks for in-place correction,
+draft retention, arrow keys, selected replacement, Unicode, held Space, parity,
+single-letter feedback and unchanged histories. All previous tests, the tracer,
+stored data models and the timer/Method Library implementations are unchanged.
+Web Python runtime checks pass at 1440×900, 1080×800, 390×700 and 280×400, using
+all navigation styles and both modes. Actual browser keyboard/selection
+rendering was not measured here; no deployment was performed.
+
 # Corner recall trainer — 2.42.0
 
 Method Library has a new **Corner trainer** section and overview card. Filter

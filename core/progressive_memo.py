@@ -92,6 +92,10 @@ def build_plan(scramble: str, scheme: LetterScheme,
         for index, letter in enumerate(letters):
             orientation_target = index < len(flags) and flags[index]
             (orientation if orientation_target else ordinary).append(letter)
+        if category == "edges" and snapshot.three_style_enabled and len("".join(ordinary)) % 2:
+            # The tracer already applies the configured parity swap. Never
+            # conceal an inconsistent plan by dropping or padding a target.
+            raise ScrambleError("3-style edge memo must contain complete pairs. Check the scheme's edge letters and parity settings.")
         categories[category[0].upper()] = CategoryMemo(category, pairs("".join(ordinary)), pairs("".join(orientation)))
     memo_order = snapshot.memo_order or "CE"
     execution_order = snapshot.execution_order or "EC"
@@ -149,6 +153,25 @@ class ProgressiveRun:
         self.memo_finished_at: float | None = None
         self.finished_at: float | None = None
         self.recall: list[ProgressiveRecall] = []
+        self._drafts: dict[int, str] = {}
+
+    @property
+    def current_input(self) -> str:
+        if self.recall_index in self._drafts:
+            return self._drafts[self.recall_index]
+        return self.recall[self.recall_index].entered if self.recall_index < len(self.recall) else ""
+
+    def remember_input(self, value: str) -> None:
+        if self.phase == "recall":
+            self._drafts[self.recall_index] = normalize_letters(value)
+
+    def previous(self, draft: str | None = None) -> bool:
+        if self.phase != "recall" or self.recall_index == 0:
+            return False
+        if draft is not None:
+            self.remember_input(draft)
+        self.recall_index -= 1
+        return True
 
     @property
     def category(self) -> CategoryMemo:
@@ -192,7 +215,12 @@ class ProgressiveRun:
         if self.phase != "recall":
             return False
         prompt = self.prompt
-        self.recall.append(ProgressiveRecall(prompt.category, prompt.kind, prompt.letters, normalize_letters(value)))
+        answer = ProgressiveRecall(prompt.category, prompt.kind, prompt.letters, normalize_letters(value))
+        if self.recall_index < len(self.recall):
+            self.recall[self.recall_index] = answer
+        else:
+            self.recall.append(answer)
+        self.remember_input(value)
         self.recall_index += 1
         if self.recall_index == len(self.plan.recall_prompts):
             self.phase = "result"

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.43.0
+
+- Progressive Memo recall adds Previous before Confirm, Left Arrow to go back,
+  and Right Arrow/Skip to leave a blank answer at the current position.
+- Returning to a prompt restores and selects its previous input for immediate
+  replacement. Corrections overwrite the answer in place; later answers and
+  unconfirmed drafts remain available. Timing continues and the attempt saves once.
+- Single-letter prompts accept one letter. Result tiles represent only actual
+  expected letters; additional input in older results is listed separately,
+  with existing accuracy/scoring retained.
+- The ready screen identifies the selected scheme's 3-style setting. The
+  existing buffer/helper parity trace is unchanged; an explicit Progressive
+  Memo check rejects inconsistent odd edge plans instead of padding/dropping letters.
+- Existing histories, data format, storage keys, timer, Method Library and
+  deployment steps are unchanged.
+- Validation: all 610 tests pass, including 20 new correction/parity/feedback
+  checks; all previous tests are unchanged. Web Python runtime checks pass in
+  four viewport/navigation configurations. Actual browser keyboard/selection
+  rendering was not measured; no deployment was performed.
+
 ## 2.42.0
 
 - Added **Corner trainer** in Method Library, accessible from the overview,

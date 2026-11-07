@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.42.0**.
+or as a desktop app. Current version: **2.43.0**.
 
 ## Workspaces
 
@@ -50,6 +50,29 @@ planned modes are grouped under **More practice modes**.
   compact rating-colour editor below.
 
 See [UI_CHANGES.md](UI_CHANGES.md) for the page-by-page UI review.
+
+## Progressive Memo corrections
+
+During recall, **Previous** (to the left of Confirm) or **Left Arrow** returns
+to the preceding answer, including across a category boundary. Its previous
+text is selected so typing replaces it immediately. Later answers and the
+current draft stay in place; confirming a correction replaces the original
+answer instead of shifting the sequence.
+
+**Right Arrow** or **Skip** records a blank answer at the current position.
+Space/Enter still confirms. The clock continues while correcting, and only
+the final answers save when the attempt finishes. Completed results are not
+editable after the correct solution has been revealed.
+
+Recall inputs accept the number of letters in their prompt: a final single
+letter uses one letter, without an unused Extra tile. Older saved attempts
+keep their original scoring; additional typed letters are listed separately.
+
+The ready screen shows whether the selected scheme has **3-style** enabled.
+When enabled, the existing tracer applies its configured edge-buffer/helper
+swap for odd corner parity; Progressive Memo requires complete ordinary edge
+pairs. It never pads or drops a target. Without 3-style, a final single edge
+letter remains valid, and corners can also finish with one letter.
 
 ## 3-style corner trainer
 
