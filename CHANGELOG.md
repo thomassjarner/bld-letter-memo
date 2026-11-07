@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.44.0
+
+- Fixed recall review erasing answers: Right Arrow/Next preserves entered text
+  and only skips a never-answered prompt. Empty changes/submissions retain
+  existing answers and drafts; only new letters replace them.
+- Each recall visit has its own prompt-bound input, so delayed edits or Enter
+  events from an old field cannot blank or advance a different answer.
+- Added a **Constraints** section before starting Progressive Memo: **Allow
+  memo navigation** (off by default) and **Show category overview** (on by default).
+  Memo navigation includes Previous/Left Arrow and Next/Right Arrow; disabling
+  overview omits the end-of-category all-letters display.
+- Constraint choices save in browser preferences/backups, freeze for each
+  attempt, and appear in saved result metadata. Existing data imports default
+  to the previous one-pass/overview-shown behavior. Old scores and timing are retained.
+- Memo revisits retain the original clock. Delayed intro tasks are revision
+  checked; an obsolete task cannot skip a new category title.
+- Validation: all 632 tests pass, including 22 new protection/constraint checks.
+  The earlier Right Arrow test now expects retained text instead of deletion.
+  Web Python runtime checks pass for all four constraint combinations across
+  four viewport/navigation configurations. Actual browser keyboard/focus
+  rendering was not measured; no deployment was performed.
+
 ## 2.43.0
 
 - Progressive Memo recall adds Previous before Confirm, Left Arrow to go back,

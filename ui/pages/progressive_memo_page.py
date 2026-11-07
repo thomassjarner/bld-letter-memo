@@ -75,13 +75,15 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                                           on_select=self._choose_scheme)
         self.display_letters = ft.Text("", size=84, weight=ft.FontWeight.W_600,
                                        font_family="monospace", text_align=ft.TextAlign.CENTER)
-        self.recall_field = ft.TextField(
-            hint_text="Type letters", width=240, height=58, dense=True,
-            text_size=28, text_align=ft.TextAlign.CENTER,
-            capitalization=ft.TextCapitalization.CHARACTERS,
-            autocorrect=False, enable_suggestions=False,
-            on_change=self._input_changed, on_submit=self._input_submitted,
-        )
+        self.recall_field = self._make_recall_field()
+        self.recall_forward = ft.TextButton("Skip", icon=ft.Icons.ARROW_FORWARD, height=36,
+                                           on_click=self._skip_recall)
+        self.allow_memo_navigation = ft.Switch(label="Allow memo navigation",
+            value=self.state.data.progressive_memo_allow_navigation, label_text_style=ft.TextStyle(size=13),
+            on_change=lambda e:self._constraint_changed('allow_navigation',e.control.value))
+        self.show_category_overview = ft.Switch(label="Show category overview",
+            value=self.state.data.progressive_memo_show_overview, label_text_style=ft.TextStyle(size=13),
+            on_change=lambda e:self._constraint_changed('show_overview',e.control.value))
         self.stage_scroll = ft.ListView(spacing=12, scroll=ft.ScrollMode.AUTO,
                                         build_controls_on_demand=False)
         self.stage_panel = panel(self.stage_scroll, padding=20)
@@ -118,6 +120,32 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         page = self._page()
         if page is not None:
             page.run_task(function, *args)
+
+    def _make_recall_field(self, run=None, index=None):
+        field = ft.TextField(hint_text="Type letters", width=240, height=58, dense=True,
+            text_size=28, text_align=ft.TextAlign.CENTER,
+            capitalization=ft.TextCapitalization.CHARACTERS,
+            autocorrect=False, enable_suggestions=False)
+        def current():
+            return run is None or (self.run is run and self.phase == 'recall'
+                                   and self.run.recall_index == index and self.recall_field is field)
+        field.on_change = lambda e:self._input_changed(e) if current() else None
+        field.on_submit = lambda e:self._input_submitted(e) if current() else None
+        return field
+
+    def _constraint_changed(self, name, enabled):
+        if self.in_attempt:
+            return
+        self.state.set_progressive_memo_constraint(name, enabled)
+        self._update()
+
+    def _sync_recall_forward(self):
+        label = 'Next' if self.run and self.phase == 'recall' and self.run.current_input else 'Skip'
+        changed = self.recall_forward.content != label
+        self.recall_forward.content = label
+        self.recall_forward.tooltip = ('Keep this answer and go forward (→)' if label == 'Next'
+                                       else 'Leave this unanswered and go forward (→)')
+        return changed
 
     def set_viewport(self, width, height):
         width, height = max(280.0, float(width)), max(300.0, float(height))
@@ -179,6 +207,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.cancel_button.visible = self.in_attempt
         self.clock.visible = self.phase != "ready"
         if self.phase == "ready":
+            self.allow_memo_navigation.value = self.state.data.progressive_memo_allow_navigation
+            self.show_category_overview.value = self.state.data.progressive_memo_show_overview
             scheme = self.state.active_scheme
             info = []
             if scheme:
@@ -192,8 +222,14 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                                 size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
             self.stage_scroll.controls = [
                 ft.Text("Memo, then recall", size=24, weight=ft.FontWeight.W_600),
-                ft.Text("See each pair, press Space to continue, and review the whole category. Then type the letters from memory.", size=13),
+                ft.Text("Memo each pair, then type the letters from memory. Choose your memo constraints below.", size=13),
                 self.scheme_dropdown, *info,
+                panel(ft.Column([
+                    ft.Text('Constraints', size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    self.allow_memo_navigation, self.show_category_overview,
+                    ft.Text('Navigation off = one pass. Overview on = all letters after each category.',
+                            size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ], spacing=4, tight=True), padding=12),
                 ft.Text("Real scramble", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Text(self.current_scramble, size=13, font_family="monospace", selectable=True),
                 ft.Text(self.error or ("Choose or create a letter scheme first." if not scheme else ""), color=ft.Colors.ERROR),
@@ -204,15 +240,24 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ]
         elif self.phase == "intro":
-            self._center([ft.Text(self.run.category.category.title(), size=44, weight=ft.FontWeight.W_600)], 70)
+            controls = [ft.Text(self.run.category.category.title(), size=44, weight=ft.FontWeight.W_600)]
+            if self.run.can_memo_previous:
+                controls.append(ft.OutlinedButton('Previous', icon=ft.Icons.ARROW_BACK, on_click=self._previous_memo))
+            self._center(controls, 120 if len(controls)>1 else 70)
         elif self.phase == "memo":
             prompt = self.run.prompt
             self.display_letters.value = " ".join(pairs(prompt.letters))
             self._center([
                 ft.Text(f"{prompt.category.title()} · {prompt.label}", size=14, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.display_letters,
-                ft.Text("Space → next", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.FilledButton("Next", on_click=self._next),
+                ft.Text("← Previous · Space / → Next" if self.run.allow_memo_navigation else "Space → next",
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Row([
+                    *([ft.OutlinedButton('Previous', icon=ft.Icons.ARROW_BACK,
+                        disabled=not self.run.can_memo_previous, on_click=self._previous_memo)]
+                      if self.run.allow_memo_navigation else []),
+                    ft.FilledButton("Next", on_click=self._next),
+                ], spacing=8, wrap=True, alignment=ft.MainAxisAlignment.CENTER),
             ])
         elif self.phase == "overview":
             category = self.run.category
@@ -224,10 +269,16 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                              ft.Text(" ".join(category.orientation_pairs), size=28, font_family="monospace")]
             last = self.run.category_index == len(self.run.plan.categories) - 1
             controls += [ft.Text("Space → type your recall" if last else "Space → next category", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                         ft.FilledButton("Recall" if last else "Next category", on_click=self._next)]
+                         ft.Row([
+                             *([ft.OutlinedButton('Previous',icon=ft.Icons.ARROW_BACK,
+                                 disabled=not self.run.can_memo_previous,on_click=self._previous_memo)]
+                               if self.run.allow_memo_navigation else []),
+                             ft.FilledButton("Recall" if last else "Next category", on_click=self._next),
+                         ], spacing=8,wrap=True,alignment=ft.MainAxisAlignment.CENTER)]
             self._center(controls, 260)
         elif self.phase == "recall":
             prompt = self.run.prompt
+            self._sync_recall_forward()
             instruction = ("Type this flip's letter pair." if prompt.category == "edges"
                            else "Type all twist letters together.") if prompt.kind == "orientation" else (
                                "Type the single final letter." if len(prompt.letters) == 1 else "Type the letter pair.")
@@ -237,13 +288,14 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                 ft.Text(f"Answer {self.run.recall_index + 1} / {len(self.run.plan.recall_prompts)}", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.recall_field,
                 ft.Text(instruction, size=12),
-                ft.Text("← Previous · Space / Enter to confirm · → Skip", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("← Previous · → Next / skip empty · Space / Enter confirm", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Saved answers stay unless you type replacement letters.", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Row([ft.OutlinedButton("Previous", icon=ft.Icons.ARROW_BACK, height=36,
                                          disabled=self.run.recall_index == 0, on_click=self._previous),
                         ft.FilledButton("Confirm", height=36, on_click=self._next),
-                        ft.TextButton("Skip", icon=ft.Icons.ARROW_FORWARD, height=36, on_click=self._skip_recall)],
+                        self.recall_forward],
                        alignment=ft.MainAxisAlignment.CENTER, spacing=8, run_spacing=6, wrap=True),
-            ], 310)
+            ], 330)
         else:
             self._render_result()
         self.set_viewport(*self._viewport)
@@ -277,7 +329,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             self._update()
             return
         self._generation += 1
-        self.run = ProgressiveRun(plan)
+        self.run = ProgressiveRun(plan,
+            allow_memo_navigation=self.state.data.progressive_memo_allow_navigation,
+            show_category_overview=self.state.data.progressive_memo_show_overview)
         self.result = None
         self.error = ""
         self.clock.value = "0.00"
@@ -290,20 +344,26 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self._schedule_intro()
 
     def _schedule_intro(self):
-        self._task(self._intro_delay, self._generation, self.run.category_index)
+        self._task(self._intro_delay, self._generation, self.run.category_index, self.run.memo_revision)
 
-    async def _intro_delay(self, token, category_index):
+    async def _intro_delay(self, token, category_index, revision=None):
         await asyncio.sleep(self.INTRO_SECONDS)
-        self._finish_intro(token, category_index)
+        self._finish_intro(token, category_index, revision)
 
-    def _finish_intro(self, token, category_index):
+    def _finish_intro(self, token, category_index, revision=None):
         if not self.active or token != self._generation or not self.run or self.phase != "intro" or self.run.category_index != category_index:
+            return
+        if revision is not None and revision != self.run.memo_revision:
             return
         started = self.run.started_at is not None
         self.run.finish_intro(time.monotonic())
+        if self.phase == 'recall':
+            self._load_recall_input(new_control=True)
         self._render_stage()
         self._update()
-        self._focus(False)
+        self._focus(self.phase == 'recall')
+        if self.phase == 'intro':
+            self._schedule_intro()
         if not started and self.run.started_at is not None:
             self._task(self._tick, token)
 
@@ -321,6 +381,13 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             elif e.key in self.RIGHT_KEYS:
                 self._skip_recall()
             return
+        if self.active and self.run and self.run.allow_memo_navigation:
+            if e.key in self.LEFT_KEYS:
+                self._previous_memo()
+                return
+            if e.key in self.RIGHT_KEYS and self.phase in {'memo','overview'}:
+                self._next()
+                return
         if self.active and e.key in self.SPACE_KEYS and self.phase in {"memo", "overview"}:
             self._next()
         # During recall the TextField's actual edit event submits the answer.
@@ -331,10 +398,20 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             self._space_submitted = False
             self._last_space_letters = ""
 
-    def _load_recall_input(self):
+    def _load_recall_input(self, new_control=False):
+        if new_control and self.run and self.phase == 'recall':
+            # Each visit gets an input ID bound to that run and prompt. Late
+            # events from a discarded field cannot change a different answer.
+            self.recall_field = self._make_recall_field(self.run, self.run.recall_index)
         value = self.run.current_input if self.run and self.phase == "recall" else ""
         self.recall_field.value = value[:len(self.run.prompt.letters)] if value else ""
         self.recall_field.selection = None
+
+    def _previous_memo(self, e=None):
+        if not self.active or not self.run or not self.run.previous_memo():
+            return
+        self._focus_revision += 1
+        self._render_stage(); self._update(); self._focus(False)
 
     def _previous(self, e=None):
         if not self.active or not self.run or not self.run.previous(self.recall_field.value or ""):
@@ -342,13 +419,13 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self._focus_revision += 1
         self._space_submitted = False
         self._last_space_letters = ""
-        self._load_recall_input()
+        self._load_recall_input(new_control=True)
         self._render_stage()
         self._update()
         self._focus(True, select_answer=True)
 
     def _skip_recall(self, e=None):
-        self._submit_recall("")
+        self._submit_recall(self.recall_field.value or "")
 
     def _next(self, e=None):
         if not self.active or not self.run:
@@ -358,7 +435,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             return
         if self.run.next(time.monotonic()):
             if self.phase == "recall":
-                self._load_recall_input()
+                self._load_recall_input(new_control=True)
             self._render_stage()
             self._update()
             self._focus(self.phase == "recall")
@@ -371,11 +448,12 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         raw = e.control.value or ""
         if any(char.isspace() for char in raw):
             letters = normalize_letters(raw)
+            retained = self.run.current_input
             # Held Space cannot skip empty answers or re-submit a stale edit.
-            if letters and (not self._space_submitted or letters != self._last_space_letters):
+            if (letters or retained) and (not self._space_submitted or letters and letters != self._last_space_letters):
                 self._space_submitted = True
-                self._last_space_letters = letters
-                self._submit_recall(letters, via_space=True)
+                self._last_space_letters = letters or retained
+                self._submit_recall(letters or retained, via_space=True)
             else:
                 self._load_recall_input()
                 self._update()
@@ -388,7 +466,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             limited = normalize_letters(raw)[:len(self.run.prompt.letters)]
             self.recall_field.value = limited
             self.run.remember_input(limited)
-            if limited != raw:
+            changed = self._sync_recall_forward()
+            if limited != raw or changed:
                 self._update()
 
     def _input_submitted(self, e):
@@ -403,7 +482,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         if not via_space:
             self._space_submitted = False
             self._last_space_letters = ""
-        self._load_recall_input()
+        self._load_recall_input(new_control=True)
         if self.phase == "result":
             self._complete()
         self._render_stage()
@@ -421,6 +500,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             memo_order=plan.memo_order, execution_order=plan.execution_order,
             memo_centiseconds=memo, recall_centiseconds=recall,
             correct_letters=correct, scored_letters=scored, recall=list(self.run.recall),
+            allow_memo_navigation=self.run.allow_memo_navigation,
+            show_category_overview=self.run.show_category_overview,
         )
         self.state.add_progressive_memo_attempt(self.result)
         self.clock.value = _format_centiseconds(self.result.centiseconds)
@@ -483,6 +564,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             ft.Row([ft.Text(f"{result.accuracy:.1f}% accuracy", size=23, weight=ft.FontWeight.W_600),
                     ft.Text(f"Total {_format_centiseconds(result.centiseconds)}", size=20, font_family="monospace")], wrap=True, spacing=24),
             ft.Text(f"Memo {_format_centiseconds(result.memo_centiseconds)} · Recall {_format_centiseconds(result.recall_centiseconds)} · {result.correct_letters}/{result.scored_letters} scored letters correct", size=12),
+            ft.Text(self._constraints_label(result), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ft.Text("Green = correct · Red = incorrect or missing. Each tile shows your answer above the correct letter. Additional typed letters are listed separately and still reduce the score.",
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
@@ -517,6 +599,11 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self._new_scramble()
         self._start()
 
+    @staticmethod
+    def _constraints_label(attempt):
+        return ('Memo navigation: ' + ('allowed' if attempt.allow_memo_navigation else 'one pass') +
+                ' · Category overview: ' + ('shown' if attempt.show_category_overview else 'hidden'))
+
     def _refresh_history(self):
         history = self.state.data.progressive_memo_history
         self.history_meta.value = str(len(history))
@@ -529,7 +616,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                         ft.Text(f"{item.accuracy:.1f}%", size=13)], spacing=8),
                 ft.Text(f"{item.scheme_name} · {item.created_at[:16].replace('T', ' ')} UTC", size=10,
                         color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-            ], spacing=3), tooltip=item.scramble, disabled=self.in_attempt,
+            ], spacing=3), tooltip=item.scramble + '\n' + self._constraints_label(item), disabled=self.in_attempt,
                 on_click=lambda e, saved=item: self._show_saved(saved)) for item in reversed(history[-self.history_limit:])]
 
     def _show_saved(self, saved):

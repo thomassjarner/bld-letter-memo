@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.43.0**.
+or as a desktop app. Current version: **2.44.0**.
 
 ## Workspaces
 
@@ -53,14 +53,32 @@ See [UI_CHANGES.md](UI_CHANGES.md) for the page-by-page UI review.
 
 ## Progressive Memo corrections
 
+Before starting, the **Constraints** section has two saved switches:
+
+- **Allow memo navigation** — off by default for one-pass training. Enable it
+  to use Previous/Left Arrow and Next/Right Arrow during memo, including moving
+  back to the preceding category before recall begins.
+- **Show category overview** — on by default. Disable it to move directly from
+  the final prompt to the next category title or recall without showing all
+  the category's letters again.
+
+Recall correction is always available. Both choices freeze when an attempt
+starts and are recorded with its result/history. Older attempts retain the
+original one-pass/overview-shown defaults. Category titles still last one
+second, and revisiting memo prompts does not restart the clock.
+
 During recall, **Previous** (to the left of Confirm) or **Left Arrow** returns
 to the preceding answer, including across a category boundary. Its previous
 text is selected so typing replaces it immediately. Later answers and the
 current draft stay in place; confirming a correction replaces the original
 answer instead of shifting the sequence.
 
-**Right Arrow** or **Skip** records a blank answer at the current position.
-Space/Enter still confirms. The clock continues while correcting, and only
+**Right Arrow / Next** keeps the current answer and moves forward. It acts as
+**Skip** only when that prompt has never had any letters. Empty edits, clearing
+a selection and passing through answers cannot erase retained input: only
+replacement letters overwrite it. Space/Enter also keeps a retained answer
+when no new letters were typed. Late events from an old prompt are ignored.
+The clock continues while correcting, and only
 the final answers save when the attempt finishes. Completed results are not
 editable after the correct solution has been revealed.
 

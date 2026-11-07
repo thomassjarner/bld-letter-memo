@@ -143,8 +143,11 @@ def score_recall(recall: list[ProgressiveRecall]) -> tuple[int, int]:
 
 class ProgressiveRun:
     """One attempt; UI controls and delayed intro tasks do not own the answers."""
-    def __init__(self, plan: ProgressivePlan):
+    def __init__(self, plan: ProgressivePlan, *, allow_memo_navigation=False, show_category_overview=True):
         self.plan = plan
+        self.allow_memo_navigation = bool(allow_memo_navigation)
+        self.show_category_overview = bool(show_category_overview)
+        self.memo_revision = 0
         self.phase = "intro"
         self.category_index = 0
         self.prompt_index = 0
@@ -157,13 +160,16 @@ class ProgressiveRun:
 
     @property
     def current_input(self) -> str:
-        if self.recall_index in self._drafts:
+        if self._drafts.get(self.recall_index):
             return self._drafts[self.recall_index]
         return self.recall[self.recall_index].entered if self.recall_index < len(self.recall) else ""
 
     def remember_input(self, value: str) -> None:
-        if self.phase == "recall":
-            self._drafts[self.recall_index] = normalize_letters(value)
+        value = normalize_letters(value)
+        if self.phase == "recall" and value:
+            # Empty edits, selection changes and review navigation must never
+            # erase an answer. Only new letters replace the retained input.
+            self._drafts[self.recall_index] = value
 
     def previous(self, draft: str | None = None) -> bool:
         if self.phase != "recall" or self.recall_index == 0:
@@ -190,24 +196,58 @@ class ProgressiveRun:
             self.phase = "memo"
             if self.started_at is None:
                 self.started_at = now
-        else:
+        elif self.show_category_overview:
             self.phase = "overview"
+        else:
+            self._advance_category(now)
+        self.memo_revision += 1
         return True
+
+    @property
+    def can_memo_previous(self) -> bool:
+        if not self.allow_memo_navigation or self.phase not in {"intro", "memo", "overview"}:
+            return False
+        return (self.phase == "memo" and self.prompt_index > 0
+                or self.phase == "overview" and bool(self.category.prompts)
+                or any(category.prompts for category in self.plan.categories[:self.category_index]))
+
+    def previous_memo(self) -> bool:
+        if not self.can_memo_previous:
+            return False
+        if self.phase == "memo" and self.prompt_index > 0:
+            self.prompt_index -= 1
+        elif self.phase == "overview" and self.category.prompts:
+            self.prompt_index = len(self.category.prompts) - 1
+        else:
+            self.category_index = next(i for i in range(self.category_index - 1, -1, -1)
+                                       if self.plan.categories[i].prompts)
+            self.prompt_index = len(self.category.prompts) - 1
+        self.phase = "memo"
+        self.memo_revision += 1
+        return True
+
+    def _advance_category(self, now):
+        if self.category_index + 1 < len(self.plan.categories):
+            self.category_index += 1
+            self.prompt_index = 0
+            self.phase = "intro"
+        else:
+            self.phase = "recall"
+            self.memo_finished_at = now
 
     def next(self, now: float) -> bool:
         if self.phase == "memo":
             self.prompt_index += 1
             if self.prompt_index == len(self.category.prompts):
-                self.phase = "overview"
+                if self.show_category_overview:
+                    self.phase = "overview"
+                else:
+                    self._advance_category(now)
+            self.memo_revision += 1
             return True
         if self.phase == "overview":
-            if self.category_index + 1 < len(self.plan.categories):
-                self.category_index += 1
-                self.prompt_index = 0
-                self.phase = "intro"
-            else:
-                self.phase = "recall"
-                self.memo_finished_at = now
+            self._advance_category(now)
+            self.memo_revision += 1
             return True
         return False
 
@@ -215,7 +255,8 @@ class ProgressiveRun:
         if self.phase != "recall":
             return False
         prompt = self.prompt
-        answer = ProgressiveRecall(prompt.category, prompt.kind, prompt.letters, normalize_letters(value))
+        value = normalize_letters(value) or self.current_input
+        answer = ProgressiveRecall(prompt.category, prompt.kind, prompt.letters, value)
         if self.recall_index < len(self.recall):
             self.recall[self.recall_index] = answer
         else:

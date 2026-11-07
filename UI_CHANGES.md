@@ -1,3 +1,31 @@
+# Progressive Memo constraints and safe review — 2.44.0
+
+Right Arrow is now forward navigation that retains an entered answer, with
+Skip only for a prompt without any letters. Empty changes and submissions
+cannot replace saved text. Only replacement letters overwrite it. Recall
+inputs belong to a specific prompt visit, so a delayed event from an old input
+cannot clear or submit another answer.
+
+Before Start, **Constraints** offers **Allow memo navigation** and **Show
+category overview**. Defaults preserve one-pass memo with a category review.
+Enabling navigation adds Previous/Next and arrow shortcuts during memo;
+disabling overview omits the final display of all the category's letters.
+The original timer continues through revisits, and stale intro tasks are ignored.
+
+Choices are saved as optional preferences and frozen in each attempt's result.
+Old histories keep their prior defaults and scores. Recall correction remains
+available regardless of the memo navigation constraint.
+
+Validation: **632 tests pass**, including 22 new checks. The reported pair-4
+correction is tested with retained pairs 5 and 6, along with empty edits, stale
+input callbacks, forward review, all constraint combinations, empty categories,
+intro timing, settings/backup defaults and per-attempt metadata. One existing
+test's destructive Right Arrow expectation was corrected; other existing test
+files are unchanged. Web Python runtime checks pass at 1440×900, 1080×800,
+390×700 and 280×400 for every constraint combination and all navigation styles.
+Actual browser keyboard/focus rendering was not measured here; no deployment
+was performed.
+
 # Progressive Memo corrections — 2.43.0
 
 Recall has Previous / Confirm / Skip in that order, with Left Arrow and Right

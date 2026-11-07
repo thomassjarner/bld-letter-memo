@@ -163,6 +163,8 @@ class ProgressiveMemoAttempt:
     correct_letters: int
     scored_letters: int
     recall: List[ProgressiveRecall] = field(default_factory=list)
+    allow_memo_navigation: bool = False
+    show_category_overview: bool = True
 
     @property
     def centiseconds(self) -> int:
@@ -179,7 +181,9 @@ class ProgressiveMemoAttempt:
                 "centiseconds": self.centiseconds, "memo_centiseconds": self.memo_centiseconds,
                 "recall_centiseconds": self.recall_centiseconds, "accuracy": self.accuracy,
                 "correct_letters": self.correct_letters, "scored_letters": self.scored_letters,
-                "recall": [item.to_dict() for item in self.recall]}
+                "recall": [item.to_dict() for item in self.recall],
+                "allow_memo_navigation": bool(self.allow_memo_navigation),
+                "show_category_overview": bool(self.show_category_overview)}
 
     @staticmethod
     def from_dict(d: dict) -> "ProgressiveMemoAttempt":
@@ -199,6 +203,8 @@ class ProgressiveMemoAttempt:
             memo_centiseconds=number("memo_centiseconds"), recall_centiseconds=number("recall_centiseconds"),
             correct_letters=min(scored, number("correct_letters")), scored_letters=scored,
             recall=[ProgressiveRecall.from_dict(item) for item in raw_recall if isinstance(item, dict)] if isinstance(raw_recall, list) else [],
+            allow_memo_navigation=d.get("allow_memo_navigation", False) is True,
+            show_category_overview=d.get("show_category_overview", True) is not False,
         )
 
 
@@ -305,6 +311,8 @@ class AppData:
     letter_scheme_editor: str = "cards"  # cards / cube
     simultaneous_moves: bool = False
     light_theme: str = DEFAULT_LIGHT_THEME
+    progressive_memo_allow_navigation: bool = False
+    progressive_memo_show_overview: bool = True
 
     def ensure_default_sessions(self) -> None:
         for name in ("Session 1", "Session 2", "Session 3"):
@@ -350,6 +358,8 @@ class AppData:
             "navigation_style": self.navigation_style,
             "letter_scheme_editor": self.letter_scheme_editor,
             "simultaneous_moves": self.simultaneous_moves,
+            "progressive_memo_allow_navigation": bool(self.progressive_memo_allow_navigation),
+            "progressive_memo_show_overview": bool(self.progressive_memo_show_overview),
         }
 
     @staticmethod
@@ -451,6 +461,8 @@ class AppData:
             navigation_style=(str(d.get("navigation_style", "top_tabs") or "top_tabs") if str(d.get("navigation_style", "top_tabs") or "top_tabs") in {"top_tabs", "compact_sidebar", "popout"} else "top_tabs"),
             letter_scheme_editor=d.get("letter_scheme_editor", "cards") if d.get("letter_scheme_editor", "cards") in ("cards", "cube") else "cards",
             simultaneous_moves=d.get("simultaneous_moves", False) is True,
+            progressive_memo_allow_navigation=d.get("progressive_memo_allow_navigation", False) is True,
+            progressive_memo_show_overview=d.get("progressive_memo_show_overview", True) is not False,
         )
         data.ensure_default_sessions()
         return data

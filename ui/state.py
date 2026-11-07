@@ -265,6 +265,14 @@ class AppState:
         self.data.simultaneous_moves = bool(enabled)
         self._save(notify=False)
 
+    def set_progressive_memo_constraint(self, name: str, enabled: bool) -> None:
+        fields = {"allow_navigation": "progressive_memo_allow_navigation",
+                  "show_overview": "progressive_memo_show_overview"}
+        if name not in fields:
+            return
+        setattr(self.data, fields[name], bool(enabled))
+        self._save(notify=False)
+
     # ---- global words ------------------------------------------------------
 
     def set_word(self, pair: str, word: str) -> None:

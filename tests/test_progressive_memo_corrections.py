@@ -58,7 +58,7 @@ def test_previous_skip_and_confirm_buttons_are_ordered_and_arrow_keys_do_not_rep
     mode._key_down(SimpleNamespace(key='Arrow Left'))
     assert mode.run.recall_index==0 and mode.recall_field.value=='D'
     mode._key_down(SimpleNamespace(key='ArrowRight'))
-    assert mode.run.recall_index==1 and mode.run.recall[0].entered==''
+    assert mode.run.recall_index==1 and mode.run.recall[0].entered=='D'
     for _ in range(3):mode.keyboard_listener.on_key_repeat(SimpleNamespace(key='ArrowRight'))
     assert mode.run.recall_index==1
     mode._submit_recall('FG')
@@ -66,7 +66,7 @@ def test_previous_skip_and_confirm_buttons_are_ordered_and_arrow_keys_do_not_rep
     mode._key_down(SimpleNamespace(key='ArrowLeft'))
     assert mode.run.recall_index==1 and mode.recall_field.value=='FG'
     mode._key_down(SimpleNamespace(key='Right'))
-    assert mode.run.recall[1].entered=='' and mode.recall_field.value=='HI'
+    assert mode.run.recall[1].entered=='FG' and mode.recall_field.value=='HI'
     assert mode.run.recall_index==2 and len(mode.run.recall)==2 and repo.data.to_dict()==before
 
 
