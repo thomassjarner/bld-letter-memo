@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.41.0**.
+or as a desktop app. Current version: **2.42.0**.
 
 ## Workspaces
 
@@ -16,7 +16,7 @@ or as a desktop app. Current version: **2.41.0**.
   cycle-break alternatives without changing saved preferences.
 - **Method Library** — browse 378 UFR 3-style corner cases, save preferred
   algorithms, use linked move/commutator fields, explore arbitrary algorithms
-  in the Playground and watch a Scramble walkthrough.
+  in the Playground, watch a Scramble walkthrough and train case recall.
 - **Practice** — train Progressive Memo with real scrambles, typed recall,
   accuracy feedback and saved attempts. Blind Timer is also accessible here.
 - **Timer** — a dedicated destination with sessions, history, averages and
@@ -50,6 +50,43 @@ planned modes are grouped under **More practice modes**.
   compact rating-colour editor below.
 
 See [UI_CHANGES.md](UI_CHANGES.md) for the page-by-page UI review.
+
+## 3-style corner trainer
+
+Open **Method Library → Corner trainer** (or the overview's **Open corner
+trainer** card). This trainer uses the same fixed **UFR buffer** case library.
+
+1. Choose one or more target-layer subsets (U/U, U/D, D/U, D/D), optional first
+   and second target stickers, and learning statuses. Target choices show your
+   scheme's letters beside sticker IDs. Favorites can narrow the selection.
+   The matching count updates before you start.
+2. Start a session. Each matching case appears once, in shuffled order. From a
+   **solved physical cube**, apply the displayed setup in your scheme's U/F
+   orientation. The preview shows that case without letters or highlighting.
+3. Recall and execute your algorithm. **Show alg** reveals the letter pair,
+   physical targets, commutator and cleaned full moves. Valid saved preferred
+   algorithms are used; invalid imported choices get a verified built-in
+   fallback without changing the saved record. Some raw algs may have no
+   recoverable commutator; their verified full moves are still shown.
+4. Rate **Remembered** or **Missed**. The solution is then shown automatically;
+   this automatic reveal does not count as a hint. Use the solution to restore
+   your cube before pressing **Next case**. A reveal before rating is counted
+   separately, and recall percentages are self-rated.
+5. After the last case, open the summary for remembered/missed lists, recall
+   rate and reveal count. Expand a result to review its alg or open its editor.
+   **Retry missed cases** starts a new shuffled pass of those cases only.
+
+Subset/status selections combine within their groups, then intersect with the
+target and favorite filters. Empty selections cannot start a round. The round
+freezes its scheme and algorithm choices. Navigation, theme changes, resizing,
+and returning from the editor retain the current round; **End session** shows
+a partial summary with **Resume session** available. Results live in the current
+page session and are not added to browser backups or retained after a reload.
+Recall ratings do not modify Learning/Learned labels or any existing histories.
+
+Setups use the bundled solver via an independent route, and are checked against
+the complete cube state. A verified generated setup remains available when a
+native installation has no JavaScript runtime. No additional dependency is needed.
 
 ## Light color themes
 

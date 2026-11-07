@@ -1,3 +1,29 @@
+# Corner recall trainer — 2.42.0
+
+Method Library has a new **Corner trainer** section and overview card. Filter
+case layers/statuses with checkboxes, select letter-labelled targets, then run
+one shuffled pass. Setups and solutions are verified on the entire cube.
+
+The setup and cube appear first. Targets and algorithms remain hidden until
+Show alg or rating. Remembered/Missed records only once; Next case is separate
+so there is time to solve the physical cube before another setup. The summary
+groups misses and successes, counts reveals and offers Retry missed cases.
+The case editor has a return button to preserve your training position.
+
+The layout scrolls at compact sizes and uses the existing light palettes and
+dark mode. Session choices/results are local to this page session; existing
+learning statuses and saved training data are not rewritten. See README for
+the complete flow and PATCHING for the unchanged update process.
+
+Validation: **590 automated tests pass**, including 24 new trainer checks. The
+378-case portable setup route is verified on the complete cube; the bundled
+solver is also exercised directly. Web Python runtime checks pass at 1440×900
+(top tabs), 1080×700 (sidebar), 390×700 (pop-out) and 280×400 (top tabs), including
+12 real web-solver setups, hidden answers, summary/retry, navigation and themes.
+Navigation expectations in two existing test files now include the sixth
+section/card; other existing test files and all previous core/data modules are unchanged.
+Actual browser-client rendering was not measured here; no deployment was made.
+
 # Light color themes — 2.41.0
 
 Settings → Appearance now includes a **Light color theme** selector with a small

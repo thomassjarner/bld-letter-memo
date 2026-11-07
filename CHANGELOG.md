@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.42.0
+
+- Added **Corner trainer** in Method Library, accessible from the overview,
+  section tabs and compact Workspace selector.
+- Filter by multiple layer subsets and learning statuses, first/second target
+  stickers labelled with your scheme, and favorites. Each matching case is
+  presented once in a shuffled round.
+- Generate and verify a physical-cube setup, hide target letters and algorithms
+  until reveal/rating, then show the preferred commutator and cleaned full moves.
+  Every setup and selected solution is checked against the full cube state;
+  invalid imported choices fall back without overwriting user algorithms.
+- Self-rate Remembered/Missed, advance explicitly, inspect a detailed summary,
+  retry misses, or open a case editor and return to the same round. Reveals are
+  counted separately. Partial rounds can be resumed after navigation.
+- Session results stay in the current page session. Learning statuses, existing
+  histories, data format, storage keys, dependencies and deployment steps are unchanged.
+- Validation: all 590 tests pass, including 24 trainer checks. All 378 portable
+  setups and their solutions are verified, with real solver checks on native
+  Python and the web Python runtime. Four viewport/navigation configurations
+  pass the full recall flow. Actual browser-client rendering was not measured;
+  no live deployment was performed.
+
 ## 2.41.0
 
 - Added **Light color theme** in Settings → Appearance: Classic Teal, Cobalt Blue,

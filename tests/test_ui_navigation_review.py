@@ -91,11 +91,11 @@ def test_home_quick_actions_open_the_existing_timer_and_method_library_without_s
 
 
 @pytest.mark.parametrize('width',[280,390,700])
-def test_method_workspace_picker_exposes_all_five_sections_and_retains_the_current_mode(width):
+def test_method_workspace_picker_exposes_all_six_sections_and_retains_the_current_mode(width):
     page,repo=mount(width=width)
     view=click_nav(page,'Method Library');before=deepcopy(repo.data.to_dict())
     assert view.section_menu in view.header.controls
-    assert len(view.section_menu.options)==5
+    assert len(view.section_menu.options)==6
     for option in view.section_menu.options:
         view.section_menu.value=option.key
         view.section_menu.on_select(SimpleNamespace(control=view.section_menu))
