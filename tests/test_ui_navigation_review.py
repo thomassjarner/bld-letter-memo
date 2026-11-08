@@ -81,10 +81,10 @@ def test_home_quick_actions_open_the_existing_timer_and_method_library_without_s
     page,repo=mount()
     home=page.root.controls[0].content;before=deepcopy(repo.data.to_dict())
     assert not any(isinstance(c,(ft.TextField,ft.Dropdown,ft.KeyboardListener)) for c in walk(home))
-    next(c for c in walk(home) if isinstance(c,ft.FilledButton) and c.content=='Open Timer').on_click(None)
+    next(c for c in walk(home) if c.key=='home_open_timer').on_click(None)
     timer=page.root.controls[0].content;listener=timer.keyboard_listener
     home=click_nav(page,'Home')
-    next(c for c in walk(home) if isinstance(c,ft.OutlinedButton) and c.content=='Method Library').on_click(None)
+    next(c for c in walk(home) if c.key=='home_open_library').on_click(None)
     assert page.root.controls[0].content.mode=='overview'
     assert click_nav(page,'Timer') is timer and timer.keyboard_listener is listener
     assert repo.data.to_dict()==before

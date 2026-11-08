@@ -1,6 +1,7 @@
 """Shared presentation tokens. No training or persistence logic lives here."""
 import flet as ft
 from data.color_themes import DEFAULT_LIGHT_THEME, light_theme as get_light_theme
+from ui.feature_icons import feature_icon
 
 PAGE_TITLE = 24
 SECTION_TITLE = 16
@@ -81,12 +82,14 @@ def panel(content, padding=16, **kwargs):
     )
 
 
-def activity_card(title, description, icon, action, on_click=None, number=None, enabled=True):
+def activity_card(title, description, icon, action, on_click=None, number=None, enabled=True, *, feature=None):
     """Keyboard-accessible destination button; cards never mount tool controls."""
     return panel(ft.Column([
         ft.Row([
-            ft.Container(ft.Icon(icon, size=20, color=ft.Colors.PRIMARY if enabled else ft.Colors.ON_SURFACE_VARIANT),
-                         padding=8, bgcolor=ft.Colors.PRIMARY_CONTAINER if enabled else ft.Colors.SURFACE_CONTAINER_HIGH,
+            ft.Container(feature_icon(feature, size=22, muted=not enabled) if feature else
+                         ft.Icon(icon, size=20, color=ft.Colors.PRIMARY if enabled else ft.Colors.ON_SURFACE_VARIANT),
+                         padding=8, bgcolor=ft.Colors.SURFACE_CONTAINER_LOW if feature and enabled else
+                         ft.Colors.PRIMARY_CONTAINER if enabled else ft.Colors.SURFACE_CONTAINER_HIGH,
                          border_radius=8),
             ft.Column([
                 ft.Text(title, size=17, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE,

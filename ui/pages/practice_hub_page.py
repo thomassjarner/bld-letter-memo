@@ -35,9 +35,9 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
             page_heading("Practice", "Choose a training session. Your scheme and saved preferences carry through."),
             ft.ResponsiveRow([
                 activity_card("Blind Timer", "Generate scrambles, time full blind attempts, and review your session history.",
-                              ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback()),
+                              ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback(), feature="timer"),
                 activity_card("Progressive Memo", "Memo a real scramble one pair at a time, then type your recall and check your accuracy.",
-                              ft.Icons.PSYCHOLOGY, "Open Progressive Memo", self.open_progressive),
+                              ft.Icons.PSYCHOLOGY, "Open Progressive Memo", self.open_progressive, feature="progressive"),
             ], spacing=12, run_spacing=12),
             ft.ExpansionTile(title=ft.Text("More practice modes", size=14, color=ft.Colors.ON_SURFACE),
                 subtitle=ft.Text("Planned activities", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -45,9 +45,9 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
                 expanded_cross_axis_alignment=ft.CrossAxisAlignment.STRETCH,
                 controls=[ft.ResponsiveRow([
                 activity_card("Delayed Recall", "Memo, wait for a countdown, then type what you remember.",
-                              ft.Icons.HOURGLASS_BOTTOM, "Coming soon", enabled=False),
+                              ft.Icons.HOURGLASS_BOTTOM, "Coming soon", enabled=False, feature="delayed"),
                 activity_card("Letter Pair Drill", "Build fast, reliable pair-to-word recall from your dictionary.",
-                              ft.Icons.BOLT, "Coming soon", enabled=False),
+                              ft.Icons.BOLT, "Coming soon", enabled=False, feature="drill"),
             ], spacing=12, run_spacing=12)]),
             ft.Text("Blind Timer and Progressive Memo are ready. Delayed Recall and Letter Pair Drill are planned.",
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),

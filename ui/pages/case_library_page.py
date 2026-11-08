@@ -153,16 +153,16 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         cards = [
             activity_card('3-style corner cases',
                 'Choose two target stickers, compare algorithms, and track progress. 378 cases with UFR as the buffer.',
-                ft.Icons.GRID_VIEW, 'Open corner cases', lambda e: self._set_mode('library'), 'CASE LIBRARY'),
+                ft.Icons.GRID_VIEW, 'Open corner cases', lambda e: self._set_mode('library'), 'CASE LIBRARY', feature='cases'),
             activity_card('3-style corner trainer',
                 'Filter your cases, recall each algorithm once, and review what you remembered or missed.',
-                ft.Icons.PSYCHOLOGY, 'Open corner trainer', lambda e: self._set_mode('trainer'), 'RECALL TRAINING'),
+                ft.Icons.PSYCHOLOGY, 'Open corner trainer', lambda e: self._set_mode('trainer'), 'RECALL TRAINING', feature='trainer'),
             activity_card('Algorithm Playground',
                 'Paste moves or a commutator, inspect its effect, and save your own algorithm.',
-                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'FREE EXPLORATION'),
+                ft.Icons.VIEW_IN_AR_OUTLINED, 'Open Playground', lambda e: self._set_mode('explorer'), 'FREE EXPLORATION', feature='playground'),
             activity_card('Scramble walkthrough',
                 'Watch the corner target pairs from a scramble using your scheme and cycle breaks.',
-                ft.Icons.PLAY_CIRCLE_OUTLINE, 'Open walkthrough', lambda e: self._set_mode('walkthrough'), 'FROM A SCRAMBLE'),
+                ft.Icons.PLAY_CIRCLE_OUTLINE, 'Open walkthrough', lambda e: self._set_mode('walkthrough'), 'FROM A SCRAMBLE', feature='walkthrough'),
         ]
         for card in cards:
             card.col = {'xs': 12, 'md': 6, 'xl': 3}

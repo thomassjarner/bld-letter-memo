@@ -18,7 +18,7 @@ def test_home_and_top_level_navigation_open_the_same_method_library_without_load
         page, repo = mount()
         before = deepcopy(repo.data.to_dict())
         home = page.root.controls[0].content
-        button = next(c for c in walk(home) if isinstance(c, ft.TextButton) and c.content == 'Open Method Library')
+        button = next(c for c in walk(home) if c.key == 'home_open_library')
         button.on_click(None)
         view = page.root.controls[0].content
         assert view.mode == 'overview' and view.active and view._cases is None

@@ -2,6 +2,7 @@ import flet as ft
 
 from data.shared_preferences_repository import SharedPreferencesAppDataRepository
 from ui.design import build_theme, icon_action
+from ui.feature_icons import feature_icon
 from ui.theme_colors import apply_palette
 from ui.pages.home_page import build_home
 from ui.pages.case_library_page import CaseLibraryPage
@@ -14,20 +15,20 @@ from ui.pages.settings_page import SettingsPage
 from ui.state import AppState
 
 DESTINATIONS = [
-    ("Home", ft.Icons.HOME_OUTLINED),
-    ("Letter Schemes", ft.Icons.GRID_VIEW),
-    ("Letter Pairs", ft.Icons.TABLE_CHART),
-    ("Scramble Memo", ft.Icons.SHUFFLE),
-    ("Method Library", ft.Icons.SCHOOL_OUTLINED),
-    ("Practice", ft.Icons.FITNESS_CENTER),
-    ("Timer", ft.Icons.TIMER),
-    ("Settings", ft.Icons.SETTINGS),
+    ("Home", "home"),
+    ("Letter Schemes", "schemes"),
+    ("Letter Pairs", "pairs"),
+    ("Scramble Memo", "memo"),
+    ("Method Library", "library"),
+    ("Practice", "practice"),
+    ("Timer", "timer"),
+    ("Settings", "settings"),
 ]
 HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_INDEX, TIMER_INDEX, SETTINGS_INDEX = range(8)
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.45.0"
+    page.title = "BLD Letter Memo · 2.46.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -83,7 +84,23 @@ async def main(page: ft.Page):
     practice_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     scramble_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     practice_page.show_menu(update=False)
-    home_page = build_home(lambda name: navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name)), data=state)
+    def open_home_destination(name):
+        if name == "Method Library":
+            method_page._set_mode("overview")
+            navigate_to(METHOD_INDEX)
+        elif name == "Scramble walkthrough":
+            method_page._set_mode("walkthrough")
+            navigate_to(METHOD_INDEX)
+        elif name == "Algorithm Playground":
+            method_page._set_mode("explorer")
+            navigate_to(METHOD_INDEX)
+        elif name == "Progressive Memo":
+            practice_page.open_progressive()
+            navigate_to(PRACTICE_INDEX)
+        else:
+            navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name))
+
+    home_page = build_home(open_home_destination, data=state)
     pages = [home_page, schemes_page, pairs_page, scramble_page, method_page, practice_page, timer_page, settings_page]
     content_area.content = home_page
 
@@ -121,7 +138,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.45.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.46.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 
@@ -130,7 +147,7 @@ async def main(page: ft.Page):
         selected = index == current_index
         color = ft.Colors.ON_PRIMARY_CONTAINER if selected else ft.Colors.ON_SURFACE_VARIANT
         content = ft.Row([
-            ft.Icon(icon, size=18, color=color),
+            feature_icon(icon, size=18, selected=selected),
             ft.Text(label, size=13, color=color, weight=ft.FontWeight.W_600,
                     max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
         ], spacing=8, tight=True)
@@ -194,7 +211,7 @@ async def main(page: ft.Page):
             width=40, height=40, bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST, icon_color=ft.Colors.PRIMARY,
             menu_position=ft.PopupMenuPosition.UNDER, on_cancel=restore_training_focus, items=[
                 ft.PopupMenuItem(content=ft.Row([
-                    ft.Icon(icon, size=18, color=ft.Colors.PRIMARY if i == current_index else ft.Colors.ON_SURFACE_VARIANT),
+                    feature_icon(icon, size=18),
                     ft.Text(label, size=13, color=ft.Colors.ON_SURFACE, expand=True),
                     ft.Icon(ft.Icons.CHECK, size=17, color=ft.Colors.PRIMARY, visible=i == current_index),
                 ], spacing=10, width=210), height=44,
@@ -234,6 +251,8 @@ async def main(page: ft.Page):
             right=side_padding, bottom=64 if style == "popout" else 12)
         horizontal_padding = side_padding * 2
         bottom_padding = 64 if style == "popout" else 12
+        home_page.set_viewport(width - content_area.left - horizontal_padding,
+                               (page.height or 800) - content_area.top - 12 - bottom_padding)
         timer_page.set_viewport(width - content_area.left - horizontal_padding,
                                 (page.height or 800) - content_area.top - 12 - bottom_padding)
         pairs_page.set_viewport(width - content_area.left - horizontal_padding,

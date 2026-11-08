@@ -80,7 +80,8 @@ def test_home_has_routes_and_no_embedded_tools():
     assert not any(isinstance(c, (ft.TextField, ft.Dropdown, ft.KeyboardListener, PracticePage)) for c in walk(home))
     for button in (c for c in walk(home) if isinstance(c, ft.TextButton)):
         button.on_click(None)
-    assert routed == ["Letter Schemes", "Letter Pairs", "Practice", "Scramble Memo", "Method Library", "Settings"]
+    assert routed == ["Letter Schemes", "Letter Pairs", "Scramble Memo", "Scramble walkthrough",
+                      "Method Library", "Algorithm Playground", "Timer", "Progressive Memo", "Settings"]
 
 
 def test_nav_order_and_home_default():

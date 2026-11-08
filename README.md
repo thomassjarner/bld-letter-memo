@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.45.0**.
+or as a desktop app. Current version: **2.46.0**.
 
 ## Workspaces
 
@@ -31,9 +31,30 @@ shows your current page and **Open navigation** opens the complete page menu.
 Sidebar and pop-out navigation remain available in Settings; their saved
 preferences are retained across screen sizes.
 
-Home has quick **Timer** and **Method Library** shortcuts plus compact cards for
-the setup and training workflow. Practice shows the available activities first;
-planned modes are grouped under **More practice modes**.
+Home groups its shortcuts by what you want to do:
+
+| Category | Destinations |
+| --- | --- |
+| **Set up your memo** | Set up your letter scheme; Build your letter pairs |
+| **Analyze a scramble** | Scramble Memo; Scramble walkthrough |
+| **Learning material** | Method Library; Algorithm Playground |
+| **Practice** | Blind Timer; Progressive Memo |
+
+Each full-width feature row is one keyboard-accessible link. The four groups
+sit in two columns on wider screens and stack into one scrolling column on
+phones. Descriptions and icon badges stay compact, with extra text room on
+narrow screens. Home is a route chooser; it does not embed the tools.
+
+Walkthrough and Playground open their sections directly in the existing
+Method Library. The Method Library Home link opens its overview. Progressive
+Memo opens directly in Practice; its back button still returns to the practice
+menu. The top navigation and the original routes remain available, including
+Timer as its own destination. Planned modes stay under **More practice modes**.
+
+Original two-tone line icons identify the features in Home, navigation and
+the Practice/Method Library cards. They are drawn with Flet's native Canvas;
+their colors follow all five light palettes and dark mode. Standard action
+symbols such as Play, Save and Back keep their familiar meanings.
 
 - **Letter Schemes:** use **Rename** beside the active scheme to edit its name
   in a dialog. Face cards, 2D cube entry order and buffer controls are unchanged.

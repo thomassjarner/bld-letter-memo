@@ -1,19 +1,20 @@
-# Update to 2.45.0
+# Update to 2.46.0
 
-Copy all contents of `bld-letter-memo-web-2.45.0/` into your existing
+Copy all contents of `bld-letter-memo-web-2.46.0/` into your existing
 `~/Desktop/letterpairscheme-helper-web/` project, replacing matching files.
 Do not put the release folder itself inside the project.
 
-**This update includes a deployment change:** copy the hidden `.github/`
-folder too, along with `scripts/` and `web_preview/`. The workflow adds the
-link-preview metadata and artwork after Flet publishes the app. Finder can
-hide `.github`; Command+Shift+. shows hidden files.
+The copy/commit/push process is unchanged. Include the new `ui/feature_icons.py`
+and `tests/test_home_workspaces.py` files, plus all updated files. Continue to
+copy the hidden `.github/` folder and `scripts/`/`web_preview/` to retain the
+branded link-preview deployment from 2.45.0. Finder can hide `.github`;
+Command+Shift+. shows hidden files.
 
 If you extracted the ZIP into Downloads, this terminal command copies all
 contents, including `.github`, without deleting anything from your project:
 
 ```bash
-rsync -av ~/Downloads/bld-letter-memo-web-2.45.0/ ~/Desktop/letterpairscheme-helper-web/
+rsync -av ~/Downloads/bld-letter-memo-web-2.46.0/ ~/Desktop/letterpairscheme-helper-web/
 ```
 
 Adjust the source path if you extracted it elsewhere. Then use the usual push:
@@ -21,23 +22,19 @@ Adjust the source path if you extracted it elsewhere. Then use the usual push:
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Improve link previews and verify scheme cycle-break preferences"
+git commit -m "Group Home by activity and add theme-aware feature icons"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, refresh and confirm **2.45.0** in the header/tab title.
+Wait for GitHub Actions, refresh and confirm **2.46.0** in the header/tab title.
 Command+Shift+R can refresh the build on macOS.
 
-The deployment log should include **Add branded link preview and app icons**.
-The published HTML will contain the new title, description, image and canonical
-URL. An older shared message may continue to show its cached card; check a newly
-shared link after deployment. No manual command on the hosted site is needed.
-
-Progressive Memo already uses the active scheme's ordered cycle-break choices
-and preferred stickers. New regression tests verify this for corners/edges,
-3-style parity and scheme changes. Each attempt retains its starting scheme;
-edits and scheme switches apply on the next Start.
+Home should show **Set up your memo**, **Analyze a scramble**, **Learning
+material**, and **Practice**. Try the new direct Scramble walkthrough,
+Algorithm Playground and Progressive Memo links. The original Method Library,
+Practice and Timer routes remain available. Switch themes to see the same
+feature icons adapt to the chosen colors.
 
 No dependency or storage-key changes are required. Data version remains 18,
 with the existing optional constraint preferences/attempt metadata. Old

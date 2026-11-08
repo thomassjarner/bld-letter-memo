@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.46.0
+
+- Reorganized Home into **Set up your memo**, **Analyze a scramble**,
+  **Learning material**, and **Practice**, with two clear feature links per
+  group. Compact full-row buttons replace the previous mixed activity cards
+  and duplicate quick-action area. Groups reflow into one scrolling column
+  on phones, with more room for wrapped text.
+- Added direct Home links to Scramble walkthrough, Algorithm Playground and
+  Progressive Memo. They use the existing Method Library/Practice controls;
+  the original routes, top-level destinations and Timer remain available.
+  The Home Method Library link opens the overview.
+- Added original two-tone feature icons to Home, all navigation styles and
+  Practice/Method Library overview cards. Native Canvas shapes follow the
+  selected light palette or dark mode; focus/selected states remain readable.
+- BLD logic, progressive constraints and cycle-break handling, histories,
+  algorithms, saved preferences, storage keys, backup format/data version 18,
+  dependencies and the branded-preview deployment workflow are unchanged.
+- Validation: all 676 tests pass, including 21 new Home routing/palette checks.
+  Three existing tests now locate the grouped Home links or expect the new
+  route list. Web Python checks pass for all five light palettes and dark mode
+  across four viewport/navigation configurations, including native icon
+  transport and unchanged saved data. Icon primitives were visually inspected;
+  actual browser-client layout was not measured and no deployment was performed.
+
 ## 2.45.0
 
 - Replaced generic Flet share metadata with the BLD Letter Memo name, a

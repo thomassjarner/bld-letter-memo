@@ -1,3 +1,44 @@
+# Grouped Home and feature icons — 2.46.0
+
+Home now has four sections with two feature rows each:
+
+| Section | Links |
+| --- | --- |
+| Set up your memo | Set up your letter scheme; Build your letter pairs |
+| Analyze a scramble | Scramble Memo; Scramble walkthrough |
+| Learning material | Method Library; Algorithm Playground |
+| Practice | Blind Timer; Progressive Memo |
+
+Each row has one compact icon badge, a readable feature name, a short
+description and a trailing arrow. The entire row is a focusable button, with
+a theme-aware focus background. Category headings separate intent from the
+individual tool names. The smaller introduction and two-column category grid
+keep the desktop page compact; phones get one scrolling column and taller
+rows for wrapping text.
+
+The Home Method Library entry opens its overview. Walkthrough and Playground
+open their exact Method Library sections, and Progressive Memo opens directly
+in Practice. Their original entry points remain. Timer keeps its top-level
+destination and existing control/session. The shortcuts do not create duplicate
+tool instances or change the existing behavior when leaving an unfinished
+training attempt.
+
+The main feature icons use original native line drawings: lettered cards for
+pairs/memo, a target route for Scramble Memo, a cube/play mark for walkthrough,
+a book for Method Library and a stopwatch for Timer. Small warm accents work
+with the current palette. The same glyphs appear in the top tabs, compact
+menu/sidebar/pop-out and Practice/Method Library cards. Every paint follows
+semantic theme roles; no external image assets or dependencies are used.
+
+Validation: **676 tests pass**, including 21 new checks of grouping, direct
+and original routes, reused tool controls, existing training navigation
+behavior and reversible icon colors/contrast. Three older tests were updated
+for the new Home entry layout. Web Python checks pass in 24 configurations:
+five light themes plus dark mode at 1440×900, 1080×800, 390×700 and 280×400,
+covering all navigation styles. Native Canvas icons also serialize correctly
+at small sizes and were visually inspected from their actual primitives.
+Actual browser-client layout was not measured; no live deployment was performed.
+
 # Shared-link preview and scheme verification — 2.45.0
 
 Shared links use a proper site title, a concise training description and a
