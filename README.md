@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.44.0**.
+or as a desktop app. Current version: **2.45.0**.
 
 ## Workspaces
 
@@ -91,6 +91,40 @@ When enabled, the existing tracer applies its configured edge-buffer/helper
 swap for odd corner parity; Progressive Memo requires complete ordinary edge
 pairs. It never pads or drops a target. Without 3-style, a final single edge
 letter remains valid, and corners can also finish with one letter.
+
+Progressive Memo follows the **active letter scheme's saved cycle-break
+priority order and preferred sticker for each piece**, using the same tracer
+as Scramble Memo. Each Start freezes those preferences for the attempt;
+switching schemes or editing their order takes effect on the next Start.
+Temporary alternatives explored in Scramble Memo do not replace the scheme's
+saved choices. This behavior is covered for both corners and edges, including
+3-style and orientation-letter memo.
+
+## Sharing the site
+
+Shared links have a branded **BLD Letter Memo | Blindfold Cube Training**
+title, a short feature description and a 1200×630 cube image. Browser and
+installed-app icons use the matching cube mark. The metadata is in the static
+HTML, so preview services can read it before the Python app starts.
+
+The GitHub Pages workflow runs `scripts/web_metadata.py` immediately after
+`flet publish`, before uploading `dist`. It derives the public URL from the
+repository owner/name and preserves Flet's base path, runtime scripts and
+manifest navigation. **Include the updated hidden `.github` folder when
+installing this release**; see [PATCHING.md](PATCHING.md).
+
+For a manual static build or a custom domain, run the same step with the actual
+public URL after publishing:
+
+```bash
+flet publish main.py --base-url /bld-letter-memo/
+python scripts/web_metadata.py --output dist --site-url https://thomassjarner.github.io/bld-letter-memo/
+```
+
+Publish uses the bundled `web_preview/` PNGs with no new dependency. Developers
+can regenerate them with `python scripts/render_preview.py` if Pillow is
+installed. Existing chat messages may retain a previously cached preview;
+the release does not edit those messages or force external cache refreshes.
 
 ## 3-style corner trainer
 

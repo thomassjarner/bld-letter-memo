@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.45.0
+
+- Replaced generic Flet share metadata with the BLD Letter Memo name, a
+  training-focused description and a branded 1200×630 cube card. Added
+  Open Graph/Twitter tags, canonical URL and matching favicon/PWA icons.
+- Added a standard-library post-publish step to the GitHub Pages workflow.
+  Images are bundled; no extra deployment/runtime dependency is needed.
+  Flet bootstrap, repository base path and manifest navigation are preserved.
+  The updated hidden `.github` folder must be copied with this release.
+- Verified that Progressive Memo already follows the active scheme's saved
+  cycle-break order and exact preferred stickers. Added regressions for
+  corners/edges, both orientation modes, 3-style parity, switching schemes and
+  changing priorities between attempts. Existing tracing logic is unchanged.
+- Prior recall protections, constraints, training histories, data version 18,
+  browser storage keys, algorithms, import/export and all other tools are retained.
+- Validation: all 655 tests pass, including 23 new preview/active-scheme checks.
+  The pinned Flet 0.86.3 publish template retains its four startup scripts and
+  base path byte-for-byte after metadata processing. Artwork was visually
+  inspected; no live deployment or chat-service card rendering was performed.
+
 ## 2.44.0
 
 - Fixed recall review erasing answers: Right Arrow/Next preserves entered text

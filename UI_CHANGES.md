@@ -1,3 +1,24 @@
+# Shared-link preview and scheme verification — 2.45.0
+
+Shared links use a proper site title, a concise training description and a
+1200×630 dark/mint cube graphic. The matching cube mark appears as the browser
+favicon and installed-app icon. These assets and metadata are added to the
+static build, where preview services can read them without starting Flet.
+There is no change to in-app layouts or saved preferences.
+
+Progressive Memo is confirmed to use the active scheme's saved cycle-break
+order and preferred stickers. The existing tracer and attempt snapshots are
+retained. New tests check the actual chosen piece/sticker, resulting letters,
+scheme switching and priority edits on the next Start, with and without 3-style.
+
+The release includes a new post-publish workflow step; the hidden `.github`
+folder is part of the update. See PATCHING.md for a copy command that includes it.
+
+Validation: **655 tests pass**, including 23 new metadata/active-scheme checks.
+The Flet 0.86.3 published HTML template keeps its startup scripts and base path
+unchanged after processing. The PNG artwork was visually inspected. No live
+deployment or external chat-card rendering was performed.
+
 # Progressive Memo constraints and safe review — 2.44.0
 
 Right Arrow is now forward navigation that retains an entered answer, with
