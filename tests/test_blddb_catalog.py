@@ -42,6 +42,8 @@ def test_all_378_cases_and_2423_variants_are_real_pure_cycles_in_the_unchanged_t
             identifiers.add(candidate.id)
             expected_id = 'builtin:blddb:' + sha256((key + '\n' + candidate.raw_alg).encode()).hexdigest()[:24]
             assert candidate.id == expected_id and candidate.source_count == len(candidate.sources)
+            assert candidate.name == candidate.raw_alg + f' · {candidate.source_count} ' + (
+                'source' if candidate.source_count == 1 else 'sources')
             raw = parse_algorithm(candidate.raw_alg)
             actual = parse_algorithm(candidate.alg)
             assert identify_case(raw) == identify_case(actual) == key
@@ -106,12 +108,17 @@ def test_case_picker_contains_only_ranked_blddb_choices_and_personal_alternative
     assert view.selected_algorithm == 'mine' and view._variant() == ('Keep my alg', personal.alg)
     options = view.variant_picker.options
     assert [o.key for o in options] == ['', *[a.id for a in builtin_algorithms(key)], 'mine']
+    assert options[0].text.startswith(builtin_algorithms(key)[0].raw_alg)
+    assert all(option.text.startswith(candidate.raw_alg)
+               for option, candidate in zip(options[1:-1], builtin_algorithms(key)))
+    assert all('BLDDB #' not in option.text for option in options)
     assert not any(word in str(o.content) for o in options for word in ('Generated fallback', 'One-move setup', 'Supplied algorithm'))
     source_link = next(c for c in walk(view) if isinstance(c, ft.TextButton) and c.content == 'BLDDB')
     assert source_link.url == case_source_url(key)
     candidate = builtin_algorithms(key)[1]
     view._choose_variant(SimpleNamespace(control=SimpleNamespace(value=candidate.id)))
     assert view.selected_algorithm == candidate.id and view._variant()[1] == candidate.alg
+    assert view.variant_picker.tooltip == candidate.name
     assert 'BLDDB' in ' '.join(text_values(view))
     assert repo.data.to_dict() == before
 

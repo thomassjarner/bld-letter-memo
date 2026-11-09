@@ -77,8 +77,7 @@ def blddb_case_algorithms():
                 # Rank/source count are deliberately absent from the ID: a
                 # saved choice survives later popularity changes.
                 identifier = 'builtin:blddb:' + sha256((key + '\n' + item['moves']).encode()).hexdigest()[:24]
-                number = str(rank) + (f'.{index}' if count > 1 else '')
-                name = f'BLDDB #{number} · {len(sources)} ' + ('source' if len(sources) == 1 else 'sources')
+                name = item['moves'] + f' · {len(sources)} ' + ('source' if len(sources) == 1 else 'sources')
                 variants.append(BuiltinAlgorithm(
                     identifier, name, item['source'], 'blddb', 'UFR-' + key.replace(':', '-'),
                     len(sources), rank, index, count, item['moves'], item['commutator'], sources))

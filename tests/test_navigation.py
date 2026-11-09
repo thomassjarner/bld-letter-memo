@@ -81,7 +81,8 @@ def test_home_has_routes_and_no_embedded_tools():
     for button in (c for c in walk(home) if isinstance(c, ft.TextButton)):
         button.on_click(None)
     assert routed == ["Letter Schemes", "Letter Pairs", "Scramble Memo", "Scramble walkthrough",
-                      "Method Library", "Algorithm Playground", "Timer", "Progressive Memo", "Settings"]
+                      "Method Library", "Algorithm Playground", "Timer", "Progressive Memo",
+                      "3-style corner trainer", "Settings"]
 
 
 def test_nav_order_and_home_default():

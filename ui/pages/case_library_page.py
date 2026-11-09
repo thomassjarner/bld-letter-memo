@@ -364,15 +364,16 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.algorithm_field.visible = self.case_converter.commutator.visible = not self.hidden
         self.viewer.move_text.visible = not self.hidden
         recommended = builtins[0]
-        recommendation = f'{recommended.source_count} ' + ('source' if recommended.source_count == 1 else 'sources')
-        options = [ft.DropdownOption('', f'Most popular · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
+        options = [ft.DropdownOption('', recommended.name + ' · most popular'
+                    + (' · preferred' if not record.preferred_algorithm else ''))]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else ''))
                     for a in display_builtin_algorithms(case.id, (self.selected_algorithm, record.preferred_algorithm))]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in record.algorithms]
         valid_ids = {o.key for o in options}
         self.selected_algorithm = self.selected_algorithm if self.selected_algorithm in valid_ids else ''
         self.variant_picker = dropdown(label='Algorithm alternative', value=self.selected_algorithm,
-                                      options=options, on_select=self._choose_variant, height=38, dense=True)
+                                      options=options, on_select=self._choose_variant, height=38, dense=True,
+                                      tooltip=name)
         self.notes_field = field(label='Case notes · saves on leaving this field', value=record.notes,
             multiline=True, min_lines=2, max_lines=4,
             on_blur=lambda e, key=case.id: self._save_notes(key, e.control.value or ''))
@@ -389,7 +390,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         missing = '?' in case_letters(case, self.scheme)
         selected_builtin = next((a for a in builtins if a.id == self.selected_algorithm), recommended)
         provenance = 'Your saved algorithm' if personal else (
-            f'BLDDB #{selected_builtin.rank} · {selected_builtin.source_count} source sheets'
+            f'BLDDB · {selected_builtin.source_count} source sheets'
             + (f' · spelling {selected_builtin.variant}/{selected_builtin.variant_count}' if selected_builtin.variant_count > 1 else '')
             + f' · {catalog_metadata()["snapshot_date"]}')
         source_tooltip = provenance if personal else provenance + '\n' + ', '.join(selected_builtin.sources)

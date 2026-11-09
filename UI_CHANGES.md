@@ -1,3 +1,26 @@
+# Move names and Home trainer shortcut — 2.48.0
+
+Built-in algorithm names now show the actual move sequence followed by the
+same source count. The most-popular/default option uses this format too.
+Numbered BLDDB titles are removed from the provenance line, which still shows
+the source-sheet count, snapshot date and equivalent-spelling information.
+The selected-name tooltip contains the full moves and count. Popularity order,
+variants, stable IDs and the original algorithms/commutators are unchanged;
+saved personal names remain editable and are not renamed.
+
+Home's **Practice** group now contains **Blind Timer**, **Progressive Memo**,
+and **3-style corner trainer**. The new row uses the existing corner-trainer
+icon and opens the same Method Library trainer. It retains filters, the current
+card, recall grades and session. The Method Library overview entry still works.
+
+Validation: **694 tests pass**. Updated catalog checks cover every move name,
+unchanged source count/ID and picker labels. Home routing covers all navigation
+styles; three additional checks retain a graded session, filters and card
+through Home and resizing. Web Python checks pass at 1440×900, 1080×800,
+390×700 and 280×400, including live control serialization, names/counts and
+the same trainer session. The app's browser-client layout was not measured;
+no live deployment was performed.
+
 # BLDDB corner alternatives — 2.47.0
 
 The existing case picker now offers only the BLDDB manmade choices plus your

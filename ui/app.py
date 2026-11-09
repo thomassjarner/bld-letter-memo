@@ -28,7 +28,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.47.0"
+    page.title = "BLD Letter Memo · 2.48.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -97,6 +97,9 @@ async def main(page: ft.Page):
         elif name == "Progressive Memo":
             practice_page.open_progressive()
             navigate_to(PRACTICE_INDEX)
+        elif name == "3-style corner trainer":
+            method_page._set_mode("trainer")
+            navigate_to(METHOD_INDEX)
         else:
             navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name))
 
@@ -138,7 +141,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.47.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.48.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 

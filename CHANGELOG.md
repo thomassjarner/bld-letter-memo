@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.48.0
+
+- Named BLDDB alternatives by their actual move sequences, with the existing
+  source count appended. The default/most-popular option also includes its
+  moves, and numbered BLDDB names are removed from the source line. Long
+  selected names have a tooltip. IDs, ordering, algorithms and counts are unchanged.
+- Added **3-style corner trainer** under **Practice** on Home, using its
+  existing theme-aware icon and the same Method Library trainer. The original
+  entry point remains; filters and an ongoing recall session survive the shortcut.
+- Personal names/algorithms and all saved training data, browser keys, data
+  version 18, BLDDB snapshot, dependencies and deployment workflow are retained.
+- Validation: all 694 tests pass. Existing catalog checks now verify move-based
+  names and source counts for every variant; Home routing checks include the
+  trainer. Three new session checks cover re-entry, grades/cards, filters and
+  resizing. Web Python checks pass at four viewport/navigation configurations,
+  including labels, counts/IDs, the Home shortcut and retained data/session.
+  App browser-client layout was not measured; no deployment was performed.
+
 ## 2.47.0
 
 - Replaced every offered built-in UFR corner alternative with BLDDB v2's

@@ -1,12 +1,14 @@
 """Home deep links must reuse the existing workspaces and preserve training data."""
 from copy import deepcopy
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import flet as ft
 import pytest
 
 from data.color_themes import LIGHT_THEMES
 from test_gold_scrambles import GOLD_TESTS
+from test_corner_trainer import trainer_scheme
 from test_navigation import click_nav, mount, no_client_mount, text_values, walk
 from test_progressive_memo import letter_scheme
 from test_theme_contrast import contrast
@@ -28,13 +30,14 @@ def test_home_groups_keep_setup_analysis_learning_and_practice_distinct():
         "setup": {"Set up your memo", "Set up your letter scheme", "Build your letter pairs"},
         "analyze": {"Analyze a scramble", "Scramble Memo", "Scramble walkthrough"},
         "learn": {"Learning material", "Method Library", "Algorithm Playground"},
-        "practice": {"Practice", "Blind Timer", "Progressive Memo"},
+        "practice": {"Practice", "Blind Timer", "Progressive Memo", "3-style corner trainer"},
     }
     for key, labels in expected.items():
         group = next(c for c in walk(home) if c.key == f"home_group_{key}")
         assert labels <= set(text_values(group))
         buttons = [c for c in walk(group) if isinstance(c, ft.TextButton)]
-        assert len(buttons) == 2 and all(button.on_click and button.tooltip for button in buttons)
+        assert len(buttons) == (3 if key == "practice" else 2)
+        assert all(button.on_click and button.tooltip for button in buttons)
     assert home.scroll == ft.ScrollMode.AUTO
     assert not any(isinstance(c, (ft.TextField, ft.Dropdown, ft.KeyboardListener)) for c in walk(home))
 
@@ -70,8 +73,45 @@ def test_home_deep_links_reuse_existing_tools_in_every_navigation_style(style, w
     next(c for c in walk(practice) if isinstance(c, ft.TextButton) and c.content == "Open Progressive Memo").on_click(None)
     assert practice.mode == "progressive"
     assert launch(page, "timer") is timer and timer.keyboard_listener is listener
+    assert launch(page, "trainer") is method and method.mode == "trainer"
+    trainer = method.trainer
+    assert trainer.active and not timer.active and not practice.progressive.active
+    assert launch(page, "library") is method
+    next(c for c in walk(method) if isinstance(c, ft.TextButton) and c.content == "Open corner trainer").on_click(None)
+    assert method.mode == "trainer" and method.trainer is trainer
     assert launch(page, "schemes") is click_nav(page, "Letter Schemes")
     assert launch(page, "pairs") is click_nav(page, "Letter Pairs")
+    assert repo.data.to_dict() == before
+
+
+@pytest.mark.parametrize("width", [280, 390, 1440])
+def test_home_trainer_shortcut_retains_filters_and_an_existing_recall_session(width):
+    page, repo = mount(width=width)
+    scheme = trainer_scheme()
+    repo.data.schemes = {scheme.name: scheme}
+    repo.data.active_scheme = scheme.name
+    method = launch(page, "trainer")
+    trainer = method.trainer
+    trainer.first_target.value, trainer.second_target.value = "UBL", "UBR"
+    trainer._filter_changed()
+    before = deepcopy(repo.data.to_dict())
+    with patch("core.corner_trainer.solve_facelets", return_value=None):
+        trainer._start()
+    assert trainer.session and not trainer.busy
+    session, card = trainer.session, trainer.session.card
+    trainer._show()
+    trainer._grade(True)
+    assert session.answered and len(session.results) == 1
+    home = click_nav(page, "Home")
+    assert not trainer.active
+    page.width = 390 if width == 1440 else 1440
+    page.on_resize(None)
+    assert home.launch_buttons["trainer"].visible
+    assert launch(page, "trainer") is method
+    assert method.trainer is trainer and trainer.active and trainer.view == "recall"
+    assert trainer.session is session and session.card is card
+    assert session.answered and len(session.results) == 1
+    assert (trainer.first_target.value, trainer.second_target.value) == ("UBL", "UBR")
     assert repo.data.to_dict() == before
 
 

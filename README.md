@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.47.0**.
+or as a desktop app. Current version: **2.48.0**.
 
 ## Workspaces
 
@@ -38,7 +38,7 @@ Home groups its shortcuts by what you want to do:
 | **Set up your memo** | Set up your letter scheme; Build your letter pairs |
 | **Analyze a scramble** | Scramble Memo; Scramble walkthrough |
 | **Learning material** | Method Library; Algorithm Playground |
-| **Practice** | Blind Timer; Progressive Memo |
+| **Practice** | Blind Timer; Progressive Memo; 3-style corner trainer |
 
 Each full-width feature row is one keyboard-accessible link. The four groups
 sit in two columns on wider screens and stack into one scrolling column on
@@ -48,7 +48,9 @@ narrow screens. Home is a route chooser; it does not embed the tools.
 Walkthrough and Playground open their sections directly in the existing
 Method Library. The Method Library Home link opens its overview. Progressive
 Memo opens directly in Practice; its back button still returns to the practice
-menu. The top navigation and the original routes remain available, including
+menu. The **3-style corner trainer** shortcut opens the existing Method Library
+trainer with its current filters and session retained. The top navigation and
+the original routes remain available, including
 Timer as its own destination. Planned modes stay under **More practice modes**.
 
 Original two-tone line icons identify the features in Home, navigation and
@@ -195,12 +197,16 @@ and generated fallback menu option.
 
 - Groups sort by the number of **source sheets**, highest first, with BLDDB's
   original order retained for ties. Equivalent spellings stay in their group
-  and original order; for example `BLDDB #2.3` is spelling 3 in group 2.
+  and original order. Choices are named by their **actual moves**, followed by
+  the unchanged source count, for example
+  `R' B' R2 D R' U' R D' R' U R' B R · 23 sources`.
+  The most-popular/default choice also shows its moves. Long selected names
+  have a full-name tooltip, and the source count remains in the provenance line.
   Source counts belong to the group and are not measured execution speeds.
 - **Most popular** uses the first BLDDB choice by default. You can select and
   pin a different choice with **Use selected alg**. IDs depend on the physical
   case and move spelling, so later popularity changes do not change their identity.
-- The selected choice shows its rank, source-sheet count and snapshot date.
+- The selected choice shows its source-sheet count and snapshot date.
   Hover the source text for contributor names; **BLDDB** opens that exact case
   and the original source-sheet links. Popularity does not guarantee optimality.
 - The case editor, Playground case lookup, Scramble walkthrough and corner

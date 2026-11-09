@@ -1,13 +1,12 @@
-# Update to 2.47.0
+# Update to 2.48.0
 
-Copy all contents of `bld-letter-memo-web-2.47.0/` into your existing
+Copy all contents of `bld-letter-memo-web-2.48.0/` into your existing
 `~/Desktop/letterpairscheme-helper-web/` project, replacing matching files.
 Do not put the release folder itself inside the project.
 
-The copy/commit/push process is unchanged. Include the new
-`core/blddb_corner_catalog.json`, `core/legacy_corner_algorithms.py`,
-`tools/import_blddb_corners.py`, `third_party/blddb/` and tests, plus all updated
-files. The JSON catalog is required in the deployed app. Continue to
+The copy/commit/push process is unchanged. Replace all matching files and
+retain the bundled `core/blddb_corner_catalog.json`, import tools, attribution
+and tests. The JSON catalog is required in the deployed app. Continue to
 copy the hidden `.github/` folder and `scripts/`/`web_preview/` to retain the
 branded link-preview deployment from 2.45.0. Finder can hide `.github`;
 Command+Shift+. shows hidden files.
@@ -16,7 +15,7 @@ If you extracted the ZIP into Downloads, this terminal command copies all
 contents, including `.github`, without deleting anything from your project:
 
 ```bash
-rsync -av ~/Downloads/bld-letter-memo-web-2.47.0/ ~/Desktop/letterpairscheme-helper-web/
+rsync -av ~/Downloads/bld-letter-memo-web-2.48.0/ ~/Desktop/letterpairscheme-helper-web/
 ```
 
 Adjust the source path if you extracted it elsewhere. Then use the usual push:
@@ -24,18 +23,18 @@ Adjust the source path if you extracted it elsewhere. Then use the usual push:
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Replace corner alternatives with popularity-ranked BLDDB algorithms"
+git commit -m "Use move names for algorithms and add Home corner trainer link"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, refresh and confirm **2.47.0** in the header/tab title.
+Wait for GitHub Actions, refresh and confirm **2.48.0** in the header/tab title.
 Command+Shift+R can refresh the build on macOS.
 
-Open **Method Library → 3-style corner cases**. Choices should say **BLDDB**,
-with a popularity rank and source-sheet count. The UFR–UBL–UBR case starts
-with two groups of 23 sources; the second group has four spellings. The old
-supplied/setup/generated alternatives should not be offered.
+Open **Method Library → 3-style corner cases**. Algorithm choices should show
+the actual moves followed by their source count. Popularity order is unchanged.
+On Home, **Practice** should also contain **3-style corner trainer**, which
+opens the existing trainer. Its original Method Library entry remains available.
 
 Personal algorithms, notes, statuses, favorites and explicit personal choices
 are kept. Earlier builtin IDs stay in backup data but use the new most-popular
