@@ -1,3 +1,33 @@
+# Automatic commutator brackets — 2.49.0
+
+The case editor and Algorithm Playground use the same bracket assistance.
+An empty commutator shows `[]`, with the caret placed inside on focus. A short,
+theme-aware hint explains that you can type `A, B` or `setup: A, B`. Setup
+nesting is inferred only when another separator requires it: `R: U, D` becomes
+`[R: [U, D]]`. Plain conjugates such as `[R: U]` remain valid.
+
+New `[`/`(` characters receive matching closers immediately. Typing an existing
+closer moves past it. Complete pastes keep their notation, whether pasted over
+the full field or inside the empty frame. The editor preserves native caret
+positions for ordinary edits, converts UTF-16 offsets when formatting, ignores
+brackets in comments and never removes move text when repairing brackets.
+It does not guess how to group ambiguous `[R,U,D]` notation.
+
+Empty/incomplete input gives neutral guidance instead of a premature red error.
+Explicit Preview/Save still requires a valid algorithm. The visible empty pair
+is excluded from conversion and saving; valid Final alg moves remain usable
+when no reverse match exists. Revision guards protect against delayed searches.
+There is no auto-save, persisted preference, parser change or data migration.
+
+Validation: **722 tests pass**, including 28 additional editing regressions.
+The event harness models the pinned Flet client's selection-before-change
+ordering. The shipped web Python runtime passes both editors at 1440×900,
+1080×800, 390×700 and 280×400, checking caret offsets, shorthand nesting,
+full/inside-frame pastes, preserved raw final moves, delayed-search protection,
+helper/color serialization and unchanged saved data. All 2,423 catalog variants
+are retained byte-for-byte. Actual browser keyboard/rendering behavior was not
+measured; no live deployment was performed.
+
 # Move names and Home trainer shortcut — 2.48.0
 
 Built-in algorithm names now show the actual move sequence followed by the

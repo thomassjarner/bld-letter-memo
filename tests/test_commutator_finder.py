@@ -131,10 +131,10 @@ def test_invalid_or_partial_conversion_clears_stale_output_without_changing_save
     assert converter.commutator.value
     converter.final_alg.value = 'R +'
     converter.final_alg.on_change(None)
-    assert not converter.commutator.value and converter.algorithm is None
+    assert converter.commutator.value == '[]' and converter.algorithm is None
     converter.final_alg.value = 'R'
     converter.final_alg.on_change(None)
-    assert not converter.commutator.value and converter.algorithm is not None
+    assert converter.commutator.value == '[]' and converter.algorithm is not None
     view.select_case('UBL:RDF')
     assert converter.algorithm is not None
     assert repo.data.to_dict() == before

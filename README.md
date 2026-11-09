@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.48.0**.
+or as a desktop app. Current version: **2.49.0**.
 
 ## Workspaces
 
@@ -276,6 +276,36 @@ In the solved-edge preview, UF swaps with your configured helper when needed,
 regardless of the edge buffer. A UF/self or invalid helper uses UR for this
 preview. These display choices do not change tracing preferences or the scramble.
 Timer cube icons open the current scramble or a saved solve in this workspace.
+
+## Writing commutators
+
+The linked **Commutator** field in the case editor and Algorithm Playground
+starts with `[]`. Click inside it and type the parts; leave the outer closing
+bracket in place.
+
+| Type inside the empty field | Displayed notation |
+| --- | --- |
+| `R, U` | `[R, U]` |
+| `R: U, D` | `[R: [U, D]]` |
+| `R: U: F, D` | `[R: [U: [F, D]]]` |
+
+Typing `[` or `(` creates its matching closing bracket and leaves the caret
+inside. Typing that closing bracket moves past the existing one. Habitually
+typing `[` at the empty field reuses its outer pair; a second `[` nests it.
+Setup notation gains another pair when a comma or another colon makes that
+nesting necessary. Complete pasted/loaded notation keeps its existing pairs,
+including shorthand such as `f:[U2,R' D' R]`.
+
+Clear the field to start again with `[]`. Bracket deletion never removes move
+text. Ambiguous notation such as `[R,U,D]` still needs correction; the editor
+does not guess which algorithm you mean. An unfinished draft does not show a
+red error merely because its second part is not written yet.
+
+The empty frame is not an algorithm. Plain moves still belong in **Final alg**,
+and the reverse finder works as before. If no short commutator is found, `[]`
+remains visible while your final moves stay authoritative and usable. Edits
+remain drafts until you explicitly save them. There is no new setting or data
+migration for bracket assistance.
 
 ## Algorithm playback
 

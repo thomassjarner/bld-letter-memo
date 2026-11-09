@@ -53,12 +53,13 @@ def test_last_edited_field_drives_conversion_and_partial_input_never_leaves_stal
     enter(converter, 'commutator', '[F,D]')
     assert converter.source == '[F,D]' and converter.final_alg.value == "F D F' D'"
     enter(converter, 'commutator', '[F,')
-    assert converter.algorithm is None and converter.commutator.error_text and not converter.final_alg.value
+    assert converter.algorithm is None and converter.incomplete and not converter.commutator.error_text
+    assert not converter.final_alg.value
     enter(converter, 'final', 'R')
-    assert converter.algorithm is not None and not converter.commutator.value
+    assert converter.algorithm is not None and converter.commutator.value == '[]'
     assert 'usable' in converter.status.value
     enter(converter, 'final', '')
-    assert converter.algorithm is None and not converter.commutator.value
+    assert converter.algorithm is None and converter.commutator.value == '[]'
 
 
 def test_loading_preserves_saved_notation_and_programmatic_edits_can_be_synchronized():
@@ -78,7 +79,7 @@ def test_late_debounced_search_cannot_replace_a_newer_commutator_or_cleared_fiel
     with patch.object(converter, '_page', return_value=page), patch.object(converter, 'update'):
         enter(converter, 'final', "R U R' U'")
         callback, revision, source = page.run_task.call_args.args
-        assert converter.pending and not converter.commutator.value
+        assert converter.pending and converter.commutator.value == '[]'
         enter(converter, 'commutator', '[F,D]')
         with patch('ui.components.algorithm_converter.asyncio.sleep', new=AsyncMock()):
             asyncio.run(callback(revision, source))
@@ -88,7 +89,7 @@ def test_late_debounced_search_cannot_replace_a_newer_commutator_or_cleared_fiel
         converter.cancel_pending()
         with patch('ui.components.algorithm_converter.asyncio.sleep', new=AsyncMock()):
             asyncio.run(callback(revision, source))
-        assert not converter.commutator.value
+        assert converter.commutator.value == '[]'
 
 
 def test_general_effect_analysis_reports_permutation_orientation_and_cube_reorientation():
@@ -115,7 +116,7 @@ def test_cancelled_reverse_conversion_is_completed_when_the_draft_is_reopened():
     with patch.object(converter, '_page', return_value=page), patch.object(converter, 'update'):
         enter(converter, 'final', "M U2 M' U2")
         converter.cancel_pending()
-        assert not converter.commutator.value
+        assert converter.commutator.value == '[]'
         converter.sync()
         assert converter.commutator.value and not converter.pending
 

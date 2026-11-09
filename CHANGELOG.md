@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.49.0
+
+- Added bracket assistance to the shared case-editor/Playground commutator
+  input. It starts with `[]`, pairs new square brackets and parentheses,
+  skips existing closing brackets and infers nested setup notation as you type.
+- Complete pasted or loaded notation keeps its existing pairs. The caret stays
+  inside new pairs, including edits in the middle and UTF-16 comment offsets.
+  Clearing restores the empty frame; deleting brackets never deletes moves.
+- Empty/incomplete drafts use neutral guidance. The empty frame is never a
+  valid/stored algorithm and cannot override Final alg when reverse search has
+  no match. Pending reverse searches cannot overwrite newer commutator edits.
+- BLD logic, parser rules, BLDDB catalog, personal algorithms, saved data,
+  preferences, storage keys/data version 18, dependencies and copy/push workflow
+  remain unchanged.
+- Validation: all 722 tests pass, including 28 new editing regressions. Both
+  editors also pass in the shipped web Python runtime across four viewport/
+  navigation configurations, with unchanged saved data and transport-safe
+  helper colors. Actual browser keyboard/rendering behavior was not measured;
+  no deployment was performed. See UI_CHANGES.md for details.
+
 ## 2.48.0
 
 - Named BLDDB alternatives by their actual move sequences, with the existing

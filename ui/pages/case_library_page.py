@@ -466,7 +466,13 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._update()
 
     def _case_input_changed(self, converter):
-        if self.mode == 'library': self._preview_editor(sync=False)
+        if self.mode == 'library':
+            if converter.incomplete:
+                self.viewer.stop(update=False)
+                self.error.value = self.notice.value = ''
+                self._update()
+            else:
+                self._preview_editor(sync=False)
 
     def _preview_editor(self, *, sync=True):
         case = self.cases[self.selected_case]
