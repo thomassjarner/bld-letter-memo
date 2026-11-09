@@ -5,7 +5,7 @@ import flet as ft
 
 from core.algorithms import parse_algorithm, simplified_algorithm
 from core.commutator_finder import find_commutator, has_commutator_structure
-from ui.commutator_editing import (CommutatorEditor, contains_square_bracket, empty_commutator,
+from ui.commutator_editing import (CommutatorEditor, constrain_selection, contains_square_bracket, empty_commutator,
                                    index_to_utf16, utf16_to_index)
 
 
@@ -21,6 +21,8 @@ class AlgorithmConverter(ft.Column):
         self.algorithm = None
         self.pending = False
         self._needs_reverse = False
+        self._caret_request = None
+        self._caret_acknowledged = False
         self.incomplete = False
         self._brackets = CommutatorEditor()
         self.last_input = 'final'
@@ -28,10 +30,8 @@ class AlgorithmConverter(ft.Column):
             lambda e: self._input('commutator', self.commutator.value or ''))
         self.commutator.value = '[]'
         self.commutator.on_focus = self._commutator_focus
-        # The pinned Flet client reports its post-edit caret before on_change
-        # only when this listener is registered. No async caret task is needed.
-        self.commutator.on_selection_change = lambda e: None
-        self.commutator.helper = 'Auto brackets · type A, B or setup: A, B'
+        self.commutator.on_selection_change = self._commutator_selection
+        self.commutator.helper = 'Auto brackets · : opens a pair · keep typing after ,'
         self.commutator.helper_style = ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.commutator.helper_max_lines = 2
         self.final_alg = self._field('Final alg', "R U R' U' · wide/slice moves also work",
@@ -66,7 +66,58 @@ class AlgorithmConverter(ft.Column):
             self.commutator.selection = ft.TextSelection(1, 1)
             if self._page() is not None: self.commutator.update()
 
+    def _commutator_selection(self, e):
+        native = getattr(e, 'selection', None) or self.commutator.selection
+        if native is None: return
+        text = self.commutator.value or ''
+        offsets = native.base_offset, native.extent_offset
+        pending = self._caret_request
+        if pending is not None:
+            revision, expected, desired = pending
+            if revision != self._revision:
+                self._caret_request = None
+            elif text != expected:
+                return  # A queued text edit will consume the intended caret.
+            elif offsets == desired:
+                self._caret_acknowledged = True
+                return
+            elif not self._caret_acknowledged and offsets == (index_to_utf16(text, len(text)),) * 2:
+                # The pinned client resets its controller to the end when it
+                # applies formatted text. That listener also overwrites the
+                # selection in the same patch. Its selection event acknowledges
+                # the text update: now send the intended caret separately.
+                self.commutator.selection = ft.TextSelection(*desired)
+                self._caret_acknowledged = True
+                if self._page() is not None: self.commutator.update()
+                return
+            elif all(0 <= p <= index_to_utf16(text, len(text)) for p in offsets):
+                self._caret_request = None  # Respect a different deliberate selection.
+        start, end = (utf16_to_index(text, offset) for offset in offsets)
+        if start is None or end is None or offsets[0] > index_to_utf16(text, len(text)):
+            return  # Selection-before-change may refer to the next text value.
+        bounded = constrain_selection(text, (start, end))
+        if bounded == (start, end) or text != self._brackets.text: return
+        page = self._page()
+        if page is not None:
+            # Let a queued value/on_change event cancel a pure selection clamp.
+            page.run_task(self._constrain_caret_later, self._revision, text, offsets)
+        else:
+            self.commutator.selection = ft.TextSelection(*(index_to_utf16(text, p) for p in bounded))
+
+    async def _constrain_caret_later(self, revision, text, offsets):
+        await asyncio.sleep(.02)
+        native = self.commutator.selection
+        if (revision != self._revision or text != self.commutator.value or native is None
+                or (native.base_offset, native.extent_offset) != offsets): return
+        points = tuple(utf16_to_index(text, p) for p in offsets)
+        if None in points: return
+        bounded = constrain_selection(text, points)
+        if bounded != points:
+            self.commutator.selection = ft.TextSelection(*(index_to_utf16(text, p) for p in bounded))
+            if self._page() is not None: self.commutator.update()
+
     def _set_commutator(self, source):
+        self._caret_request = None
         display = source or '[]'
         if source and not contains_square_bracket(source):
             display = CommutatorEditor().edit(source).text
@@ -74,19 +125,26 @@ class AlgorithmConverter(ft.Column):
         self.commutator.selection = None
         self._brackets.reset(display)
 
-    def _edit_commutator(self, source):
+    def _edit_commutator(self, source, pending_caret=None):
         native = self.commutator.selection
         selection = None
         if native is not None:
             start = utf16_to_index(source, native.base_offset)
             end = utf16_to_index(source, native.extent_offset)
             if start is not None and end is not None: selection = start, end
-        result = self._brackets.edit(source, selection)
+        resume_at = None
+        if pending_caret is not None and pending_caret[1] == self._brackets.text:
+            resume_at = utf16_to_index(self._brackets.text, pending_caret[2][1])
+        result = self._brackets.edit(source, selection, resume_at=resume_at)
         self.commutator.value = result.text
         if result.selection is not None:
             start, end = result.selection
             self.commutator.selection = ft.TextSelection(
                 index_to_utf16(result.text, start), index_to_utf16(result.text, end))
+            if result.text != source:
+                self._caret_acknowledged = False
+                self._caret_request = (self._revision, result.text,
+                    (index_to_utf16(result.text, start), index_to_utf16(result.text, end)))
         return '' if empty_commutator(result.text) else result.text
 
     def _snapshots(self):
@@ -96,6 +154,7 @@ class AlgorithmConverter(ft.Column):
     def cancel_pending(self):
         self._revision += 1
         self.pending = False
+        self._caret_request = None
 
     def _publish(self, notify=True):
         if notify and self.on_result is not None: self.on_result(self)
@@ -136,6 +195,7 @@ class AlgorithmConverter(ft.Column):
         self.status.value = f'{count} moves' + (' · fields linked' if found else ' · no short commutator found; final alg is usable.')
 
     def _input(self, direction, source, *, debounce=True, notify=True):
+        pending_caret = self._caret_request
         self.cancel_pending()
         self._needs_reverse = False
         self.incomplete = False
@@ -144,7 +204,7 @@ class AlgorithmConverter(ft.Column):
         target = self.commutator if direction == 'commutator' else self.final_alg
         output = self.final_alg if direction == 'commutator' else self.commutator
         if direction == 'commutator':
-            source = self._edit_commutator(source)
+            source = self._edit_commutator(source, pending_caret)
             self.final_alg.value = ''
         else:
             target.value = source

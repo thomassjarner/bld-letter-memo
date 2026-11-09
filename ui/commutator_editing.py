@@ -90,29 +90,75 @@ def _complete_expression(text):
         return False
 
 
+def editable_span(text):
+    """The inside of a single enclosing root pair; keep compound pastes intact."""
+    masked, stack, groups, invalid = _groups(text)
+    if invalid or stack:
+        return None
+    left, right = len(masked) - len(masked.lstrip()), len(masked.rstrip()) - 1
+    return (left + 1, right) if (left, right) in groups else None
+
+
+def constrain_selection(text, selection):
+    # Select All is deliberately allowed for copying/replacing the whole input.
+    span = editable_span(text)
+    if span is None or selection[0] != selection[1]:
+        return selection
+    point = max(span[0], min(span[1], selection[0]))
+    return point, point
+
+
+def _empty_pair_end(text, opener):
+    if opener is None:
+        return None
+    match = re.match(r'\[\s*\]', text[opener:])
+    return opener + match.end() - 1 if match else None
+
+
 class CommutatorEditor:
     def __init__(self):
         self.reset('[]')
 
     def reset(self, text):
         self.text = text or '[]'
-        self._reuse_frame = self.text.strip() == '[]'
+        self._fresh_opener = self.text.index('[') if self.text.strip() == '[]' else None
 
-    def edit(self, raw, selection=None):
+    def edit(self, raw, selection=None, *, resume_at=None):
         old = self.text
         anchor, extent = selection if selection is not None else (len(raw), len(raw))
         anchor = max(0, min(len(raw), anchor))
         extent = max(0, min(len(raw), extent))
-        start, stop, inserted = _difference(old, raw, extent if anchor == extent else None)
+        start, stop, inserted = _difference(old, raw,
+            extent if selection is not None and anchor == extent else None)
+        caret_recovered = (selection is not None and anchor == extent and len(inserted) == 1
+                           and start == stop and anchor != start + 1)
+        if caret_recovered:
+            # A selection acknowledgment can precede this key's value event.
+            # The actual one-character diff still identifies its post-key caret.
+            anchor = extent = start + 1
+        if selection is None or anchor == extent and inserted in (',', ':'):
+            anchor = extent = start + len(inserted)
+        span = editable_span(old)
+        relocated = False
+        if inserted and start == stop and span is not None and not span[0] <= start <= span[1]:
+            # A click, Home/End or a queued key must never put new move text
+            # outside the enclosing pair. Move that insertion inside it.
+            point = resume_at if resume_at is not None else start
+            start = stop = max(span[0], min(span[1], point))
+            raw = old[:start] + inserted + old[start:]
+            anchor = extent = start + len(inserted)
+            relocated = True
         removed = old[start:stop]
-        reuse = self._reuse_frame
-        self._reuse_frame = False
+        fresh = self._fresh_opener
+        self._fresh_opener = None
 
         def finish(text, caret=None):
             self.text = text
             if text == '[]' and not raw.strip():
-                self._reuse_frame = True
-            return BracketEdit(text, (caret, caret) if caret is not None else None)
+                self._fresh_opener = 0
+            proposed = (caret, caret) if caret is not None else (anchor, extent)
+            bounded = constrain_selection(text, proposed)
+            return BracketEdit(text, bounded if caret is not None or bounded != proposed or relocated or caret_recovered else None)
 
         if raw == old:
             return finish(raw)
@@ -121,10 +167,12 @@ class CommutatorEditor:
         if len(raw) > MAX_INPUT:
             # Keep over-limit pastes intact for the existing parser to reject.
             return finish(raw)
-        if old.strip() == '[]' and inserted == '[' and not removed and reuse:
-            # Habitually typing an opening bracket at the empty field reuses
-            # its existing frame. A second opening creates a nested pair.
-            return finish(old, old.index('[') + 1)
+        empty_end = _empty_pair_end(old, fresh)
+        if (inserted == '[' and not removed and empty_end is not None
+                and fresh + 1 <= start <= empty_end):
+            # Reuse an empty automatic pair, including the one after a colon.
+            # A second opening bracket still creates a further nested pair.
+            return finish(old, start)
         if inserted in CLOSERS and len(inserted) == 1 and not removed:
             if start < len(old) and old[start] == inserted:
                 return finish(old, start + 1)
@@ -143,7 +191,7 @@ class CommutatorEditor:
             return finish(raw)
 
         text = raw
-        changed = False
+        changed = relocated
 
         def add(index, value, *, closing=False):
             nonlocal text, anchor, extent, changed
@@ -203,7 +251,10 @@ class CommutatorEditor:
                             depth -= 1
                         elif depth == 0 and char in ':,':
                             separators.append(index)
-                    if len(separators) > 1 and masked[separators[0]] == ':':
+                    new_setup = (inserted == ':' and not removed and len(separators) == 1
+                                 and separators[0] == start
+                                 and not text[separators[0] + 1:right].strip())
+                    if separators and masked[separators[0]] == ':' and (len(separators) > 1 or new_setup):
                         begin = separators[0] + 1
                         while begin < right and text[begin].isspace():
                             begin += 1
@@ -214,8 +265,15 @@ class CommutatorEditor:
                 begin, end = target
                 add(end, ']', closing=True)
                 add(begin, '[')
+                if text[begin:begin + 2] == '[]':
+                    self._fresh_opener = begin
 
         self.text = text
+        if inserted.isspace() and self._fresh_opener is None and _empty_pair_end(text, fresh) is not None:
+            self._fresh_opener = fresh
         if text == '[]' and removed and inserted != '[':
-            self._reuse_frame = True
-        return BracketEdit(text, (anchor, extent) if changed else None)
+            self._fresh_opener = 0
+        bounded = constrain_selection(text, (anchor, extent))
+        # A separator always leaves the caret after what was just typed, even
+        # if a caller has no post-edit selection property yet.
+        return BracketEdit(text, bounded if changed or caret_recovered or bounded != (anchor, extent) or inserted in (',', ':') else None)

@@ -1,3 +1,32 @@
+# Commutator typing corrections — 2.49.1
+
+`:` now immediately adds an inner pair: after typing `R:`, the field shows
+`[R:[]]` with the caret inside the inner pair. Type `U, D` to finish it. A comma
+keeps the caret after itself. An explicitly typed `[` directly after the colon
+reuses that empty automatic pair instead of adding an unwanted extra level.
+
+The outer pair protects ordinary framed commutators. Home/End, clicks and
+redundant closing brackets keep a collapsed caret inside; a key queued at an
+outside position is placed inside without dropping the key. Select All is
+available for copying/clearing/replacing. Existing complete pastes, compound
+notation, loaded algorithms and reverse conversion retain their behavior.
+
+The pinned Flet client resets its controller during formatted-text rebuilds.
+The old tests covered Python selection values but missed the client's reset.
+A guarded selection-only reply now restores the intended position after that
+rebuild. It also retains the intended insertion point for a fast next key
+already queued before the reply. Cursor-only updates do not re-parse, preview,
+start reverse searches or save data. Later edits/loads cancel obsolete requests.
+
+Validation: **742 tests pass**, including 20 new regressions for colon/comma
+carets, manual brackets, root boundaries, controller rebuilds, clearing/focus,
+spaces, parentheses and keys queued before cursor correction. The case editor
+and Playground pass in the shipped web Python runtime at 1440×900, 1080×800,
+390×700 and 280×400, including real Flet property patches through the modeled
+client rebuild and retained saved data. Core/data/catalog/parser files are
+byte-identical to 2.49.0. Actual browser typing/rendering was not measured;
+no deployment was performed.
+
 # Automatic commutator brackets — 2.49.0
 
 The case editor and Algorithm Playground use the same bracket assistance.

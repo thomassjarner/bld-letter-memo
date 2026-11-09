@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.49.1
+
+- Fixed the commutator editor's caret round trip. It now restores the intended
+  position after the pinned client's formatted-text rebuild, instead of only
+  setting a Python selection that the client could overwrite.
+- Typing `:` immediately opens an inner `[]` and puts the caret inside.
+  Commas keep the caret after the separator for the next part. Habitually
+  typing `[` after a colon reuses its automatic pair.
+- Protected the enclosing outer pair: collapsed selections stay inside it,
+  queued/outside insertions are redirected inside, and redundant closers do
+  not move the caret out. Select All and complete/compound pastes still work.
+- Kept BLD logic, parser, source catalog, personal algorithms, data/storage
+  version 18, preferences, dependencies and the copy/push workflow unchanged.
+- Validation: all 742 tests pass, including 20 new caret/bracket regressions.
+  Both editors also pass in the shipped web Python runtime at four viewport/
+  navigation configurations, with modeled client rebuild/property round trips
+  and retained saved data. Actual browser typing/rendering was not measured;
+  no deployment was performed. See UI_CHANGES.md for details.
+
 ## 2.49.0
 
 - Added bracket assistance to the shared case-editor/Playground commutator

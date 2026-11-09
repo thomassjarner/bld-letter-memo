@@ -5,7 +5,12 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import flet as ft
+import msgpack
 import pytest
+from flet.controls.base_control import BaseControl
+from flet.controls.object_patch import ObjectPatch
+from flet.messaging.protocol import configure_encode_object_for_msgpack
+from flet.utils.object_model import patch_dataclass
 
 from core.algorithms import algorithm_states, parse_algorithm
 from test_case_library import open_library
@@ -57,11 +62,83 @@ class Typist:
         self.insert('')
 
 
+class ClientTypist:
+    """Model real property patches and the pinned client's controller rebuild.
+
+    A formatted value resets the controller to the end, whose listener changes
+    the client's selection property before the build reads it. Feed that event
+    back, rather than trusting the Python field's intended selection alone.
+    """
+    def __init__(self, converter=None):
+        self.converter = converter or AlgorithmConverter()
+        self.field = self.converter.commutator
+        self.converter._page = Mock(return_value=SimpleNamespace(run_task=Mock()))
+        self.converter.update = Mock()
+        self.field.update = Mock()
+        self.encoder = configure_encode_object_for_msgpack(ft.Control)
+        self.client = msgpack.unpackb(msgpack.packb(self.field, default=self.encoder), raw=False)
+        self.text = self.field.value
+        self.offset = 1
+        self._delta()  # Clear initial configuration's dirty properties.
+
+    def _delta(self):
+        delta = ObjectPatch.from_diff(self.field, self.field, control_cls=BaseControl)[0]
+        return msgpack.unpackb(msgpack.packb(delta.patch, default=self.encoder), raw=False)
+
+    def _event(self, point):
+        selection = {'base_offset': point, 'extent_offset': point}
+        patch_dataclass(self.field, {'selection': selection})
+        self.field.on_selection_change(SimpleNamespace(selection=ft.TextSelection(point, point), selected_text=''))
+
+    def _apply(self, operations):
+        for op in operations:
+            path = op['path']; parent = self.client
+            for key in path[:-1]:
+                parent = parent.setdefault(key, {})
+            if op['op'] == 'remove': parent.pop(path[-1], None)
+            else: parent[path[-1]] = op['value']
+        changed = self.client['value'] != self.text
+        if changed:
+            self.text = self.client['value']
+            self.offset = index_to_utf16(self.text, len(self.text))
+            self.client['selection'] = {'base_offset': self.offset, 'extent_offset': self.offset}
+            if self.acknowledge:
+                self._event(self.offset)  # The controller listener during build.
+        selected = self.client.get('selection')
+        if selected is not None and selected['extent_offset'] != self.offset:
+            self.offset = selected['extent_offset']
+            self._event(self.offset)
+
+    def insert(self, value, *, acknowledge=True):
+        self.acknowledge = acknowledge
+        index = utf16_to_index(self.text, self.offset)
+        raw = self.text[:index] + value + self.text[index:]
+        self.offset = index_to_utf16(raw, index + len(value))
+        self.text = raw
+        self.client['value'] = raw
+        self.client['selection'] = {'base_offset': self.offset, 'extent_offset': self.offset}
+        self._event(self.offset)  # Selection event precedes the value event.
+        patch_dataclass(self.field, {'value': raw})
+        self.field.on_change(SimpleNamespace(data=raw, control=self.field))
+        for _ in range(8):
+            operations = self._delta()
+            if not operations: break
+            self._apply(operations)
+        else: raise AssertionError('Caret update did not settle')
+
+    def type(self, value):
+        for char in value: self.insert(char)
+
+    @property
+    def caret(self):
+        return utf16_to_index(self.text, self.offset)
+
+
 def same_execution(converter, notation):
     assert converter.algorithm is not None
     expected = algorithm_states(parse_algorithm(notation))[-1]
     assert algorithm_states(converter.algorithm)[-1] == expected
-    assert algorithm_states(parse_algorithm(converter.final_alg.value))[-1] == expected
+    assert algorithm_states(parse_algorithm(converter.final_alg.value or "R R'"))[-1] == expected
 
 
 def test_empty_frame_is_visible_and_focus_is_inside_it_but_it_is_never_an_algorithm():
@@ -101,7 +178,7 @@ def test_complete_pastes_into_the_placeholder_preserve_notation_without_extra_ou
     same_execution(typist.converter, paste)
 
 
-def test_cursor_stays_in_the_new_inner_pair_and_can_over_type_both_existing_closers():
+def test_cursor_stays_in_the_new_inner_pair_and_cannot_step_outside_the_root_pair():
     typist = Typist()
     typist.type('R:U,')
     assert typist.field.value == '[R:[U,]]' and typist.caret == 6
@@ -112,10 +189,100 @@ def test_cursor_stays_in_the_new_inner_pair_and_can_over_type_both_existing_clos
     typist.insert(']')
     assert typist.field.value == original and typist.caret == point + 1
     typist.insert(']')
-    assert typist.field.value == original and typist.caret == len(original)
-    typist.insert("'")
-    assert typist.field.value == original + "'"
-    same_execution(typist.converter, original + "'")
+    assert typist.field.value == original and typist.caret == len(original) - 1
+    same_execution(typist.converter, original)
+
+
+@pytest.mark.parametrize('suffix', ['U,D', '[U,D]', "U,R' D R", "[U,R' D R]"])
+def test_colon_opens_an_inner_pair_immediately_and_accepts_the_interchange_after_a_comma(suffix):
+    typist = Typist();typist.type('R:')
+    assert typist.field.value == '[R:[]]' and typist.caret == 4
+    typist.type(suffix)
+    expected = '[R:[' + suffix.strip('[]') + ']]'
+    assert typist.field.value == expected
+    assert typist.caret <= len(expected) - 1
+    same_execution(typist.converter, expected)
+
+
+@pytest.mark.parametrize('body', ['R,U', 'R:U,D', "R:[U,R' D R]", 'R:U:F,D', '(R U)2,D', 'R: [U,F]'])
+def test_native_round_trip_keeps_typing_inside_every_generated_pair(body):
+    typist = ClientTypist();typist.type(body)
+    expected = {'R:U,D': '[R:[U,D]]', "R:[U,R' D R]": "[R:[U,R' D R]]",
+                'R:U:F,D': '[R:[U:[F,D]]]', 'R: [U,F]': '[R:[ U,F]]'}.get(body, '[' + body + ']')
+    assert typist.text == expected
+    assert typist.caret < len(typist.text)
+    same_execution(typist.converter, expected)
+
+
+def test_native_round_trip_observes_the_cursor_at_the_colon_and_the_comma_not_just_the_final_algorithm():
+    typist = ClientTypist();typist.type('R:')
+    assert typist.text == '[R:[]]' and typist.caret == 4
+    typist.type('U,')
+    assert typist.text == '[R:[U,]]' and typist.caret == 6
+    typist.type('D')
+    assert typist.text == '[R:[U,D]]' and typist.caret == 7
+
+
+def test_colon_space_and_a_habitual_opening_bracket_reuse_the_same_inner_pair():
+    typist = Typist();typist.type('R: [U,F]')
+    assert typist.field.value == '[R:[ U,F]]'
+    same_execution(typist.converter, '[R:[U,F]]')
+
+
+def test_a_queued_key_before_the_formatted_caret_reply_still_goes_inside_the_new_pair():
+    typist = ClientTypist();typist.type('R');typist.insert(':', acknowledge=False)
+    assert typist.text == '[R:[]]' and typist.caret == len(typist.text)
+    assert typist.converter._caret_request is not None
+    typist.insert('U')
+    assert typist.text == '[R:[U]]' and typist.caret == 5
+    typist.type(",R' D R")
+    same_execution(typist.converter, "[R:[U,R' D R]]")
+
+
+def test_a_key_already_queued_outside_the_frame_before_the_caret_reply_is_not_misplaced():
+    typist = ClientTypist();typist.type('R:')
+    # The value acknowledgment arrived, but this key was already entered at
+    # the temporary end position before the caret-only reply reached the UI.
+    typist.offset = index_to_utf16(typist.text, len(typist.text))
+    typist.insert('U')
+    assert typist.text == '[R:[U]]' and typist.caret == 5
+
+
+def test_immediately_typing_after_clear_or_focus_cannot_put_the_first_move_after_the_comma():
+    converter = AlgorithmConverter();converter.load('[F,D]')
+    typist = Typist(converter);typist.select(0,len(typist.field.value));typist.insert('')
+    converter.commutator.on_focus(None)
+    native = ClientTypist(converter);native.type("R' B' R:R D R',U'")
+    expected = "[R' B' R:[R D R',U']]"
+    assert native.text == expected
+    same_execution(converter, expected)
+
+
+@pytest.mark.parametrize('point,inserted,expected', [(0, 'F ', '[F R,U]'), (5, ' D', '[R,U D]')])
+def test_typing_before_or_after_the_outer_frame_is_redirected_inside(point, inserted, expected):
+    converter = AlgorithmConverter();converter.load('[R,U]')
+    typist = Typist(converter);typist.select(point);typist.insert(inserted)
+    assert typist.field.value == expected
+    assert 1 <= typist.caret <= len(expected) - 1
+    same_execution(converter, expected)
+
+
+@pytest.mark.parametrize('point,expected', [(0, 1), (5, 4)])
+def test_home_end_and_click_selection_cannot_leave_the_root_pair(point, expected):
+    converter = AlgorithmConverter();converter.load('[R,U]')
+    converter.commutator.selection = ft.TextSelection(point, point)
+    converter.commutator.on_selection_change(SimpleNamespace(selection=converter.commutator.selection))
+    assert converter.commutator.selection == ft.TextSelection(expected, expected)
+    assert converter.source == '[R,U]' and converter.final_alg.value == "R U R' U'"
+
+
+def test_separator_caret_can_be_recovered_without_a_selection_property():
+    editor = CommutatorEditor();editor.reset('[R]')
+    result = editor.edit('[R:]')
+    assert result.text == '[R:[]]' and result.selection == (4, 4)
+    editor.reset('[R,U]')
+    result = editor.edit('[R,UD]')
+    assert result.text == '[R,UD]'  # Never invent a move or erase one.
 
 
 def test_deleting_empty_pairs_or_the_base_bracket_never_deletes_move_text():

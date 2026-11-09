@@ -1,6 +1,6 @@
-# Update to 2.49.0
+# Update to 2.49.1
 
-Copy all contents of `bld-letter-memo-web-2.49.0/` into your existing
+Copy all contents of `bld-letter-memo-web-2.49.1/` into your existing
 `~/Desktop/letterpairscheme-helper-web/` project, replacing matching files.
 Do not put the release folder itself inside the project.
 
@@ -13,7 +13,7 @@ Finder can show hidden files with Command+Shift+.
 If you extracted the ZIP into Downloads, copy its contents with:
 
 ```bash
-rsync -av ~/Downloads/bld-letter-memo-web-2.49.0/ ~/Desktop/letterpairscheme-helper-web/
+rsync -av ~/Downloads/bld-letter-memo-web-2.49.1/ ~/Desktop/letterpairscheme-helper-web/
 ```
 
 Adjust the source path if you extracted it elsewhere. Then use the usual push:
@@ -21,17 +21,19 @@ Adjust the source path if you extracted it elsewhere. Then use the usual push:
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Add automatic brackets to commutator editing"
+git commit -m "Fix commutator brackets and cursor placement"
 git push
 ```
 
 If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, refresh and confirm **2.49.0** in the header/tab title.
+Wait for GitHub Actions, refresh and confirm **2.49.1** in the header/tab title.
 Command+Shift+R can refresh the build on macOS.
 
 In **Method Library → 3-style corner cases** or **Playground**, clear the
-Commutator field. It should show `[]`. Type `R: U, D` inside it: the result
-should be `[R: [U, D]]`, and Final alg should update. Complete pasted
+Commutator field. It should show `[]`. Type `R:`: it should immediately show
+`[R:[]]` with the caret inside the inner pair. Continue typing `U, D`; the
+result should be `[R:[U, D]]`, without moving the caret away from the comma.
+Final alg should update. Complete pasted
 commutators retain their pairs. In Final alg, a move sequence without a short
 commutator match remains usable while the Commutator field shows `[]`.
 

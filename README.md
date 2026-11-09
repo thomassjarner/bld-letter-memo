@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.49.0**.
+or as a desktop app. Current version: **2.49.1**.
 
 ## Workspaces
 
@@ -286,19 +286,26 @@ bracket in place.
 | Type inside the empty field | Displayed notation |
 | --- | --- |
 | `R, U` | `[R, U]` |
-| `R: U, D` | `[R: [U, D]]` |
-| `R: U: F, D` | `[R: [U: [F, D]]]` |
+| `R:U, D` | `[R:[U, D]]` |
+| `R:U:F, D` | `[R:[U:[F, D]]]` |
 
 Typing `[` or `(` creates its matching closing bracket and leaves the caret
 inside. Typing that closing bracket moves past the existing one. Habitually
 typing `[` at the empty field reuses its outer pair; a second `[` nests it.
-Setup notation gains another pair when a comma or another colon makes that
-nesting necessary. Complete pasted/loaded notation keeps its existing pairs,
+Typing `:` immediately opens a nested pair and places the caret inside it:
+`R:` becomes `[R:[]]`. Continue with `U, D`; the comma leaves the caret after
+it so you can write the interchange. A manually typed `[` just after `:` reuses
+the automatic pair, including after a space. The outer pair keeps the caret
+and newly typed moves inside it; Home/End, clicks and redundant closing brackets
+cannot put new text outside that frame. Select All still works for copying and
+replacement. Complete pasted/loaded notation keeps its existing pairs,
 including shorthand such as `f:[U2,R' D' R]`.
 
 Clear the field to start again with `[]`. Bracket deletion never removes move
-text. Ambiguous notation such as `[R,U,D]` still needs correction; the editor
-does not guess which algorithm you mean. An unfinished draft does not show a
+text. If you want a plain conjugate such as `[R: U]`, paste it complete or
+delete the empty inner pair before typing `U`. Ambiguous notation such as
+`[R,U,D]` still needs correction; the editor does not guess which algorithm you
+mean. An unfinished draft does not show a
 red error merely because its second part is not written yet.
 
 The empty frame is not an algorithm. Plain moves still belong in **Final alg**,
