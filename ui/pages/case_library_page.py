@@ -5,7 +5,8 @@ import flet as ft
 
 from core.algorithms import inverse_state, normalized_state, parse_algorithm, simplified_algorithm
 from core.algorithm_analysis import analyze_algorithm
-from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms, display_builtin_algorithms
+from core.corner_algorithms import (QUALITY_NOTICE, builtin_algorithms, display_builtin_algorithms,
+                                    catalog_metadata, case_source_url)
 from core.corner_cases import BASE_ALG, BUFFER, SUBSETS, TARGETS, case_letters, corner_cases, identify_case
 from data.models import CornerCaseRecord
 from ui.components.algorithm_cube import AlgorithmCube
@@ -350,8 +351,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             if changed_variant or self._loaded_key != (preview_source, case.id):
                 self._load_viewer(preview_source, initial, (case.first, case.second), case.id)
         except ValueError as ex:
-            self.error.value = str(ex) + ' Showing the verified starter.'
-            self._load_viewer(case.starter, initial, (case.first, case.second), case.id)
+            self.error.value = str(ex) + ' Showing the most-popular BLDDB algorithm.'
+            self._load_viewer(builtins[0].alg, initial, (case.first, case.second), case.id)
         if changed_variant:
             self.case_converter.load(source)
             self.name_field.value = name if personal else 'My alg'
@@ -363,8 +364,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.algorithm_field.visible = self.case_converter.commutator.visible = not self.hidden
         self.viewer.move_text.visible = not self.hidden
         recommended = builtins[0]
-        recommendation = {'supplied': 'Supplied algorithm', 'one_move': 'One-move setup', 'generated': 'Generated fallback'}[recommended.origin]
-        options = [ft.DropdownOption('', f'Recommended · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
+        recommendation = f'{recommended.source_count} ' + ('source' if recommended.source_count == 1 else 'sources')
+        options = [ft.DropdownOption('', f'Most popular · {recommendation}' + (' · preferred' if not record.preferred_algorithm else ''))]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else ''))
                     for a in display_builtin_algorithms(case.id, (self.selected_algorithm, record.preferred_algorithm))]
         options += [ft.DropdownOption(a.id, a.name + (' · preferred' if a.id == record.preferred_algorithm else '')) for a in record.algorithms]
@@ -388,8 +389,10 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         missing = '?' in case_letters(case, self.scheme)
         selected_builtin = next((a for a in builtins if a.id == self.selected_algorithm), recommended)
         provenance = 'Your saved algorithm' if personal else (
-            f'One-move setup {selected_builtin.setup} of {selected_builtin.position}' if selected_builtin.origin == 'one_move' else
-            f'Supplied algorithm · {selected_builtin.position}' if selected_builtin.origin == 'supplied' else 'Generated fallback')
+            f'BLDDB #{selected_builtin.rank} · {selected_builtin.source_count} source sheets'
+            + (f' · spelling {selected_builtin.variant}/{selected_builtin.variant_count}' if selected_builtin.variant_count > 1 else '')
+            + f' · {catalog_metadata()["snapshot_date"]}')
+        source_tooltip = provenance if personal else provenance + '\n' + ', '.join(selected_builtin.sources)
         def small_icon(icon, tooltip, callback, disabled=False):
             return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
                 icon_size=18, width=32, height=32, padding=4, disabled=disabled)
@@ -438,7 +441,12 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         ], spacing=8, tight=True), padding=12)
         self.tool_controls = [
             self.variant_picker,
-            ft.Text(provenance, size=11, color=ft.Colors.PRIMARY, max_lines=2, tooltip=provenance),
+            ft.Row([
+                ft.Text(provenance, size=11, color=ft.Colors.PRIMARY, max_lines=2,
+                        overflow=ft.TextOverflow.ELLIPSIS, tooltip=source_tooltip, expand=True),
+                ft.TextButton('BLDDB', icon=ft.Icons.OPEN_IN_NEW, url=case_source_url(case.id),
+                              height=32, tooltip='View this case and its source sheets on BLDDB'),
+            ], spacing=4),
             ft.TextButton('Use selected alg', on_click=lambda e: self._set_record(case.id, preferred=self.selected_algorithm)),
             self.algorithm_editor,
             ft.Text(QUALITY_NOTICE, size=11, color=ft.Colors.ON_SURFACE_VARIANT),

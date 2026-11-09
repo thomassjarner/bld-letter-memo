@@ -10,7 +10,7 @@ from functools import lru_cache
 import time
 
 from core.algorithms import _Parser, _expand, algorithm_states, inverse_moves, move_spec, parse_algorithm, simplify_moves
-from core.corner_algorithms import ALL_SUBMISSIONS
+from core.legacy_corner_algorithms import ALL_SUBMISSIONS
 
 BASES = ('R', 'L', 'M', 'Rw', 'Lw', 'x', 'U', 'D', 'E', 'Uw', 'Dw', 'y', 'F', 'B', 'S', 'Fw', 'Bw', 'z')
 MOVES = tuple(base + suffix for base in BASES for suffix in ('', "'", '2'))

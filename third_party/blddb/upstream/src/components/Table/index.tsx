@@ -1,0 +1,737 @@
+import React, { JSX, useState, useEffect } from "react";
+import commutator from "@/utils/commutator";
+import commutator_555 from "@/utils/commutator_555";
+import finger from "@/utils/finger";
+import codeConverter, {
+  getInverseCode,
+  canonicalCycleKey,
+} from "@/utils/codeConverter";
+import bigbldCodeConverter from "@/utils/bigbldCodeConverter";
+import { BIGBLD_CODE_TYPES } from "@/utils/codeTypes";
+import { useTranslation } from "@/i18n/client";
+import rewrite from "@/utils/rewrite";
+import { loadSettings } from "@/utils/settings";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import CopyPopup from "@/components/CopyPopup";
+
+interface VideoAttributes {
+  url: string;
+  width: string;
+  height: string;
+}
+
+function matchesPattern(patterns: string[], str: string): boolean {
+  for (const pattern of patterns) {
+    const regexPattern = pattern.replace(/\*/gu, ".");
+    const regex = new RegExp(`^${regexPattern}$`, "u");
+    if (regex.test(str)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function isInChina(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timeout = setTimeout(() => resolve(true), 500);
+    img.onload = () => {
+      clearTimeout(timeout);
+      resolve(false);
+    };
+    img.onerror = () => {
+      clearTimeout(timeout);
+      resolve(true);
+    };
+    img.src = `https://www.google.com/favicon.ico?_=${Date.now()}`;
+  });
+}
+
+const Table = ({
+  codeType,
+  inputText,
+  data,
+  divRef,
+  tableRef,
+  selected,
+  sourceToUrl,
+  sourceToResult,
+  algToUrl,
+  highlight,
+  personalCycleToAlg,
+}: {
+  codeType: string;
+  inputText: string;
+  data:
+    | { [key: string]: string[] } // nightmare
+    | { [key: string]: [alg: string[], source: string[]][] } // manmade (3bld)
+    | { [key: string]: [alg: string, source: string[], comm: string][] }; // manmade (bigbld)
+  divRef: React.RefObject<HTMLDivElement | null>;
+  tableRef: React.RefObject<HTMLTableElement | null>;
+  selected?: Record<string, string>;
+  sourceToUrl?: Record<string, Record<string, string>>;
+  sourceToResult?: {
+    [name: string]: {
+      wca_id: string;
+      "3bld"?: number;
+      "4bld"?: number;
+    };
+  };
+  algToUrl?: {
+    [key: string]: Array<VideoAttributes>;
+  };
+  highlight?: string;
+  personalCycleToAlg?: Map<string, string>;
+}) => {
+  const [inChina, setInChina] = useState<boolean>(false);
+  const [isLocationChecked, setIsLocationChecked] = useState<boolean>(false);
+  useEffect(() => {
+    const checkLocation = async () => {
+      const china = await isInChina();
+      setInChina(china);
+      setIsLocationChecked(true);
+    };
+    checkLocation();
+  }, []);
+
+  const getPosition = (matchedPosition: string[]) => {
+    let positionText = "";
+
+    if (codeType === "parity") {
+      positionText = `${t("common.position")} ${matchedPosition.slice(0, 2).join("-")} & ${matchedPosition.slice(2, 4).join("-")}`;
+    } else if (codeType === "ltct") {
+      positionText = `${t("common.position")} ${matchedPosition.slice(0, 2).join("-")}[${matchedPosition[2]}]`;
+    } else if (codeType === "flips") {
+      positionText = `${t("common.position")} ${matchedPosition[0]} & ${matchedPosition[1]}`;
+    } else {
+      positionText = `${t("common.position")} ${matchedPosition.join("-")}`;
+    }
+
+    return positionText;
+  };
+
+  const { copySuccess, copy } = useCopyToClipboard(3000);
+
+  const { t } = useTranslation();
+  let is3bld = true;
+  let isCommutatorNeeded = false;
+  let converter = codeConverter;
+  const bigbldCodeTypes = BIGBLD_CODE_TYPES;
+  const commutatorNeededList = bigbldCodeTypes.concat([
+    "corner",
+    "edge",
+    "flips",
+  ]);
+  if (bigbldCodeTypes.includes(codeType)) {
+    converter = bigbldCodeConverter;
+    is3bld = false;
+  }
+  isCommutatorNeeded =
+    commutatorNeededList.includes(codeType) ||
+    (codeType === "twists" && inputText.length === 2);
+
+  const [isVideoVisible, setIsVideoVisible] = useState(false);
+  const [videoDimensions, setVideoDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
+  const [videoList, setVideoList] = useState<VideoAttributes[]>([]);
+  const [videoIdx, setVideoIdx] = useState(0);
+  const [videoKey, setVideoKey] = useState(0);
+
+  const getVideoUrl = (algorithms: string[]) => {
+    const videoUrl: Array<VideoAttributes> = [];
+    if (!isLocationChecked) {
+      return videoUrl;
+    }
+    for (const algorithm of algorithms) {
+      if (algToUrl?.[algorithm]) {
+        let videos = algToUrl[algorithm];
+        if (inChina) {
+          videos = videos.filter((video) => video.url.includes("douyin"));
+        }
+        videoUrl.push(...videos);
+      }
+    }
+    return videoUrl;
+  };
+
+  const hasVideo = (algorithms: string[]) => {
+    if (!isLocationChecked) {
+      return false;
+    }
+    for (const algorithm of algorithms) {
+      if (algToUrl?.[algorithm]) {
+        let videos = algToUrl[algorithm];
+        if (inChina) {
+          videos = videos.filter((video) => video.url.includes("douyin"));
+        }
+        if (videos.length > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const calculateAndSetDimensions = (
+    width: number,
+    height: number,
+    isScale: boolean,
+  ) => {
+    const widthScale = (Math.min(window.innerWidth, 1000) * 0.8) / width;
+    const heightScale = (Math.min(window.innerHeight, 1000) * 0.8) / height;
+    const scale = isScale ? Math.min(widthScale, heightScale) : 1;
+    setVideoDimensions({
+      width: width * scale,
+      height: height * scale,
+    });
+  };
+
+  const handleCellClick = (algorithms: string[]) => {
+    const videos = getVideoUrl(algorithms);
+    if (videos.length > 0) {
+      setVideoList(videos);
+      setVideoIdx(0);
+      const { url, width, height } = videos[0];
+      calculateAndSetDimensions(
+        Number(width),
+        Number(height),
+        !url.includes("douyin"),
+      );
+      setIsVideoVisible(true);
+    }
+  };
+
+  const handleVideoChange = (delta: number) => {
+    if (videoList.length > 1) {
+      setVideoKey((prev) => prev + 1);
+      const newIdx = (videoIdx + delta + videoList.length) % videoList.length;
+      setVideoIdx(newIdx);
+      const { url, width, height } = videoList[newIdx];
+      calculateAndSetDimensions(
+        Number(width),
+        Number(height),
+        !url.includes("douyin"),
+      );
+    }
+  };
+
+  const currentVideoUrl = videoList[videoIdx]?.url ?? "";
+  const settings = loadSettings();
+  const thumbPosition = settings.showThumbPosition;
+  const mirrorLR = settings.mirrorLR;
+  type MoveCountMetric = "STM" | "QTM";
+
+  function getMoveCount(algorithm: string, metric: MoveCountMetric): number {
+    const tokens = algorithm.trim().split(/\s+/u).filter(Boolean);
+    if (tokens.length === 0) {
+      return 0;
+    }
+    if (metric === "STM") {
+      return tokens.length;
+    }
+    return tokens.reduce(
+      (sum, token) => sum + (token.endsWith("2") ? 2 : 1),
+      0,
+    );
+  }
+  const moveCountMetrics: MoveCountMetric[] = Array.isArray(
+    settings.moveCountMetrics,
+  )
+    ? (settings.moveCountMetrics as MoveCountMetric[])
+    : [];
+  const allowedOrders = ["Chichu", "Speffz", "Alphabetical"] as const;
+  type OrderOfAlgsType = (typeof allowedOrders)[number];
+  let orderOfAlgs: OrderOfAlgsType =
+    settings.orderOfAlgs ?? codeConverter.getDefaultOrderOfAlgs();
+  // Usually won't happen; this check is only for safety
+  if (!allowedOrders.includes(orderOfAlgs)) {
+    orderOfAlgs = "Chichu";
+  }
+  const variantCode = converter.customCodeToVariantCode(
+    inputText,
+    codeType,
+    mirrorLR,
+  );
+  const tableElements: JSX.Element[] = [];
+  const isManmade = Array.isArray(Object.values(data)[0]?.[0]);
+  if (variantCode.length === 0 || variantCode[0].split("*").length > 2) {
+    return <div ref={divRef} className="mt-4"></div>;
+  }
+  const isRegularExpression = variantCode[0].includes("*");
+  const hasInverseCodeTypes = bigbldCodeTypes.concat(["corner", "edge"]);
+  const showInverseAlgs =
+    settings.showInverseAlgs &&
+    !isRegularExpression &&
+    hasInverseCodeTypes.includes(codeType);
+  const starIndex = inputText.indexOf("*");
+  if (isRegularExpression && !isManmade) {
+    return <div ref={divRef} className="mt-4"></div>;
+  }
+  let actualCodeType = codeType;
+  if (isRegularExpression) {
+    if (codeType === "parity") {
+      if (starIndex === 0 || starIndex === 1) {
+        actualCodeType = "edge";
+      } else {
+        actualCodeType = "corner";
+      }
+    } else if (codeType === "ltct") {
+      actualCodeType = "corner";
+    } else if (codeType === "flips") {
+      actualCodeType = "edge";
+    }
+  }
+  const isThumbPositionNeeded =
+    is3bld && (typeof thumbPosition === "undefined" || thumbPosition);
+  const columnCount =
+    2 +
+    (isCommutatorNeeded ? 1 : 0) +
+    (isThumbPositionNeeded ? 1 : 0) +
+    (isManmade ? 1 : 0) +
+    moveCountMetrics.length;
+  for (const [key, value] of Object.entries(data)) {
+    if (!(
+      matchesPattern(variantCode, key) ||
+      (showInverseAlgs && matchesPattern(variantCode, getInverseCode(key)))
+    )) {
+      continue;
+    }
+    let processedValue = [...value];
+    let personalAlgDisplayed: string = "";
+    if (personalCycleToAlg && personalCycleToAlg.size > 0) {
+      const ck = canonicalCycleKey(key, codeType);
+      personalAlgDisplayed = personalCycleToAlg.get(ck) as string;
+    }
+    if (isManmade && sourceToResult) {
+      const show3BldAlgsUnderSecs = settings.show3BldAlgsUnderSecs;
+      const show4BldAlgsUnderSecs = settings.show4BldAlgsUnderSecs;
+      processedValue = processedValue
+        .map((innerArray) => {
+          const filteredNames = innerArray[1].filter((name: string) => {
+            return is3bld
+              ? show3BldAlgsUnderSecs === "" ||
+                  typeof show3BldAlgsUnderSecs === "undefined" ||
+                  (sourceToResult[name] &&
+                    (sourceToResult[name]["3bld"] ?? Infinity) <=
+                      100 * parseFloat(show3BldAlgsUnderSecs))
+              : show4BldAlgsUnderSecs === "" ||
+                  typeof show4BldAlgsUnderSecs === "undefined" ||
+                  (sourceToResult[name] &&
+                    (sourceToResult[name]["4bld"] ?? Infinity) <=
+                      100 * parseFloat(show4BldAlgsUnderSecs));
+          });
+          return [innerArray[0], filteredNames, innerArray[2]];
+        })
+        .filter((innerArray) => innerArray[1].length > 0);
+      processedValue.sort((a, b) => {
+        return b[1].length - a[1].length;
+      });
+    }
+    if (personalAlgDisplayed) {
+      const listed = isManmade
+        ? processedValue.some((inner) => {
+            const algs = is3bld ? (inner[0] as string[]) : [inner[0] as string];
+            return algs.some((a) => a === personalAlgDisplayed);
+          })
+        : processedValue.some((alg) => alg === personalAlgDisplayed);
+      if (!listed) {
+        if (isManmade) {
+          let personalComm: string | string[] = "";
+          if (isCommutatorNeeded) {
+            const searchResult = is3bld
+              ? commutator.search({
+                  algorithm: personalAlgDisplayed,
+                  maxDepth: 1,
+                  slashNotation: settings.slashNotation,
+                  noBrackets: settings.noBrackets,
+                  spaceAfterColon: settings.spaceAfterColon,
+                  spaceAfterComma: settings.spaceAfterComma,
+                  outerBrackets: settings.outerBrackets,
+                })
+              : [];
+            const commStr =
+              Array.isArray(searchResult) && searchResult.length > 0
+                ? searchResult[0]
+                : "";
+            personalComm = is3bld ? [commStr] : commStr;
+          }
+          processedValue.push(
+            is3bld
+              ? [[personalAlgDisplayed], [], personalComm as string[]]
+              : [personalAlgDisplayed, [], personalComm as string],
+          );
+        } else {
+          processedValue.push(personalAlgDisplayed);
+        }
+      }
+    }
+    const tableRows: JSX.Element[] = [];
+    for (let i = 0; i < processedValue.length; i++) {
+      let item: string[] = [];
+      let source: string[] = [];
+      let comm: string = "";
+      if (isManmade) {
+        item = is3bld ? processedValue[i][0] : [processedValue[i][0]];
+        source = processedValue[i][1];
+        comm = isCommutatorNeeded ? processedValue[i][2] : "";
+      } else {
+        item = [processedValue[i]];
+      }
+      if (mirrorLR) {
+        item = item.map((alg) => rewrite.mirrorAxis(alg, "M"));
+      }
+      const entryHasPersonalAlg =
+        personalAlgDisplayed !== null &&
+        item.some((alg) => alg === personalAlgDisplayed);
+      const cycleHasPersonalAlg = personalAlgDisplayed !== null;
+      const fingerResult = finger
+        .fingerbeginfrom(item[0])
+        .map((word) => t(word))
+        .join("/");
+      let hasHighlight = false;
+      for (let j = 0; j < item.length; j++) {
+        if (item[j] === highlight) {
+          hasHighlight = true;
+        }
+      }
+      for (let j = 0; j < item.length; j++) {
+        let commutatorResult = "";
+        if (isCommutatorNeeded) {
+          if (is3bld && !isManmade) {
+            commutatorResult =
+              typeof item[j] === "string" && item[j].length > 0
+                ? commutator.search({
+                    algorithm: item[j],
+                    maxDepth: 1,
+                    slashNotation: settings.slashNotation,
+                    noBrackets: settings.noBrackets,
+                    spaceAfterColon: settings.spaceAfterColon,
+                    spaceAfterComma: settings.spaceAfterComma,
+                    outerBrackets: settings.outerBrackets,
+                  })[0]
+                : "";
+          } else {
+            const commutatorResultBefore = is3bld ? comm[j] : comm;
+            const commutatorFunction = is3bld
+              ? commutator.commutatorPost
+              : commutator_555.commutatorPost;
+            commutatorResult =
+              typeof commutatorResultBefore === "string" &&
+              commutatorResultBefore.length > 0
+                ? commutatorFunction({
+                    algorithm: commutatorResultBefore,
+                    slashNotation: settings.slashNotation,
+                    noBrackets: settings.noBrackets,
+                    spaceAfterColon: settings.spaceAfterColon,
+                    spaceAfterComma: settings.spaceAfterComma,
+                    outerBrackets: settings.outerBrackets,
+                  })
+                : "";
+            if (mirrorLR) {
+              commutatorResult = rewrite.mirrorAxis(commutatorResult, "M");
+            }
+          }
+        }
+        let sourceResult: JSX.Element[] = [];
+        if (isManmade) {
+          sourceResult = source.map((name: string, index: number) => {
+            let sourceElement: JSX.Element = <>{name}</>;
+            if (sourceToUrl && name in sourceToUrl) {
+              let url = "";
+              if (name in sourceToUrl) {
+                if (codeType in sourceToUrl[name]) {
+                  url = sourceToUrl[name][codeType];
+                } else if ((is3bld ? "3bld" : "bigbld") in sourceToUrl[name]) {
+                  url = sourceToUrl[name][is3bld ? "3bld" : "bigbld"];
+                } else if ("bld" in sourceToUrl[name]) {
+                  url = sourceToUrl[name]["bld"];
+                }
+              }
+              let nameNew = name;
+              if (name.length > 25) {
+                nameNew = name.split("(")[0].trim();
+                if (nameNew.length > 25) {
+                  nameNew = `${name.slice(0, 25)}...`;
+                }
+              }
+              sourceElement = (
+                <a href={url} target="_blank" className="dashed-link">
+                  {nameNew}
+                </a>
+              );
+            }
+            return (
+              <React.Fragment key={`${key}-source-${index}`}>
+                {sourceElement}
+                <br />
+              </React.Fragment>
+            );
+          });
+        }
+        const getClassName = () => {
+          if (hasHighlight) {
+            return "bg-orange-300 dark:bg-yellow-700";
+          }
+          if (entryHasPersonalAlg) {
+            return "bg-gray-200 dark:bg-gray-600";
+          }
+          const selectedValue = selected?.[key] ?? "";
+          const compareValue = mirrorLR
+            ? rewrite.mirrorAxis(selectedValue, "M")
+            : selectedValue;
+          const isSelected = item[j] === compareValue;
+          return !cycleHasPersonalAlg && isSelected
+            ? "bg-gray-200 dark:bg-gray-600"
+            : "";
+        };
+
+        tableRows.push(
+          <tr key={`${key}-${i}-${j}`} className={getClassName()}>
+            {j === 0 && <td rowSpan={item.length}>{i + 1}</td>}
+            <td
+              style={{
+                borderLeft: j === 0 ? "" : "none",
+              }}
+              className="cursor-pointer"
+              id="alg"
+              onClick={() => copy(item[j])}
+            >
+              {item[j]}
+            </td>
+            {isCommutatorNeeded && (
+              <td
+                className="cursor-pointer"
+                onClick={() => copy(commutatorResult)}
+              >
+                {commutatorResult}
+              </td>
+            )}
+            {j === 0 && isThumbPositionNeeded && (
+              <td
+                rowSpan={item.length}
+                onClick={() => hasVideo(item) && handleCellClick(item)}
+                className={`${hasVideo(item) ? "text-primary cursor-pointer dark:text-[#00BCD4]" : ""} ${entryHasPersonalAlg ? "bg-gray-200 dark:bg-gray-600" : ""}`}
+                id={hasVideo(item) ? "video" : ""}
+              >
+                {fingerResult}
+              </td>
+            )}
+            {moveCountMetrics.map((metric) => (
+              <td key={metric}>{getMoveCount(item[j], metric)}</td>
+            ))}
+            {isManmade && j === 0 && (
+              <td
+                className={`help ${entryHasPersonalAlg ? "bg-gray-200 dark:bg-gray-600" : ""}`}
+                rowSpan={item.length}
+              >
+                {source.length}
+                <span className="help-content">{sourceResult}</span>
+                <div className="triangle"></div>
+              </td>
+            )}
+          </tr>,
+        );
+      }
+    }
+    if (isRegularExpression) {
+      const variantCodeKey = converter.initCodeToVariantCustomCode(
+        key,
+        codeType,
+        mirrorLR,
+      );
+      let matchedCode = "";
+      const regex = new RegExp(`^${inputText.replace(/\*/gu, ".")}$`, "u"); // Matches the entire string
+      for (const i of variantCodeKey) {
+        if (regex.test(i)) {
+          matchedCode = i;
+          break;
+        }
+      }
+      const matchedPosition = converter.customCodeToPosition(
+        matchedCode,
+        codeType,
+      );
+      const matchedCharacterPosition = converter.customCodeToPosition(
+        matchedCode[starIndex],
+        actualCodeType,
+      );
+      tableElements.push(
+        <React.Fragment key={matchedCharacterPosition[0]}>
+          <thead>
+            <tr>
+              <th
+                colSpan={columnCount}
+                className="border-b-0 bg-green-300 text-left dark:bg-green-800"
+                style={{ fontFamily: "Inter, sans-serif" }}
+              >
+                {getPosition(matchedPosition)}
+                <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                {codeType === "ltct"
+                  ? `${t("common.pairs")} ${matchedCode.slice(0, 2)}[${matchedCode[2]}]`
+                  : `${t("common.pairs")} ${matchedCode}`}
+              </th>
+            </tr>
+            <tr>
+              <th>{t("table.no")}</th>
+              <th>{t("table.algorithm")}</th>
+              {isCommutatorNeeded && <th>{t("table.commutator")}</th>}
+              {isThumbPositionNeeded && <th>{t("table.thumbPosition")}</th>}
+              {moveCountMetrics.map((metric) => (
+                <th key={metric}>{metric}</th>
+              ))}
+              {isManmade && <th>{t("table.source")}</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows}
+            <tr>
+              <td colSpan={columnCount} style={{ border: "none" }}>
+                &nbsp;
+              </td>
+            </tr>
+          </tbody>
+        </React.Fragment>,
+      );
+    } else if (showInverseAlgs && !matchesPattern(variantCode, key)) {
+      const matchedCode = getInverseCode(
+        converter.initCodeToCustomCode(variantCode[0], codeType),
+      );
+      const matchedPosition = converter.customCodeToPosition(
+        matchedCode,
+        codeType,
+      );
+      tableElements.push(
+        <React.Fragment key={0}>
+          <thead>
+            <tr>
+              <td colSpan={columnCount} style={{ border: "none" }}>
+                &nbsp;
+              </td>
+            </tr>
+            <tr>
+              <th
+                colSpan={columnCount}
+                className="border-b-0 bg-green-300 text-left dark:bg-green-800"
+                style={{ fontFamily: "Inter, sans-serif" }}
+              >
+                {getPosition(matchedPosition)}
+                <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                {codeType === "ltct"
+                  ? `${t("common.pairs")} ${matchedCode.slice(0, 2)}[${matchedCode[2]}]`
+                  : `${t("common.pairs")} ${matchedCode}`}
+              </th>
+            </tr>
+            <tr>
+              <th>{t("table.no")}</th>
+              <th>{t("table.algorithm")}</th>
+              {isCommutatorNeeded && <th>{t("table.commutator")}</th>}
+              {isThumbPositionNeeded && <th>{t("table.thumbPosition")}</th>}
+              {moveCountMetrics.map((metric) => (
+                <th key={metric}>{metric}</th>
+              ))}
+              {isManmade && <th>{t("table.source")}</th>}
+            </tr>
+          </thead>
+          <tbody>{tableRows}</tbody>
+        </React.Fragment>,
+      );
+    } else {
+      tableElements.push(
+        <React.Fragment key={key}>
+          <thead>
+            <tr>
+              <th>{t("table.no")}</th>
+              <th>{t("table.algorithm")}</th>
+              {isCommutatorNeeded && <th>{t("table.commutator")}</th>}
+              {isThumbPositionNeeded && <th>{t("table.thumbPosition")}</th>}
+              {moveCountMetrics.map((metric) => (
+                <th key={metric}>{metric}</th>
+              ))}
+              {isManmade && <th>{t("table.source")}</th>}
+            </tr>
+          </thead>
+          <tbody>{tableRows}</tbody>
+        </React.Fragment>,
+      );
+    }
+  }
+
+  tableElements.sort((a, b) => {
+    const keyA = (a.key ?? "") as string;
+    const keyB = (b.key ?? "") as string;
+    if (keyA === "0" || keyB === "0") {
+      return keyA === "0" ? 1 : -1;
+    }
+    // Usually won't happen; this check is only for safety
+    if (!allowedOrders.includes(orderOfAlgs)) {
+      orderOfAlgs = "Chichu";
+    }
+    if (orderOfAlgs === "Alphabetical") {
+      const codeA = converter.positionToCustomCode([keyA]);
+      const codeB = converter.positionToCustomCode([keyB]);
+      return codeA.charCodeAt(0) - codeB.charCodeAt(0);
+    }
+    const order = converter.positionArrays[orderOfAlgs];
+    return order.indexOf(keyA) - order.indexOf(keyB);
+  });
+  const tableElements2: JSX.Element[] = [];
+  if (tableElements.length !== 0) {
+    tableElements2.push(
+      <table ref={tableRef} key="table">
+        {tableElements}
+      </table>,
+    );
+  }
+  return (
+    <div ref={divRef} className="mt-4">
+      {copySuccess && <CopyPopup show={copySuccess} />}
+      {tableElements2}
+      {isVideoVisible && (
+        <>
+          <div
+            className="fixed top-0 left-0 z-[999] h-full w-full bg-black/50"
+            onClick={() => setIsVideoVisible(false)}
+          />
+          <div
+            className="fixed top-1/2 left-1/2 z-[1000] flex -translate-x-1/2 -translate-y-1/2 transform flex-col items-center rounded-lg bg-white shadow-lg"
+            style={{
+              width: videoDimensions.width || "80%",
+              height: videoDimensions.height || "80%",
+            }}
+          >
+            <>
+              {videoIdx > 0 && (
+                <button
+                  className="absolute top-1/2 left-4 -translate-y-1/2 transform rounded-full bg-gray-300 p-2"
+                  onClick={() => handleVideoChange(-1)}
+                >
+                  ◀
+                </button>
+              )}
+              {videoIdx < videoList.length - 1 && (
+                <button
+                  className="absolute top-1/2 right-4 -translate-y-1/2 transform rounded-full bg-gray-300 p-2"
+                  onClick={() => handleVideoChange(1)}
+                >
+                  ▶
+                </button>
+              )}
+            </>
+            <iframe
+              key={videoKey}
+              src={currentVideoUrl}
+              width="100%"
+              height="100%"
+              allow="autoplay; fullscreen"
+              sandbox="allow-same-origin allow-scripts"
+            ></iframe>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default Table;

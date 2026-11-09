@@ -8,7 +8,7 @@ import flet as ft
 import pytest
 
 from core.algorithms import algorithm_states, parse_algorithm, simplify_moves, simplified_algorithm
-from core.corner_algorithms import supplied_case_algorithms
+from core.legacy_corner_algorithms import supplied_case_algorithms
 from test_case_library import open_library
 from test_navigation import no_client_mount, walk
 from ui.components.algorithm_cube import AlgorithmCube

@@ -1,3 +1,39 @@
+# BLDDB corner alternatives — 2.47.0
+
+The existing case picker now offers only the BLDDB manmade choices plus your
+saved personal algorithms. The former supplied/setup/generated menu entries
+are replaced. **Most popular** is the default; other choices use labels such
+as **BLDDB #2.3 · 23 sources**, where 2 is the upstream popularity group and
+3 is its spelling. All spellings in a group share its source-sheet count.
+Ordering and ties match BLDDB's unfiltered manmade view.
+
+The short source line shows rank, count and snapshot date. Contributor names
+are available in its tooltip. A compact **BLDDB** link opens the physical
+UFR/first/second case, including its original source sheet links. Existing
+editor fields, cube size/layout, stage playback and custom-alg controls remain.
+No new panel above the cube is introduced.
+
+Case defaults, Playground lookup, Scramble walkthrough and trainer now use
+the same new catalog. Personal algs and their preferences remain. Retired
+builtin IDs are preserved in backup data and fall back to the new default
+without being reintroduced into the menu. Notes, statuses, favorites and
+training/session data are not migrated or reset.
+
+The 2026-11-09 offline snapshot contains **378 cases**, **2,252 groups** and
+**2,423 spellings**. Each spelling solves its stated exact pure corner cycle.
+Notation, where supplied, is checked against both its full cube effect and
+actual execution signature. Snapshot provenance, source credit, license and
+a reproducible importer are included in the release.
+
+Validation: **691 tests pass**, including 15 new checks. All 2,423 variants
+also pass cube verification in the web Python runtime. At 1440×900, 1080×800,
+390×700 and 280×400, the ranked picker/source links serialize correctly,
+component and full playback retain the same final state, and default/personal
+selection, walkthrough/trainer integration and saved-data preservation pass.
+Popularity order, ties and spellings were independently checked on the live
+UFR–UBL–UBR and UFR–LDB–FDL BLDDB pages. App browser-client layout was not
+measured; no live deployment was performed.
+
 # Grouped Home and feature icons — 2.46.0
 
 Home now has four sections with two feature rows each:

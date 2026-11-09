@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.47.0
+
+- Replaced every offered built-in UFR corner alternative with BLDDB v2's
+  manmade data: 378 cases, 2,252 popularity groups and 2,423 algorithm spellings.
+  The pinned snapshot was retrieved on 2026-11-09.
+- Preserved BLDDB's descending source-sheet counts, tie order and spellings
+  within each group. Menus identify group/spelling rank and source count;
+  provenance shows the snapshot date and links to the exact BLDDB case.
+- Verified all variants against the original tracer and cube-state engine.
+  Supplied commutators also match the actual move execution. The case editor,
+  Playground lookup, Scramble walkthrough and trainer share the new defaults.
+- Personal algorithms and explicit personal preferences remain, along with
+  case notes/status/favorites and all other app data. Previous built-in IDs
+  remain round-trippable in backups but do not reappear as choices; the new
+  most-popular choice is used when an old builtin preference has been retired.
+- Included original data, source attribution, GPL-3.0-or-later license, exact
+  input hashes and a deterministic validating import script. Algorithms work
+  from the bundled snapshot; no live database dependency was introduced.
+- Existing Home/layout/themes, BLD tracing and cycle-break logic, training
+  constraints/history, storage format/version 18, dependencies, import/export
+  and deployment workflow are preserved.
+- Validation: all 691 tests pass, including 15 new catalog/import/integration
+  checks. Legacy fixture tests now explicitly exercise the archived source;
+  preference tests reflect the requested replacement of retired menu options.
+  The web Python runtime also verifies all 2,423 variants and passes four
+  viewport/navigation configurations with source links, component playback,
+  shared defaults and unchanged saved data. Two live BLDDB cases were checked
+  independently for order/counts. App browser-client layout was not measured;
+  no deployment was performed.
+
 ## 2.46.0
 
 - Reorganized Home into **Set up your memo**, **Analyze a scramble**,

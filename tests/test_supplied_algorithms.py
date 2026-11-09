@@ -9,7 +9,9 @@ import pytest
 
 from core.algorithms import inverse_moves, normalized_state, parse_algorithm, simplify_moves
 from core.corner_algorithm_seeds import SUPPLIED_ALGORITHMS
-from core.corner_algorithms import ALL_SUBMISSIONS, QUALITY_NOTICE, SETUP_MOVES, builtin_algorithms, supplied_case_algorithms, generate_algorithm_registry
+from core.corner_algorithms import QUALITY_NOTICE, builtin_algorithms, blddb_case_algorithms
+from core.legacy_corner_algorithms import (ALL_SUBMISSIONS, SETUP_MOVES, supplied_case_algorithms,
+    generate_algorithm_registry, builtin_algorithms as legacy_builtin_algorithms)
 from core.corner_cases import corner_cases, identify_case
 from core.tracer import ScrambleTracer
 from data.models import AppData
@@ -72,7 +74,7 @@ def test_catalog_covers_all_distinct_one_move_cases_including_wide_setups():
     actual = {(key, simplify_moves(a.moves)) for key, group in supplied_case_algorithms().items() for a in group}
     assert actual == expected
     assert {(key, a.id, a.alg) for key, group in generated.items() for a in group} == {
-        (key, a.id, a.alg) for key in corner_cases() for a in builtin_algorithms(key) if a.origin != 'generated'}
+        (key, a.id, a.alg) for key in corner_cases() for a in legacy_builtin_algorithms(key) if a.origin != 'generated'}
     wide = [a for group in supplied_case_algorithms().values() for a in group if 'w' in a.setup]
     assert len(wide) >= 366 and {'Fw', "Fw'", 'Fw2'} <= {a.setup for a in wide}
     assert all(len(parse_algorithm(a.setup).moves) == 1 for a in wide)
@@ -82,7 +84,7 @@ def test_direct_submissions_take_priority_then_one_move_variants_then_fallbacks(
     direct = {':'.join(position.split('-')[1:]): position
               for position, _, _ in ALL_SUBMISSIONS if position.startswith('UFR-')}
     for key in corner_cases():
-        group = builtin_algorithms(key)
+        group = legacy_builtin_algorithms(key)
         assert group[-1].origin == 'generated' and group[-1].alg == corner_cases()[key].starter
         if key in direct:
             assert group[0].origin == 'supplied' and group[0].position == direct[key]
@@ -147,8 +149,8 @@ def test_supplied_defaults_are_editable_with_a_single_save_and_use_action_and_pr
 
 def test_wide_setup_preference_survives_backup_reload_without_inserting_builtins_into_personal_data():
     _, repo, _, view = open_library()
-    key, wide = next((key, a) for key, group in supplied_case_algorithms().items()
-                     for a in group if a.setup == "Fw'")
+    key, wide = next((key, a) for key, group in blddb_case_algorithms().items()
+                     for a in group if "Fw'" in a.moves)
     view.select_case(key)
     view.variant_picker.value = wide.id
     view._choose_variant(SimpleNamespace(control=view.variant_picker))
@@ -158,10 +160,10 @@ def test_wide_setup_preference_survives_backup_reload_without_inserting_builtins
     view.state.data = restored
     view.select_case(key)
     assert view.selected_algorithm == wide.id and view._variant()[1] == wide.alg
-    supplied_case_algorithms.cache_clear()
-    assert any(a.id == wide.id for a in supplied_case_algorithms()[key])
+    blddb_case_algorithms.cache_clear()
+    assert any(a.id == wide.id for a in blddb_case_algorithms()[key])
     # IDs from another case and unknown IDs cannot be set as a preference.
-    other_key = next(k for k in supplied_case_algorithms() if k != key)
+    other_key = next(k for k in blddb_case_algorithms() if k != key)
     before = deepcopy(restored.to_dict())
     with patch.object(repo, 'save') as save:
         with pytest.raises(ValueError): view.state.update_corner_case(other_key, preferred=wide.id)

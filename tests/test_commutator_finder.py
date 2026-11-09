@@ -13,7 +13,8 @@ import pytest
 from core.algorithms import algorithm_states, parse_algorithm
 from core.commutator_finder import execution_signature, find_commutator
 from core.corner_algorithm_additions import ADDITIONAL_ALGORITHMS
-from core.corner_algorithms import ALL_SUBMISSIONS, builtin_algorithms, display_builtin_algorithms, supplied_case_algorithms
+from core.corner_algorithms import builtin_algorithms, display_builtin_algorithms
+from core.legacy_corner_algorithms import ALL_SUBMISSIONS, builtin_algorithms as legacy_builtin_algorithms
 from core.tracer import ScrambleTracer
 from data.models import AppData, CornerCaseRecord
 from test_case_library import open_library
@@ -44,21 +45,22 @@ def test_all_332_attached_algorithms_trace_to_their_stated_targets_and_have_reco
             assert algorithm_states(parse_algorithm(commutator))[-1] == algorithm_states(original)[-1]
 
 
-def test_all_765_earlier_builtin_ids_sources_and_explicit_preferences_remain_usable():
+def test_earlier_builtin_ids_remain_archived_and_round_trip_but_are_replaced_in_current_menus():
     path = Path(__file__).parent / 'fixtures' / 'legacy_case_algorithms_230.json'
     old = json.loads(path.read_text())
     assert len(old) == 765
     assert sha256(json.dumps(sorted(old), ensure_ascii=False).encode()).hexdigest() == 'e19bfc54613ed590b820973067300cab4976d586f90d7e2ab5dc26dfcff54803'
     for key, identifier, source in old:
-        assert any(a.id == identifier and a.alg == source for a in builtin_algorithms(key))
+        assert any(a.id == identifier and a.alg == source for a in legacy_builtin_algorithms(key))
     _, repo, _, view = open_library()
     key, identifier, source = next((key, identifier, source) for key, identifier, source in old
         if identifier not in {a.id for a in display_builtin_algorithms(key)})
     repo.data.corner_case_library[key] = CornerCaseRecord(preferred_algorithm=identifier, notes='Keep preference')
     view.select_case(key)
-    assert view.selected_algorithm == identifier and view._variant()[1] == source
-    assert identifier in {o.key for o in view.variant_picker.options}
-    view.state.update_corner_case(key, preferred=identifier)
+    assert view.selected_algorithm == '' and view._variant()[1] == builtin_algorithms(key)[0].alg
+    assert identifier not in {o.key for o in view.variant_picker.options}
+    with pytest.raises(ValueError, match='existing algorithm'):
+        view.state.update_corner_case(key, preferred=identifier)
     restored = AppData.from_dict(json.loads(json.dumps(repo.data.to_dict())))
     assert restored.corner_case_library[key].preferred_algorithm == identifier
 

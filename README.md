@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.46.0**.
+or as a desktop app. Current version: **2.47.0**.
 
 ## Workspaces
 
@@ -184,6 +184,42 @@ Setups use the bundled solver via an independent route, and are checked against
 the complete cube state. A verified generated setup remains available when a
 native installation has no JavaScript runtime. No additional dependency is needed.
 
+## BLDDB corner algorithms
+
+The Method Library's built-in corner choices now come exclusively from
+[BLDDB v2's manmade database](https://v2.blddb.net/corner?position=UFR-UBL-UBR&mode=manmade),
+with **UFR fixed as the buffer**. The **2026-11-09** snapshot covers all
+**378 cases**, **2,252 popularity groups** and **2,423 algorithm spellings**.
+It replaces the previously offered supplied algorithms, one-move setup choices
+and generated fallback menu option.
+
+- Groups sort by the number of **source sheets**, highest first, with BLDDB's
+  original order retained for ties. Equivalent spellings stay in their group
+  and original order; for example `BLDDB #2.3` is spelling 3 in group 2.
+  Source counts belong to the group and are not measured execution speeds.
+- **Most popular** uses the first BLDDB choice by default. You can select and
+  pin a different choice with **Use selected alg**. IDs depend on the physical
+  case and move spelling, so later popularity changes do not change their identity.
+- The selected choice shows its rank, source-sheet count and snapshot date.
+  Hover the source text for contributor names; **BLDDB** opens that exact case
+  and the original source-sheet links. Popularity does not guarantee optimality.
+- The case editor, Playground case lookup, Scramble walkthrough and corner
+  trainer use the same catalog. All move sequences are verified as their stated
+  pure three-cycles. Available upstream commutators must also match the exact
+  execution signature and full cube effect before being bundled.
+- Your personal algorithms, preferences for them, notes, learning statuses and
+  favorites are retained. Earlier built-in preference IDs remain unchanged in
+  backup data, but no longer add old alternatives to the menu; those cases use
+  the new most-popular choice until you select another. The internal legacy
+  source is retained for historical fixtures and exact-execution notation recovery.
+
+Algorithms load from a bundled snapshot. No live BLDDB fetch occurs while
+using the app. The original public data, contributor/source URLs, input hashes,
+GPL-3.0-or-later license and rebuild instructions are included under
+[third_party/blddb/NOTICE.md](third_party/blddb/NOTICE.md). Validate the snapshot
+with `python tools/import_blddb_corners.py --check`; `--download` fetches and
+rebuilds the same pinned source revision for reproducibility.
+
 ## Light color themes
 
 Open **Settings → Appearance → Light color theme** and choose **Classic Teal**,
@@ -225,7 +261,8 @@ three-piece highlighting have separate switches beneath the cube.
 Cards show commutators, final moves, statistics and links to the case editor.
 **Walkthrough details** beneath the cards contains the memo and extra metadata.
 The case editor's back arrow returns to the same walkthrough position.
-Built-in algorithms are starting points; save your preferred replacements.
+Built-in algorithms use the BLDDB popularity order; save or choose your
+preferred replacements.
 
 Corner twists are left untouched, and a final unpaired target is reserved for
 your separate parity algorithm. Edge display can be hidden, solved or scrambled.

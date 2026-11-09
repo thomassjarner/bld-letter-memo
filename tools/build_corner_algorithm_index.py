@@ -1,4 +1,4 @@
-"""Rebuild the bundled catalog after editing supplied algorithm data."""
+"""Rebuild the archived supplied index; current menus use import_blddb_corners.py."""
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core.algorithms import simplify_moves
-from core.corner_algorithms import ALL_SUBMISSIONS, generate_algorithm_registry, _commutator_source
+from core.legacy_corner_algorithms import ALL_SUBMISSIONS, generate_algorithm_registry, _commutator_source
 
 
 def build():

@@ -11,7 +11,7 @@ import pytest
 from core.algorithms import Algorithm, Stage, algorithm_states, parse_algorithm, simplify_moves
 from core.commutator_finder import execution_signature
 from core.commutator_playback import align_notation, commutator_study
-from core.corner_algorithms import ALL_SUBMISSIONS
+from core.legacy_corner_algorithms import ALL_SUBMISSIONS
 from core.tracer import _at
 from test_case_library import open_library
 from test_navigation import no_client_mount
