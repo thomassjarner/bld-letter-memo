@@ -5,7 +5,8 @@ import asyncio
 import time
 
 import flet as ft
-from ui.theme_colors import ThemeAwarePage, show_themed_dialog
+from ui.theme_colors import SUCCESS_COLOR, ThemeAwarePage, show_themed_dialog
+from ui.feature_icons import feature_icon
 
 from core.scramble_generator import ScrambleGenerator
 from ui.design import activity_card, page_heading, panel, eyebrow
@@ -143,9 +144,16 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.history = ft.ListView(spacing=0, scroll=ft.ScrollMode.ALWAYS,
                                    build_controls_on_demand=True)
         self.history_limit = 50
+        self.history_sort = 'newest'
         self._history_session = self.state.data.active_practice_session
-        self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.older_solves_button = ft.TextButton("Older solves", on_click=self._load_older_solves)
+        self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                                    expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
+        self.older_solves_button = ft.IconButton(ft.Icons.EXPAND_MORE, width=28, height=28, padding=2,
+            tooltip='Show 50 more solves in this order', on_click=self._load_older_solves)
+        self.date_sort_button = ft.TextButton('Newest', height=28, width=68,
+            on_click=lambda e: self._sort_history('date'))
+        self.time_sort_button = ft.TextButton('Fastest', height=28, width=68,
+            on_click=lambda e: self._sort_history('time'))
         self.metric_values = [ft.Text("—", size=17, weight=ft.FontWeight.W_600,
                                       color=ft.Colors.ON_SURFACE) for _ in range(6)]
         self._viewport = (1400, 760)
@@ -167,9 +175,13 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.new_scramble_button = ft.IconButton(
             ft.Icons.CHEVRON_RIGHT, tooltip="Next scramble", on_click=self._new_scramble,
         )
-        self.corner_walkthrough_button = ft.IconButton(ft.Icons.VIEW_IN_AR_OUTLINED,
-            tooltip="Scramble walkthrough · current scramble", width=32, height=32, padding=4,
-            icon_size=20, disabled=not self.current_scramble or bool(self._scramble_error),
+        self.scramble_memo_button = ft.IconButton(feature_icon('memo', 20),
+            tooltip='Scramble Memo · current scramble', width=32, height=32, padding=4,
+            disabled=not self.current_scramble or bool(self._scramble_error),
+            on_click=lambda e: self._open_current_memo())
+        self.corner_walkthrough_button = ft.IconButton(feature_icon('walkthrough', 20),
+            tooltip="3-style corner analysis · current scramble", width=32, height=32, padding=4,
+            disabled=not self.current_scramble or bool(self._scramble_error),
             on_click=lambda e: self._open_corner_walkthrough(self.current_scramble))
         for button in (self.previous_scramble_button, self.new_scramble_button):
             button.width = button.height = 32
@@ -184,10 +196,14 @@ class PracticePage(ThemeAwarePage, ft.Column):
             "DNF", icon=ft.Icons.CANCEL, on_click=lambda e: self._mark_last("dnf"), disabled=True
         )
         self.memo_button = ft.OutlinedButton(
-            "Analyze solve", icon=ft.Icons.SHUFFLE, tooltip="Take saved solve to Scramble Memo",
+            "Scramble Memo", icon=feature_icon('memo', 18), tooltip="Scramble Memo · last solve",
             on_click=self._take_last_to_memo, disabled=True,
         )
-        for button in (self.success_button, self.plus2_button, self.dnf_button, self.memo_button):
+        self.corner_analysis_button = ft.OutlinedButton(
+            '3-style corner analysis', icon=feature_icon('walkthrough', 18),
+            tooltip='3-style corner analysis · last solve',
+            on_click=self._take_last_to_corner_analysis, disabled=True)
+        for button in (self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button):
             button.style = ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=10, vertical=9))
 
         self._show_menu(update=False)
@@ -253,7 +269,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.scramble_text.expand = True
         self._scramble_panel = panel(ft.Row([
             self.scramble_text,
-            ft.Row([self.previous_scramble_button, self.new_scramble_button, self.corner_walkthrough_button], spacing=0, tight=True),
+            ft.Row([self.previous_scramble_button, self.new_scramble_button,
+                    self.scramble_memo_button, self.corner_walkthrough_button], spacing=0, tight=True),
         ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=12)
         self._timer_hint = ft.Text("Hold Space to arm · Release to start · Any key to stop",
                                   size=11, color=ft.Colors.ON_SURFACE_VARIANT,
@@ -263,8 +280,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
         ], spacing=8, alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER), padding=16)
         self._result_row = ft.Row([
-            self.success_button, self.plus2_button, self.dnf_button, self.memo_button,
-        ], spacing=8, wrap=True, alignment=ft.MainAxisAlignment.CENTER)
+            self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button,
+        ], spacing=8, run_spacing=4, wrap=True, alignment=ft.MainAxisAlignment.CENTER)
         self._stats_panel = panel(ft.Row([
             ft.Column([
                 ft.Text(label, size=10, color=ft.Colors.ON_SURFACE_VARIANT), value,
@@ -287,7 +304,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             ], spacing=2), height=32),
             self.history,
             ft.Container(ft.Row([
-                self.history_meta, self.older_solves_button,
+                self.history_meta, self.date_sort_button, self.time_sort_button, self.older_solves_button,
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=4), height=28),
         ], spacing=8), padding=12)
         self._main_region = ft.Column(spacing=0)
@@ -326,13 +343,23 @@ class PracticePage(ThemeAwarePage, ft.Column):
         wide = width >= 1000
         scramble_height = 72 if wide else (90 if width >= 600 else 104)
         main_height = max(120, height - 44 - scramble_height - 24)
+        # Very short phone windows can scroll the complete workspace rather
+        # than clip the second row of named analysis actions or history footer.
+        short = not wide and main_height < 240
+        self._timer_body.scroll = ft.ScrollMode.AUTO if short else None
+        if short:
+            main_height = 240
         self._scramble_panel.height = scramble_height
         self._scramble_panel.width = width
         self._timer_body.width = width
         self.scramble_text.size = 17 if wide else 14
         self.session_dropdown.width = 150 if wide else 136
         self.success_button.content = "Success" if width >= 600 else "OK"
-        self.memo_button.content = "Analyze solve" if width >= 600 else "Analyze"
+        for button in (self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button):
+            button.height = 30 if width < 600 else 36
+            button.style = ft.ButtonStyle(
+                padding=ft.Padding.symmetric(horizontal=6 if width < 600 else 10, vertical=4),
+                text_style=ft.TextStyle(size=11 if width < 600 else 13))
         self._stats_panel.visible = wide
         self._stats_button.visible = not wide
         if wide:
@@ -366,10 +393,10 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._stats_panel.width = timer_width
         self._result_row.width = timer_width
         self._stats_panel.height = 76
-        self._result_row.height = 40
+        self._result_row.height = 64 if width < 600 else 40
         # Desktop gives the time the full remaining left panel. Compact
         # screens keep statistics accessible from the history header.
-        self._timer_stage.height = max(24, timer_height - (140 if wide else 52))
+        self._timer_stage.height = max(24, timer_height - (self._result_row.height + (100 if wide else 12)))
         self._timer_stage.content.controls = [self.timer_text]
         if self._timer_stage.height >= 64:
             self._timer_stage.content.controls.append(self.status_text)
@@ -395,6 +422,25 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.history_limit += 50
         self._refresh_stats_and_history()
         self._focus_keyboard_listener()
+
+    def _sort_history(self, kind):
+        if kind == 'date':
+            self.history_sort = 'oldest' if self.history_sort == 'newest' else 'newest'
+        else:
+            self.history_sort = 'slowest' if self.history_sort == 'fastest' else 'fastest'
+        self.history_limit = 50
+        self._refresh_stats_and_history()
+        if self.page is not None:
+            self.page.run_task(self._scroll_history_top, self.history_sort)
+        self._focus_keyboard_listener()
+
+    async def _scroll_history_top(self, order):
+        await asyncio.sleep(0)
+        if order != self.history_sort: return
+        try:
+            await self.history.scroll_to(offset=0, duration=0)
+        except Exception:
+            pass
 
     def _show_session_stats(self, e=None):
         dialog = ft.AlertDialog(
@@ -582,7 +628,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         await asyncio.sleep(self.HOLD_ARM_SECONDS)
         if self.holding_space and not self.armed and self.active and self.mode == "timer" and not self.running:
             self.armed = True
-            self.timer_text.color = ft.Colors.PRIMARY
+            self.timer_text.color = SUCCESS_COLOR
             self._safe_update()
 
     async def _tick_loop(self):
@@ -658,8 +704,22 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.scramble_text.value = self.current_scramble
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
+    def _update_analysis_availability(self):
+        current_disabled = self.running or self.holding_space or not self.current_scramble or bool(self._scramble_error)
+        eligible = self.last_solve_index is not None and 0 <= self.last_solve_index < len(self.state.data.practice_solves)
+        result_disabled = self.running or self.holding_space or not eligible
+        for button, name, size, disabled in (
+                (self.scramble_memo_button, 'memo', 20, current_disabled),
+                (self.corner_walkthrough_button, 'walkthrough', 20, current_disabled),
+                (self.memo_button, 'memo', 18, result_disabled),
+                (self.corner_analysis_button, 'walkthrough', 18, result_disabled)):
+            button.disabled = disabled
+            if getattr(button, '_analysis_disabled', None) != disabled:
+                button.icon = feature_icon(name, size, muted=disabled)
+                button._analysis_disabled = disabled
+
     def _safe_update(self):
-        self.corner_walkthrough_button.disabled = self.running or self.holding_space or not self.current_scramble or bool(self._scramble_error)
+        self._update_analysis_availability()
         self._adjust_timer_font()
         if self.page is not None:
             self.update()
@@ -768,6 +828,16 @@ class PracticePage(ThemeAwarePage, ft.Column):
         if self.open_memo_callback:
             self.open_memo_callback(scramble)
 
+    def _open_current_memo(self):
+        if not self.running and not self.holding_space and self.current_scramble and not self._scramble_error:
+            self._open_solve_memo(self.current_scramble)
+
+    def _take_last_to_corner_analysis(self, e=None):
+        if self.last_solve_index is None: return
+        solves = self.state.data.practice_solves
+        if 0 <= self.last_solve_index < len(solves):
+            self._open_corner_walkthrough(solves[self.last_solve_index].scramble)
+
     def _open_corner_walkthrough(self, scramble: str):
         if not self.running and not self.holding_space and scramble and self.open_corner_walkthrough_callback:
             self.open_corner_walkthrough_callback(scramble)
@@ -775,6 +845,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
     # ---- statistics/history ---------------------------------------------
 
     def _refresh_stats_and_history(self, update=True):
+        self._update_analysis_availability()
         solves = self.state.data.practice_solves
         if self._history_session != self.state.data.active_practice_session:
             self._history_session = self.state.data.active_practice_session
@@ -807,10 +878,33 @@ class PracticePage(ThemeAwarePage, ft.Column):
         for control, value in zip(self.metric_values, metric_texts):
             control.value = value
         shown = min(len(solves), self.history_limit)
-        self.history_meta.value = f"{shown} of {len(solves)} solves · newest first"
+        self.history_meta.value = f"{shown}/{len(solves)} solves"
+        self.history_meta.tooltip = f"{shown} of {len(solves)} solves · {self.history_sort} first"
+        date_active = self.history_sort in ('newest', 'oldest')
+        for button, active, label in ((self.date_sort_button, date_active,
+                'Oldest' if self.history_sort == 'oldest' else 'Newest'),
+                (self.time_sort_button, not date_active, 'Slowest' if self.history_sort == 'slowest' else 'Fastest')):
+            button.content = label
+            button.style = ft.ButtonStyle(padding=4, text_style=ft.TextStyle(size=11,
+                weight=ft.FontWeight.W_600 if active else ft.FontWeight.NORMAL),
+                color=ft.Colors.ON_PRIMARY_CONTAINER if active else ft.Colors.PRIMARY,
+                bgcolor=ft.Colors.PRIMARY_CONTAINER if active else ft.Colors.TRANSPARENT,
+                shape=ft.RoundedRectangleBorder(radius=6))
+            button.tooltip = (f'{label} first. Click for ' + ('oldest' if label == 'Newest' else
+                'newest' if label == 'Oldest' else 'slowest' if label == 'Fastest' else 'fastest') + ' first.'
+                if active else f'Sort {label.lower()} first.')
         self.older_solves_button.visible = shown < len(solves)
+        indices = list(range(len(solves)))
+        if self.history_sort == 'newest':
+            indices.reverse()
+        elif self.history_sort in ('fastest', 'slowest'):
+            # Sorting is a view only. Keep stored chronology and original IDs
+            # for averages, result controls, deletion and analysis callbacks.
+            indices.sort(key=lambda i: (solves[i].dnf,
+                _effective_centiseconds(solves[i]) if not solves[i].dnf else 0),
+                reverse=self.history_sort == 'slowest')
         rows = []
-        for idx in range(len(solves) - 1, len(solves) - shown - 1, -1):
+        for idx in indices[:shown]:
             solve = solves[idx]
             effective = _effective_centiseconds(solve)
             if solve.dnf:
@@ -818,7 +912,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 result_color = ft.Colors.ERROR
             else:
                 result = _format_centiseconds(effective) + ("+" if getattr(solve, "plus2", False) else "")
-                result_color = ft.Colors.PRIMARY if best is not None and effective == best else ft.Colors.ON_SURFACE
+                result_color = SUCCESS_COLOR if best is not None and effective == best else ft.Colors.ON_SURFACE
 
             rows.append(
                 ft.Container(
@@ -831,10 +925,10 @@ class PracticePage(ThemeAwarePage, ft.Column):
                                 padding=ft.Padding.symmetric(vertical=4),
                                 on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
                             ),
-                            ft.IconButton(ft.Icons.SHUFFLE, icon_size=17, width=32, height=32, padding=4, tooltip="Take to Scramble Memo",
+                            ft.IconButton(feature_icon('memo', 18), width=32, height=32, padding=4, tooltip="Scramble Memo · saved solve",
                                           on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
-                            ft.IconButton(ft.Icons.VIEW_IN_AR_OUTLINED, icon_size=17, width=32, height=32, padding=4,
-                                          tooltip="Scramble walkthrough · saved solve",
+                            ft.IconButton(feature_icon('walkthrough', 18), width=32, height=32, padding=4,
+                                          tooltip="3-style corner analysis · saved solve",
                                           on_click=lambda e, s=solve.scramble: self._open_corner_walkthrough(s)),
                             ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, width=32, height=32, padding=4, tooltip="Delete solve",
                                           on_click=lambda e, i=idx: self._delete_solve(i)),

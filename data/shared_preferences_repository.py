@@ -12,6 +12,7 @@ import json
 import flet as ft
 
 from data.models import AppData
+from data.color_themes import LIGHT_THEMES
 from data.repository import AppDataRepository
 
 
@@ -21,6 +22,8 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
     STORAGE_KEY = "bld-letter-memo.app-data"
     SHADOW_KEY = "bld-letter-memo.app-data.shadow"
     ROLLBACK_KEY = "bld-letter-memo.app-data.rollback"
+    PREFERENCES_KEY = "bld-letter-memo.workspace-preferences"
+    asynchronous_saves = True
 
     def __init__(self, page: ft.Page, prefs: ft.SharedPreferences, initial: AppData, persisted_payload: str | None):
         self._page = page
@@ -29,6 +32,17 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
         self._persisted_payload = persisted_payload
         self._pending_payload: str | None = None
         self._flush_running = False
+        self._save_status_callback = None
+
+    def on_save_status(self, callback):
+        self._save_status_callback = callback
+
+    def _status(self, message):
+        if self._save_status_callback is not None:
+            try:
+                self._save_status_callback(message)
+            except Exception:
+                pass  # A disconnected view must not turn a saved write into a failure.
 
     @staticmethod
     def _decode(raw) -> tuple[AppData | None, str | None]:
@@ -62,7 +76,6 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
             + len(data.corner_case_library) * 20
             + sum(len(record.algorithms) * 10 for record in data.corner_case_library.values())
             + len(data.playground_algorithms) * 20
-            + (1 if data.dark_mode else 0)
         )
 
     @classmethod
@@ -94,6 +107,24 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
             initial = AppData()
             persisted_payload = None
 
+        # These small, current preferences are independent of which richer
+        # recovery snapshot supplies schemes/history. Never resurrect an older
+        # scheme selection or appearance just because that snapshot has data.
+        try:
+            raw = await prefs.get(cls.PREFERENCES_KEY)
+            choices = json.loads(raw) if isinstance(raw, str) else None
+            if isinstance(choices, dict):
+                selected = choices.get('active_scheme')
+                if isinstance(selected, str) and selected in initial.schemes:
+                    initial.active_scheme = selected
+                if isinstance(choices.get('dark_mode'), bool):
+                    initial.dark_mode = choices['dark_mode']
+                theme = choices.get('light_theme')
+                if isinstance(theme, str) and theme in LIGHT_THEMES:
+                    initial.light_theme = theme
+        except Exception:
+            pass
+
         return cls(page, prefs, initial, persisted_payload)
 
     def load(self) -> AppData:
@@ -112,6 +143,11 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
                 payload = self._pending_payload
                 self._pending_payload = None
                 try:
+                    snapshot = json.loads(payload)
+                    choices = {name: snapshot.get(name) for name in ('active_scheme', 'dark_mode', 'light_theme')}
+                    # Save the small workspace selection first, before rotating
+                    # potentially much larger history/algorithm backup copies.
+                    await self._prefs.set(self.PREFERENCES_KEY, json.dumps(choices, ensure_ascii=False))
                     # Preserve the last successfully persisted state before
                     # replacing it, then write two current copies.
                     if self._persisted_payload and self._persisted_payload != payload:
@@ -119,11 +155,14 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
                     await self._prefs.set(self.STORAGE_KEY, payload)
                     await self._prefs.set(self.SHADOW_KEY, payload)
                     self._persisted_payload = payload
+                    if self._pending_payload is None:
+                        self._status('Saved')
                 except Exception:
                     # Keep the payload queued for one later save attempt instead
                     # of pretending a failed browser-storage write succeeded.
                     if self._pending_payload is None:
                         self._pending_payload = payload
+                    self._status('Save failed — retry on next change')
                     break
         finally:
             self._flush_running = False

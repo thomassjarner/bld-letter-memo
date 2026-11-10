@@ -12,6 +12,14 @@ from ui.design import build_theme
 from data.color_themes import DEFAULT_LIGHT_THEME, normalize_light_theme
 
 
+# Success is a status, independent of the selected decorative accent palette.
+SUCCESS_COLOR = 'bld_success'
+
+
+def success_color(dark):
+    return '#79D99B' if dark else '#126734'
+
+
 def _defaults(control):
     if isinstance(control, (ft.Text, ft.TextField, ft.Dropdown)) and control.color is None:
         control.color = ft.Colors.ON_SURFACE
@@ -50,6 +58,7 @@ def apply_palette(root, dark, light_theme=None):
     scheme = build_theme(dark, light_theme).color_scheme
     palette = {f.name.replace('_', ''): getattr(scheme, f.name)
                for f in fields(scheme) if getattr(scheme, f.name) is not None}
+    palette[SUCCESS_COLOR] = success_color(dark)
     seen = set()
 
     def resolve(value):

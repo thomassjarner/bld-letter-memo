@@ -19,7 +19,8 @@ def test_desktop_has_large_timer_and_bounded_scrollable_history():
     assert timer.history.height + 100 == timer.history_panel.height
     row = timer._scramble_panel.content
     assert timer.scramble_text in row.controls
-    assert row.controls[1].controls == [timer.previous_scramble_button, timer.new_scramble_button, timer.corner_walkthrough_button]
+    assert row.controls[1].controls == [timer.previous_scramble_button, timer.new_scramble_button,
+                                      timer.scramble_memo_button, timer.corner_walkthrough_button]
 
 
 def test_resize_keeps_listener_history_and_active_solve():
@@ -72,7 +73,7 @@ def test_old_history_actions_reference_the_correct_solve():
     oldest_row = timer.history.controls[-1]
     clicked = []
     timer.open_memo_callback = clicked.append
-    next(c for c in walk(oldest_row) if isinstance(c, ft.IconButton) and c.tooltip == 'Take to Scramble Memo').on_click(None)
+    next(c for c in walk(oldest_row) if isinstance(c, ft.IconButton) and c.tooltip == 'Scramble Memo · saved solve').on_click(None)
     assert clicked == ['R U0']
     next(c for c in walk(oldest_row) if isinstance(c, ft.IconButton) and c.tooltip == 'Delete solve').on_click(None)
     assert len(repo.data.practice_solves) == 74

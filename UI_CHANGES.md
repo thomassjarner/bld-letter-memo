@@ -1,3 +1,45 @@
+# Timer actions, sorting and remembered workspace — 2.50.0
+
+The timer now uses the existing memo and walkthrough feature glyphs for its
+current-scramble toolbar, last-result controls and history rows. The result
+buttons explicitly say **Scramble Memo** and **3-style corner analysis**.
+The latter opens the same Method Library Scramble walkthrough. Each route
+uses its own current/last/entry scramble; disabled actions mute the glyphs.
+
+The compact history footer has two controls. Newest toggles to Oldest; Fastest
+toggles to Slowest. Switching controls starts with Newest or Fastest. The
+selected control has a palette-aware background and a descriptive tooltip.
+Counts remain in the footer, with a compact expand control for 50 more results.
+Sorting covers all saved solves and only reorders the view, preserving original
+indices for copy/analysis/delete and chronological averages. +2 is included;
+DNFs rank last in Fastest and first in Slowest. Ties keep original order.
+
+Ready/best-result green is a semantic status independent of the accent theme:
+#126734 in light mode and #79D99B in dark mode. Both are checked for text
+contrast on every surface of all five palettes. Ordinary times and DNFs retain
+their normal/error roles. The timer keeps its mounted keyboard listener and
+large desktop stage. Short phone windows can scroll to the full action/footer
+area instead of clipping the additional button row.
+
+Active scheme, mode and palette already existed in the data model. Browser
+recovery incorrectly treated dark mode as extra data richness; a stale dark
+rollback could displace a current light profile. Removing that preference from
+the recovery score fixes that path. A small current-preferences record saves
+before larger snapshots and restores valid settings even when richer data is
+recovered. Saves coalesce as before, with status reported after completion.
+No algorithms, tracing logic, catalog data, training constraints or data schema
+are changed. Existing browser data/backups remain compatible with version 18.
+
+Validation: **763 tests pass**, including 21 new cases for toggle directions,
+full-session ranking/pagination, original solve action references, current vs
+last result routes/icons, all palette/mode status colors, contrast, interrupted
+writes, stale recovery copies, malformed preferences and full app restart.
+The shipped web Python runtime passes at 1440×900, 1080×800, 390×700 and
+280×400 with original glyph transport, both analysis routes, sorting, green
+across all five light palettes, timer/listener/data preservation and remembered
+scheme/mode/palette. Browser-client rendering could not be measured through
+the local preview. No deployment was performed.
+
 # Commutator typing corrections — 2.49.1
 
 `:` now immediately adds an inner pair: after typing `R:`, the field shows

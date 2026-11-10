@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.49.1**.
+or as a desktop app. Current version: **2.50.0**.
 
 ## Workspaces
 
@@ -276,6 +276,52 @@ In the solved-edge preview, UF swaps with your configured helper when needed,
 regardless of the edge buffer. A UF/self or invalid helper uses UR for this
 preview. These display choices do not change tracing preferences or the scramble.
 Timer cube icons open the current scramble or a saved solve in this workspace.
+
+## Timer analysis and history
+
+Both analysis tools are available from the timer, using the same original
+feature icons as Home and navigation:
+
+| Location | Scramble used |
+| --- | --- |
+| Icons beside the scramble | Current displayed scramble |
+| **Scramble Memo** / **3-style corner analysis** below the time | Last recorded solve |
+| The two icons beside a history entry | That entry's scramble |
+
+**3-style corner analysis** opens the existing Method Library **Scramble
+walkthrough**. The current/last-result actions disable when their target is
+unavailable or the timer is held/running. Saved history retains its analysis,
+copy and deletion actions.
+
+History defaults to **Newest**. Click it again for **Oldest**. Click **Fastest**
+to rank the whole session by effective time, including +2; click again for
+**Slowest**. Changing between the two controls starts with Newest or Fastest.
+DNFs sort after valid times in Fastest and before them in Slowest. Equal times
+retain their stored order. Sorting resets the displayed window to 50; the
+expand button loads 50 more in the selected order. Sorting only changes the
+view: solve numbers, original history order and all averages remain intact.
+The chosen order survives navigation/resizing; a new page load starts Newest.
+
+Armed `0.00` and fastest valid history times use a semantic green in every
+light color theme and dark mode. The green shade changes for light/dark
+contrast, independently of the decorative accent. Arming delay and timer
+keyboard behavior are unchanged. Very short phone windows can scroll the
+workspace so both named analysis actions and the history footer stay reachable.
+
+## Remembered workspace
+
+The active letter scheme, light/dark mode and selected light palette restore
+on reopening this site in the same browser. These preferences are written
+before the larger history/backup snapshots. An older recovery copy no longer
+wins because it had dark mode enabled, and recovering richer scheme/history
+data keeps valid current workspace preferences. Unknown/deleted scheme names
+and malformed preferences are ignored safely.
+
+The header says **Saved** after asynchronous browser writes finish, and shows
+a failed-save status if storage rejects the write; the next change retries.
+Existing main/shadow/rollback keys, data version 18 and backup import/export
+are retained. One small browser preference key is added. No setup or migration
+step is required.
 
 ## Writing commutators
 

@@ -21,6 +21,8 @@ class AppState:
         self.data: AppData = self._repo.load()
         self._listeners: List[Callable[[], None]] = []
         self._save_status_listeners: List[Callable[[str], None]] = []
+        if getattr(repository, 'asynchronous_saves', False):
+            repository.on_save_status(self._set_save_status)
 
     # ---- change notification -------------------------------------------------
 
@@ -41,7 +43,8 @@ class AppState:
     def _save(self, notify: bool = True) -> None:
         self._set_save_status("Saving…")
         self._repo.save(self.data)
-        self._set_save_status("Saved")
+        if not getattr(self._repo, 'asynchronous_saves', False):
+            self._set_save_status("Saved")
         if notify:
             self._notify()
 

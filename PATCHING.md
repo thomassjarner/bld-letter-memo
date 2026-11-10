@@ -1,46 +1,34 @@
-# Update to 2.49.1
+# Update to 2.50.0
 
-Copy all contents of `bld-letter-memo-web-2.49.1/` into your existing
-`~/Desktop/letterpairscheme-helper-web/` project, replacing matching files.
-Do not put the release folder itself inside the project.
+Copy the **contents** of `bld-letter-memo-web-2.50.0/` into your existing
+`~/Desktop/letterpairscheme-helper-web/`, replacing matching files. The update
+process is unchanged. Include all new files and the hidden `.github/` folder,
+plus the existing catalog, scripts and web-preview assets.
 
-The copy/commit/push process is unchanged. Include the new
-`ui/commutator_editing.py` and `tests/test_commutator_editing.py` files, as well
-as all matching updates. Keep the bundled BLDDB catalog/attribution and the
-hidden `.github/`, `scripts/` and `web_preview/` folders used for deployment.
-Finder can show hidden files with Command+Shift+.
-
-If you extracted the ZIP into Downloads, copy its contents with:
+After extracting the ZIP into Downloads:
 
 ```bash
-rsync -av ~/Downloads/bld-letter-memo-web-2.49.1/ ~/Desktop/letterpairscheme-helper-web/
-```
-
-Adjust the source path if you extracted it elsewhere. Then use the usual push:
-
-```bash
+rsync -av ~/Downloads/bld-letter-memo-web-2.50.0/ ~/Desktop/letterpairscheme-helper-web/
 cd ~/Desktop/letterpairscheme-helper-web
 git add -A
-git commit -m "Fix commutator brackets and cursor placement"
+git commit -m "Improve timer analysis, sorting and remembered preferences"
 git push
 ```
 
-If Git says "nothing to commit", still run `git push` for a pending local commit.
-Wait for GitHub Actions, refresh and confirm **2.49.1** in the header/tab title.
-Command+Shift+R can refresh the build on macOS.
+If the extracted folder is elsewhere, adjust the rsync source. If Git says
+"nothing to commit", still push any pending local commit. Wait for GitHub
+Actions, refresh and confirm **2.50.0** in the header/tab title.
 
-In **Method Library → 3-style corner cases** or **Playground**, clear the
-Commutator field. It should show `[]`. Type `R:`: it should immediately show
-`[R:[]]` with the caret inside the inner pair. Continue typing `U, D`; the
-result should be `[R:[U, D]]`, without moving the caret away from the comma.
-Final alg should update. Complete pasted
-commutators retain their pairs. In Final alg, a move sequence without a short
-commutator match remains usable while the Commutator field shows `[]`.
+On Timer, check the two analysis routes beside the current scramble, below the
+last result and on history rows. Use Newest/Oldest and Fastest/Slowest in the
+history footer; the expand icon shows more results. Armed 0.00 and fastest
+valid times stay green in every theme. On short windows, scroll if needed to
+reach both named analysis actions and the history footer.
 
-No dependency or storage-key changes are required. Data version remains 18.
-The bundled BLDDB ranking, personal algs, schemes/pairs, cycle-break priorities,
-temporary overrides, memo/timer/trainer history, preferences, browser persistence
-and import/export are unchanged.
+Select your active scheme and appearance, wait for Saved, then reopen the
+site. These settings should restore. No manual data migration is needed:
+existing storage keys/data version 18 and import/export remain compatible.
+The small workspace-preferences key is created automatically on saving.
+Dependencies and deployment workflow are unchanged.
 
-See `README.md` for usage, `UI_CHANGES.md` for the editing behavior and
-`CHANGELOG.md` for release history.
+See `README.md` for behavior and `CHANGELOG.md` / `UI_CHANGES.md` for details.

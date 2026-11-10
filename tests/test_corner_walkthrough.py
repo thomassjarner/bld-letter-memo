@@ -237,7 +237,7 @@ def test_timer_shortcuts_use_the_exact_current_or_history_scramble_and_preserve_
     assert method.mode == 'walkthrough' and method.walkthrough.plan.scramble == current
     assert not timer.active and repo.data.to_dict() == before
     click_nav(page, 'Timer')
-    shortcut = next(c for c in walk(timer.history) if isinstance(c, ft.IconButton) and c.tooltip == 'Scramble walkthrough · saved solve')
+    shortcut = next(c for c in walk(timer.history) if isinstance(c, ft.IconButton) and c.tooltip == '3-style corner analysis · saved solve')
     shortcut.on_click(None)
     assert method.walkthrough.plan.scramble == saved and repo.data.to_dict() == before
     click_nav(page, 'Timer')

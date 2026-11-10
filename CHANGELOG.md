@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.50.0
+
+- Added separate **Scramble Memo** and **3-style corner analysis** actions for
+  the timer's current scramble, last result and saved entries, using the
+  original theme-aware feature icons. Corner analysis uses the existing
+  Scramble walkthrough. Both full labels remain on compact result controls.
+- Added Newest/Oldest and Fastest/Slowest history toggles. Ranking includes +2
+  penalties and DNFs, covers the complete session before pagination, preserves
+  stored chronology/averages and keeps original solve references for actions.
+- Armed 0.00 and fastest valid history results remain green in every palette,
+  with contrasting light/dark shades. Very short windows can scroll the timer.
+- Fixed stale appearance/scheme restoration: dark mode is no longer a data
+  richness tie-breaker. Current workspace preferences save first and overlay
+  recovered data when valid. The Saved indicator waits for browser writes.
+- Existing BLD tracing, algorithms/catalog, commutator editor, training and
+  histories, backup format/data version 18, dependencies and copy/push process
+  remain. A small browser-only workspace-preferences key is added.
+- Validation: all 763 tests pass, including 21 new timer/preferences regressions.
+  Web Python checks pass at four viewport/navigation configurations across
+  all five palettes, including routes/icons, sorting, status greens, retained
+  data/listener and preferences after restart. Browser-client rendering was
+  not measured; no deployment was performed. See UI_CHANGES.md for details.
+
 ## 2.49.1
 
 - Fixed the commutator editor's caret round trip. It now restores the intended
