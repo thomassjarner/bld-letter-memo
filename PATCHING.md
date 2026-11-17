@@ -1,34 +1,25 @@
-# Update to 2.50.0
+# Update to 2.51.0
 
-Copy the **contents** of `bld-letter-memo-web-2.50.0/` into your existing
-`~/Desktop/letterpairscheme-helper-web/`, replacing matching files. The update
-process is unchanged. Include all new files and the hidden `.github/` folder,
-plus the existing catalog, scripts and web-preview assets.
-
-After extracting the ZIP into Downloads:
+The update process is unchanged. Extract the ZIP into Downloads. Copy its
+**contents** into your existing checkout, including new files and the hidden
+`.github/` directory, then commit and push:
 
 ```bash
-rsync -av ~/Downloads/bld-letter-memo-web-2.50.0/ ~/Desktop/letterpairscheme-helper-web/
-cd ~/Desktop/letterpairscheme-helper-web
-git add -A
-git commit -m "Improve timer analysis, sorting and remembered preferences"
+rsync -av ~/Downloads/bld-letter-memo-web-2.51.0/ ~/Desktop/letterpairscheme-helper-web/ &&
+cd ~/Desktop/letterpairscheme-helper-web &&
+git add -A &&
+git commit -m "Smooth cube interaction and streamline case study and practice" &&
 git push
 ```
 
-If the extracted folder is elsewhere, adjust the rsync source. If Git says
-"nothing to commit", still push any pending local commit. Wait for GitHub
-Actions, refresh and confirm **2.50.0** in the header/tab title.
+If your extracted folder is elsewhere, adjust the first path. If Git reports
+“nothing to commit” but your local branch has an earlier unpushed commit,
+run `git push` from the checkout. When GitHub Actions finishes, refresh the
+site and check **2.51.0** in the header or tab title.
 
-On Timer, check the two analysis routes beside the current scramble, below the
-last result and on history rows. Use Newest/Oldest and Fastest/Slowest in the
-history footer; the expand icon shows more results. Armed 0.00 and fastest
-valid times stay green in every theme. On short windows, scroll if needed to
-reach both named analysis actions and the history footer.
+Open a case in Method Library, drag the cube, use **Go to move**, and try
+**Reset view**. Practice now includes **Open corner trainer**. No changes to
+browser storage, your backups, or deployment settings are needed.
 
-Select your active scheme and appearance, wait for Saved, then reopen the
-site. These settings should restore. No manual data migration is needed:
-existing storage keys/data version 18 and import/export remain compatible.
-The small workspace-preferences key is created automatically on saving.
-Dependencies and deployment workflow are unchanged.
-
-See `README.md` for behavior and `CHANGELOG.md` / `UI_CHANGES.md` for details.
+See [README.md](README.md) for the app guide and [CHANGELOG.md](CHANGELOG.md)
+for the release history.

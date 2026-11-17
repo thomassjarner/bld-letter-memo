@@ -9,6 +9,7 @@ from ui.theme_colors import ThemeAwarePage
 @ft.control
 class PracticeHubPage(ThemeAwarePage, ft.Column):
     open_timer_callback = None
+    open_trainer_callback = None
     open_memo_callback = None
     open_scheme_callback = None
 
@@ -31,14 +32,22 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.mode = "menu"
         self.scroll = ft.ScrollMode.AUTO
         self.spacing = 12
+        activities = [
+            activity_card("Blind Timer", "Time a blind solve and compare it with your session history.",
+                          ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback(),
+                          "Timed solves", feature="timer"),
+            activity_card("Progressive Memo", "Memo a scramble one pair at a time, then type what you remember.",
+                          ft.Icons.PSYCHOLOGY, "Open Progressive Memo", self.open_progressive,
+                          "Letter recall", feature="progressive"),
+            activity_card("3-style corner trainer", "Choose corner cases, recall their algorithms, then retry the ones you missed.",
+                          ft.Icons.SCHOOL_OUTLINED, "Open corner trainer", lambda e: self.open_trainer_callback(),
+                          "Algorithm recall", feature="trainer"),
+        ]
+        for card in activities:
+            card.col = {"xs": 12, "md": 6, "lg": 4}
         self.controls = [
-            page_heading("Practice", "Choose a training session. Your scheme and saved preferences carry through."),
-            ft.ResponsiveRow([
-                activity_card("Blind Timer", "Generate scrambles, time full blind attempts, and review your session history.",
-                              ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback(), feature="timer"),
-                activity_card("Progressive Memo", "Memo a real scramble one pair at a time, then type your recall and check your accuracy.",
-                              ft.Icons.PSYCHOLOGY, "Open Progressive Memo", self.open_progressive, feature="progressive"),
-            ], spacing=12, run_spacing=12),
+            page_heading("Practice", "Choose what to train: complete solves, memo, or corner algorithms."),
+            ft.ResponsiveRow(activities, spacing=12, run_spacing=12),
             ft.ExpansionTile(title=ft.Text("More practice modes", size=14, color=ft.Colors.ON_SURFACE),
                 subtitle=ft.Text("Planned activities", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 expanded=False, maintain_state=True, dense=True, tile_padding=0, controls_padding=8,
@@ -49,8 +58,6 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
                 activity_card("Letter Pair Drill", "Build fast, reliable pair-to-word recall from your dictionary.",
                               ft.Icons.BOLT, "Coming soon", enabled=False, feature="drill"),
             ], spacing=12, run_spacing=12)]),
-            ft.Text("Blind Timer and Progressive Memo are ready. Delayed Recall and Letter Pair Drill are planned.",
-                    size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
         if update and self.page is not None:
             self.update()

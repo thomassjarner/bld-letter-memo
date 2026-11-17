@@ -28,7 +28,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.50.0"
+    page.title = "BLD Letter Memo · 2.51.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -103,6 +103,7 @@ async def main(page: ft.Page):
         else:
             navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name))
 
+    practice_page.open_trainer_callback = lambda: open_home_destination("3-style corner trainer")
     home_page = build_home(open_home_destination, data=state)
     pages = [home_page, schemes_page, pairs_page, scramble_page, method_page, practice_page, timer_page, settings_page]
     content_area.content = home_page
@@ -141,7 +142,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.50.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.51.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 

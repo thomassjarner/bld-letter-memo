@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.50.0**.
+or as a desktop app. Current version: **2.51.0**.
 
 ## Workspaces
 
@@ -17,8 +17,8 @@ or as a desktop app. Current version: **2.50.0**.
 - **Method Library** — browse 378 UFR 3-style corner cases, save preferred
   algorithms, use linked move/commutator fields, explore arbitrary algorithms
   in the Playground, watch a Scramble walkthrough and train case recall.
-- **Practice** — train Progressive Memo with real scrambles, typed recall,
-  accuracy feedback and saved attempts. Blind Timer is also accessible here.
+- **Practice** — open Blind Timer for timed solves, Progressive Memo for letter
+  recall, or the 3-style corner trainer for algorithm recall.
 - **Timer** — a dedicated destination with sessions, history, averages and
   full-cube, edges-only and corners-only training.
 - **Settings** — five light color themes, dark mode, playback preferences, browser-data management and
@@ -151,8 +151,9 @@ the release does not edit those messages or force external cache refreshes.
 
 ## 3-style corner trainer
 
-Open **Method Library → Corner trainer** (or the overview's **Open corner
-trainer** card). This trainer uses the same fixed **UFR buffer** case library.
+Open **Practice → Open corner trainer**, **Method Library → Corner trainer**,
+or the trainer shortcut on Home. All three open the same **UFR buffer**
+trainer and keep its current session.
 
 1. Choose one or more target-layer subsets (U/U, U/D, D/U, D/D), optional first
    and second target stickers, and learning statuses. Target choices show your
@@ -360,7 +361,26 @@ remains visible while your final moves stay authoritative and usable. Edits
 remain drafts until you explicitly save them. There is no new setting or data
 migration for bracket assistance.
 
+## Finding and editing corner cases
+
+Both target filters in **Method Library → 3-style corner cases** show your scheme
+letter alongside the sticker ID (for example, **Æ · UBL**). An unassigned sticker
+keeps its ID. **Clear filters** removes the search and filters together without
+changing the case or the draft in the editor.
+
+The editor shows **Unsaved edit** when the notation or algorithm name differs
+from the selected alternative. **Restore** puts that alternative back into both
+linked fields and restores its name. It does not change the preferred algorithm
+or write to your library. Use **Save & use my alg** to keep an edit.
+
 ## Algorithm playback
+
+Play and the step controls sit directly below the cube. Select a turn on the
+**Go to move** line to pause just before it, then press Play to study it again.
+Paired simultaneous turns act as one step. The **Notation** line tracks the
+written commutator. **Reset view**, beside the display switches, restores the
+3D camera without changing the current move. A hidden algorithm also hides
+its move and notation lines.
 
 Every Method Library cube can show commutator notation beneath the move list.
 A and B use distinct colours; the current written move is underlined and
@@ -398,6 +418,10 @@ updates retain the existing persistence format and storage keys.
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
+
+To measure cube frame preparation and patch encoding locally, run
+`python tools/benchmark_cube.py` with the normal app dependencies installed.
+The timings cover the renderer and Flet updates, not display FPS.
 
 | Folder | Purpose |
 | --- | --- |

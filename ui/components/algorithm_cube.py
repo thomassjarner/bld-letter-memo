@@ -9,8 +9,9 @@ import flet.canvas as cv
 from core.algorithms import Algorithm, Stage, algorithm_states, changed_stickers, normalized_state, parse_algorithm, simplified_algorithm
 from core.algorithm_playback import playback_steps
 from core.commutator_playback import align_notation, commutator_study
-from core.tracer import _key, _orient, _solved
+from core.tracer import _key, _solved
 from ui.components.cube_projection import project_cube
+from ui.components.cube_painter import CubePainter
 from ui.theme_colors import apply_palette
 
 TARGET_FPS = 60
@@ -24,6 +25,7 @@ class AlgorithmCube(ft.Column):
         self.original_algorithm = None
         self.simultaneous_moves = False
         self._steps = ()
+        self._sequence_generation = 0
         self._preserve_stages = False
         self._stage_targets = {}
         self._stage_focus = {}
@@ -68,25 +70,47 @@ class AlgorithmCube(ft.Column):
             visual_density=ft.VisualDensity.COMPACT, label_style=ft.TextStyle(size=11),
             tooltip='Study the original setup and A/B stages. Clean execution is the default.', on_change=self._change_structure)
         self.canvas = cv.Canvas(width=460, height=300)
+        self.canvas._cube_fixed_paints = True
+        self._painter = CubePainter(self.canvas)
         self.drag_area = ft.Container(width=460, height=300, bgcolor=ft.Colors.TRANSPARENT)
-        self.canvas.content = ft.GestureDetector(content=self.drag_area,
-            on_pan_start=self._drag_start, on_pan_update=self._drag,
-            on_pan_end=self._drag_end, on_pan_cancel=self._drag_end, drag_interval=16)
+        def camera_event(callback):
+            def handle(event):
+                # This gesture already coalesces its own canvas-only frames.
+                # The default Flet after-event update would walk the page too.
+                ft.context.disable_auto_update()
+                callback(event)
+            return handle
+        self.canvas.content = ft.GestureDetector(content=self.drag_area, mouse_cursor=ft.MouseCursor.GRAB,
+            on_pan_start=camera_event(self._drag_start), on_pan_update=camera_event(self._drag),
+            on_pan_end=camera_event(self._drag_end), on_pan_cancel=camera_event(self._drag_end), drag_interval=16)
         def icon_button(icon, tooltip, callback):
             return ft.IconButton(icon, tooltip=tooltip, on_click=callback,
                                  icon_size=18, width=32, height=32, padding=4)
         self.play_button = icon_button(ft.Icons.PLAY_ARROW, 'Play / pause', self._toggle)
-        self.counter = ft.Text('0 / 0', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.speed = ft.Dropdown(value='.6', width=108, height=36, dense=True, text_size=12,
+        self.play_button.style = ft.ButtonStyle(
+            color={ft.ControlState.DEFAULT: ft.Colors.ON_PRIMARY_CONTAINER,
+                   ft.ControlState.DISABLED: ft.Colors.ON_SURFACE_VARIANT},
+            bgcolor={ft.ControlState.DEFAULT: ft.Colors.PRIMARY_CONTAINER,
+                     ft.ControlState.DISABLED: ft.Colors.SURFACE_CONTAINER_HIGH},
+            shape=ft.RoundedRectangleBorder(radius=8))
+        self.reset_view = ft.TextButton('Reset view', icon=ft.Icons.CENTER_FOCUS_STRONG,
+            tooltip='Restore the front, right and upper view without restarting the algorithm.',
+            height=32, on_click=self._reset_camera)
+        self.display_switches.spacing = 6
+        self.display_switches.controls.append(self.reset_view)
+        self.counter = ft.Text('0 / 0', size=12, color=ft.Colors.ON_SURFACE_VARIANT, tooltip='Moves completed')
+        self.speed = ft.Dropdown(value='.6', width=106, height=36, dense=True, text_size=12,
+            content_padding=ft.Padding.symmetric(horizontal=8, vertical=3),
             tooltip='Playback speed',
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             options=[ft.DropdownOption('.3', 'Fast'), ft.DropdownOption('.6', 'Normal'), ft.DropdownOption('1.2', 'Slow')])
-        self.playback_mode = ft.Dropdown(value='full', width=145, height=36, dense=True, text_size=12,
+        self.playback_mode = ft.Dropdown(value='full', width=138, height=36, dense=True, text_size=12,
+            content_padding=ft.Padding.symmetric(horizontal=8, vertical=3),
             color=ft.Colors.ON_SURFACE, visible=False,
             options=[ft.DropdownOption('full', 'Full alg'), ft.DropdownOption('components', 'Components')],
             tooltip='Components pauses after each written commutator part. Switching mode restarts the current alg.',
             on_select=self._change_playback_mode)
-        self.move_text = ft.Text('', size=13, font_family='monospace', color=ft.Colors.ON_SURFACE)
+        self.move_text = ft.Text('', size=14, font_family='monospace', color=ft.Colors.ON_SURFACE)
         self.notation_text = ft.Text('', size=13, font_family='monospace', selectable=True,
                                     color=ft.Colors.ON_SURFACE, visible=False)
         self.component_status = ft.Text('', size=11, color=ft.Colors.ON_SURFACE_VARIANT, visible=False)
@@ -102,22 +126,25 @@ class AlgorithmCube(ft.Column):
         self.view_options = ft.ExpansionTile(title=ft.Text('View options & stages', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             dense=True, min_tile_height=34, tile_padding=0, controls_padding=ft.Padding.only(bottom=4),
             maintain_state=True, expanded_cross_axis_alignment=ft.CrossAxisAlignment.START,
-            controls=[ft.Row([self.mode_picker,
-                    icon_button(ft.Icons.RESTART_ALT, 'Reset camera', self._reset_camera)], spacing=4, wrap=True),
-                      ft.Text('Drag the 3D cube to rotate the view.', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            controls=[ft.Row([self.mode_picker, ft.Text('Drag the 3D cube to look around.', size=11,
+                          color=ft.Colors.ON_SURFACE_VARIANT, expand=True)], spacing=8),
                       ft.Row([self.structure_switch], tight=True), self.stage_text, self.stage_buttons])
-        self.controls = [
-            self.canvas,
-            self.display_switches,
-            self.stage_status,
-            ft.Row([icon_button(ft.Icons.FIRST_PAGE, 'First move', lambda e: self.seek(0)),
+        timeline = ft.Row([icon_button(ft.Icons.FIRST_PAGE, 'First move', lambda e: self.seek(0)),
                     icon_button(ft.Icons.CHEVRON_LEFT, 'Previous move', lambda e: self._step(-1)),
                     self.play_button,
                     icon_button(ft.Icons.CHEVRON_RIGHT, 'Next move', lambda e: self._step(1)),
-                    icon_button(ft.Icons.LAST_PAGE, 'Last move', lambda e: self.seek(len(self.states) - 1)),
-                    self.counter, self.speed, self.playback_mode], spacing=2, run_spacing=2, wrap=True),
-            self.move_text, self.notation_text, self.component_status, self.view_options,
-        ]
+                    icon_button(ft.Icons.LAST_PAGE, 'Last move', lambda e: self.seek(len(self.states) - 1))],
+                    spacing=2, tight=True)
+        self.transport = ft.Row([timeline, self.counter, self.speed, self.playback_mode], spacing=8, run_spacing=4, wrap=True)
+        def track_row(name, text, tip):
+            text.expand = True
+            return ft.Row([ft.Text(name, size=11, width=63, tooltip=tip, color=ft.Colors.ON_SURFACE_VARIANT),
+                           text], vertical_alignment=ft.CrossAxisAlignment.START, spacing=6)
+        self.notation_row = track_row('Notation', self.notation_text, 'Written commutator. The highlight follows the move above.')
+        self.move_row = track_row('Go to move', self.move_text, 'Select a move to pause just before it.')
+        self.track = ft.Column([self.move_row, self.notation_row, self.component_status], spacing=3, tight=True)
+        self.controls = [self.canvas, self.stage_status, self.transport, self.track,
+                         self.display_switches, self.view_options]
         self._redraw(update=False)
 
     def _page(self):
@@ -174,6 +201,7 @@ class AlgorithmCube(ft.Column):
     def component_mode(self): return self.playback_mode.value == 'components'
 
     def _rebuild_steps(self):
+        self._sequence_generation += 1
         grouping = self.algorithm
         if grouping is not None and self.component_mode:
             grouping = Algorithm(grouping.source, grouping.moves,
@@ -281,20 +309,7 @@ class AlgorithmCube(ft.Column):
             letters=self.letter_switch.value, focus=self.focus_switch.value,
             targets=self.targets, affected=self.affected, moving=self._moving, fraction=self._fraction,
             edge_colors=self.edge_colors, buffer=self.buffer, highlight_stickers=highlights)
-        shapes = []
-        for tile in tiles:
-            elements = [cv.Path.MoveTo(*tile.points[0]), *[cv.Path.LineTo(*p) for p in tile.points[1:]], cv.Path.Close()]
-            shapes.append(cv.Path(elements=elements, paint=ft.Paint(color=tile.color)))
-            shapes.append(cv.Path(elements=elements, paint=ft.Paint(color=tile.outline,
-                style=ft.PaintingStyle.STROKE, stroke_width=2 if tile.outline != '#0A0F0D' else .8)))
-            if tile.label:
-                x = sum(p[0] for p in tile.points) / 4
-                y = sum(p[1] for p in tile.points) / 4
-                side = min(math.dist(tile.points[i], tile.points[(i + 1) % 4]) for i in range(4))
-                shapes.append(cv.Text(x, y, tile.label, alignment=ft.Alignment.CENTER,
-                    style=ft.TextStyle(color=tile.foreground, size=max(9, min(20, side * (.38 if len(tile.label) == 1 else .25))),
-                                       weight=ft.FontWeight.W_600)))
-        self.canvas.shapes = shapes
+        self._painter.draw(tiles, net=self.mode_picker.value == '2D')
         caption_key = (id(self.algorithm), self.index, self.simultaneous_moves, self._boundary_stage, self._boundary_component)
         if caption_key != self._caption_key:
             self._caption_key = caption_key
@@ -303,6 +318,7 @@ class AlgorithmCube(ft.Column):
             self._update()
 
     def _render_caption(self):
+        self.set_sequence_visible(self.move_text.visible)
         self.counter.value = f'{self.index} / {len(self.states) - 1}'
         if self.algorithm:
             stage = next((s.label for s in self.algorithm.stages if s.start <= self.index < s.end), 'Finished')
@@ -318,7 +334,10 @@ class AlgorithmCube(ft.Column):
                 'Continue · ' + following.label if following is not None else 'Continue')
             active_stage = self._active_stage()
             highlight = max(0, self.index - 1) if self._boundary_stage or self._boundary_component or self.index == len(self.states) - 1 else self.index
-            self.move_text.spans = [ft.TextSpan(step.caption + ' ', style=ft.TextStyle(
+            self.move_text.spans = [ft.TextSpan(step.caption + ' ',
+                semantics_label=f'Jump to move {step.start + 1}: {step.caption}',
+                on_click=lambda e, index=step.start, gen=self._sequence_generation: self._seek_from_track(index, gen),
+                style=ft.TextStyle(
                 weight=ft.FontWeight.BOLD if step.start <= highlight < step.end else ft.FontWeight.NORMAL,
                 decoration=ft.TextDecoration.UNDERLINE if step.start <= highlight < step.end else None,
                 bgcolor=ft.Colors.PRIMARY_CONTAINER if step.start <= highlight < step.end else None,
@@ -330,6 +349,15 @@ class AlgorithmCube(ft.Column):
                 for step in self._steps if not self._preserve_stages or active_stage is not None
                 and active_stage.start <= step.start < active_stage.end]
             self._render_notation(highlight)
+            self.notation_row.visible = self.notation_text.visible
+
+    def set_sequence_visible(self, visible):
+        self.move_text.visible = bool(visible)
+        self.track.visible = bool(visible and self._steps)
+
+    def _seek_from_track(self, index, generation):
+        if self.track.visible and generation == self._sequence_generation:
+            self.seek(index)
 
     def _render_notation(self, highlight):
         parent = self._active_stage() if self._preserve_stages else None
@@ -459,6 +487,8 @@ class AlgorithmCube(ft.Column):
         self._drag_last_paint = float('-inf')
 
     def _change_view_mode(self, e=None):
+        self.reset_view.visible = self.mode_picker.value == '3D'
+        self.canvas.content.mouse_cursor = ft.MouseCursor.GRAB if self.reset_view.visible else ft.MouseCursor.BASIC
         self._cancel_drag()
         self._redraw()
 

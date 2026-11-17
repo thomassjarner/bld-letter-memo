@@ -49,6 +49,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.active = False
         self._loaded_key = None
         self._editor_key = None
+        self._editor_base = None
+        self._target_options_key = None
         self._identified = None
         self.browser_title = None
         self.mobile_browser = None
@@ -84,6 +86,12 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             on_change=self._filter_expanded)
         self.case_list = ft.ListView(height=320, spacing=2, scroll=ft.ScrollMode.ALWAYS)
         self.list_meta = ft.Text('', size=11, height=16, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.list_meta.expand = True
+        self.list_meta.max_lines = 1
+        self.list_meta.overflow = ft.TextOverflow.ELLIPSIS
+        self.clear_filters = ft.TextButton('Clear filters', tooltip='Clear all case filters', height=28,
+            on_click=self._clear_filters, style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=5)))
+        self.list_summary = ft.Row([self.list_meta, self.clear_filters], height=28, spacing=3)
         self.more_button = ft.TextButton('More cases', height=32, on_click=self._more)
         self.scheme_picker = dropdown(label='Letter labels', value=self.label_scheme, width=230,
                                       height=42, dense=True, on_select=self._choose_scheme)
@@ -95,7 +103,13 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.playground_converter.on_result = self._playground_input_changed
         self.algorithm_field = self.case_converter.final_alg
         self.explorer_field = self.playground_converter.final_alg
-        self.name_field = field(label='Algorithm name (optional)', value='My alg', height=38, dense=True)
+        self.name_field = field(label='Algorithm name (optional)', value='My alg', height=38, dense=True,
+                                on_change=self._name_edited)
+        self.restore_draft = ft.TextButton('Restore', height=28, on_click=self._restore_selected,
+            tooltip='Discard this edit and restore the selected alternative.',
+            style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=6)))
+        self.draft_actions = ft.Row([ft.Text('Unsaved edit', size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                                     self.restore_draft], visible=False, tight=True, spacing=4)
         self.selected_playground = None
         self._loaded_playground_record = None
         self._playground_analysis_source = None
@@ -191,6 +205,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         except RuntimeError: return None
 
     def _update(self):
+        if self.mode == 'library': self._sync_draft_badge()
         self.error.visible = bool(self.error.value)
         self.notice.visible = bool(self.notice.value)
         self.viewer.dark_mode = self.state.data.dark_mode
@@ -203,7 +218,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         return self.state.data.schemes.get(self.label_scheme)
 
     def record(self, key=None):
-        return self.state.data.corner_case_library.get(key or self.selected_case, CornerCaseRecord())
+        existing = self.state.data.corner_case_library.get(key or self.selected_case)
+        return existing if existing is not None else CornerCaseRecord()
 
     def _label(self, case):
         letters = case_letters(case, self.scheme)
@@ -212,23 +228,44 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
     def filtered_cases(self):
         search = (self.search.value or '').strip().casefold()
         matches = []
+        records = self.state.data.corner_case_library
         for case in self.cases.values():
-            record = self.record(case.id)
             if self.subset.value != 'all' and case.subset != self.subset.value: continue
             if self.first_target.value != 'all' and case.first != self.first_target.value: continue
             if self.second_target.value != 'all' and case.second != self.second_target.value: continue
-            if self.status_filter.value != 'all' and record.status != self.status_filter.value: continue
-            if self.favorites.value and not record.favorite: continue
-            text = f'{case.id} {case.first} {case.second} {self._label(case)} {case_letters(case, self.scheme)}'.casefold()
-            if search and search not in text: continue
+            if self.status_filter.value != 'all' or self.favorites.value:
+                record = records.get(case.id)
+                if self.favorites.value and not (record and record.favorite): continue
+                if self.status_filter.value not in ('all', record.status if record else 'new'): continue
+            if search:
+                letters = case_letters(case, self.scheme)
+                display = self.state.get_pair_display(letters) if '?' not in letters else f'{case.first} / {case.second}'
+                if search not in f'{case.id} {case.first} {case.second} {display} {letters}'.casefold(): continue
             matches.append(case)
         return matches
+
+    def _update_target_options(self):
+        stickers = self.scheme.corners.stickers if self.scheme else {}
+        letters = tuple(stickers.get(s, '') for s in TARGETS)
+        if letters == self._target_options_key: return
+        self._target_options_key = letters
+        for picker, title in ((self.first_target, 'Any first target'), (self.second_target, 'Any second target')):
+            picker.options = [ft.DropdownOption('all', title)] + [
+                ft.DropdownOption(s, f'{letter} · {s}' if letter and letter != 'BUFFER' else s)
+                for s, letter in zip(TARGETS, letters)]
+
+    def _reset_filter_values(self):
+        self.search.value = ''
+        self.subset.value = self.first_target.value = self.second_target.value = self.status_filter.value = 'all'
+        self.favorites.value = False
+
+    def _clear_filters(self, e=None):
+        self._reset_filter_values()
+        self._filter_changed()
 
     def _filter_changed(self):
         self.limit = 50
         self._render_list()
-        if self.browser_title is not None:
-            self.browser_title.value = f'Browse cases · {len(self.filtered_cases())} matching'
         self._update()
 
     def _filter_expanded(self, e):
@@ -242,8 +279,16 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self._update()
 
     def _render_list(self):
+        self._update_target_options()
         matches = self.filtered_cases()
-        self.list_meta.value = f'{len(matches)} matching · {sum(self.record(c.id).status == "learned" for c in self.cases.values())} / 378 learned'
+        self.match_count = len(matches)
+        learned = sum(r.status == 'learned' for key, r in self.state.data.corner_case_library.items() if key in self.cases)
+        self.clear_filters.visible = bool(self.search.value or self.favorites.value or any(
+            f.value != 'all' for f in (self.subset, self.first_target, self.second_target, self.status_filter)))
+        self.list_meta.tooltip = f'{len(matches)} matching · {learned} / 378 learned'
+        self.list_meta.value = f'{len(matches)} matching' if self.clear_filters.visible else self.list_meta.tooltip
+        if self.browser_title is not None:
+            self.browser_title.value = f'Browse cases · {self.match_count} matching'
         rows = []
         for case in matches[:self.limit]:
             record = self.record(case.id)
@@ -278,8 +323,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self.mobile_browser.expanded = False
         self.error.value = self.notice.value = ''
         self._render_library()
-        self.viewer.index = 0
-        self.viewer._redraw(update=False)
+        if self.viewer.index:  # A different source already starts at zero.
+            self.viewer.seek(0)
         self._update()
         if self._page() is not None:
             self._page().run_task(self._reveal_case_editor if edit else self._reset_case_scroll, self._navigation_token)
@@ -321,13 +366,14 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
 
     def _load_viewer(self, source, initial, targets=(), identity=None):
         key = (source, identity)
-        if key != self._loaded_key:
-            self.viewer.load(parse_algorithm(source), initial=initial, scheme=self.scheme, targets=targets)
-            self._loaded_key = key
         self.viewer.scheme = self.scheme
         self.viewer.dark_mode = self.state.data.dark_mode
         self.viewer.play_button.disabled = False
-        self.viewer._redraw(update=False)
+        if key != self._loaded_key:
+            self.viewer.load(parse_algorithm(source), initial=initial, scheme=self.scheme, targets=targets)
+            self._loaded_key = key
+        else:
+            self.viewer._redraw(update=False)
 
     def _render_library(self):
         self._render_list()
@@ -342,27 +388,26 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         if not changed_variant:
             self.case_converter.sync(notify=False)
         preview_source = self.case_converter.source if not changed_variant and self.case_converter.algorithm is not None else source
-        parsed = parse_algorithm(case.starter)
-        initial = inverse_state(normalized_state(parsed))
-        try:
-            candidate = parse_algorithm(preview_source)
-            if identify_case(candidate) != case.id:
-                raise ValueError('Saved algorithm solves another case. Edit it before using it.')
-            if changed_variant or self._loaded_key != (preview_source, case.id):
+        if self._loaded_key != (preview_source, case.id):
+            initial = inverse_state(normalized_state(parse_algorithm(case.starter)))
+            try:
+                if identify_case(parse_algorithm(preview_source)) != case.id:
+                    raise ValueError('Saved algorithm solves another case. Edit it before using it.')
                 self._load_viewer(preview_source, initial, (case.first, case.second), case.id)
-        except ValueError as ex:
-            self.error.value = str(ex) + ' Showing the most-popular BLDDB algorithm.'
-            self._load_viewer(builtins[0].alg, initial, (case.first, case.second), case.id)
+            except ValueError as ex:
+                self.error.value = str(ex) + ' Showing the most-popular BLDDB algorithm.'
+                self._load_viewer(builtins[0].alg, initial, (case.first, case.second), case.id)
+        self._editor_base = source, name if personal else 'My alg'
         if changed_variant:
             self.case_converter.load(source)
-            self.name_field.value = name if personal else 'My alg'
+            self.name_field.value = self._editor_base[1]
             self._editor_key = editor_key
         self.viewer.scheme = self.scheme
         self.viewer.dark_mode = self.state.data.dark_mode
-        self.viewer._redraw(update=False)
         self.case_converter.visible = not self.hidden
         self.algorithm_field.visible = self.case_converter.commutator.visible = not self.hidden
-        self.viewer.move_text.visible = not self.hidden
+        self.viewer.set_sequence_visible(not self.hidden)
+        self._sync_draft_badge()
         recommended = builtins[0]
         options = [ft.DropdownOption('', recommended.name + ' · most popular'
                     + (' · preferred' if not record.preferred_algorithm else ''))]
@@ -421,7 +466,8 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             visible=not self.hidden, spacing=8, tight=True,
             controls=[
                 ft.Row([ft.Icon(ft.Icons.EDIT_OUTLINED, size=17, color=ft.Colors.PRIMARY),
-                        ft.Text('Edit / replace alg', size=13, color=ft.Colors.ON_SURFACE)], spacing=6),
+                        ft.Text('Edit / replace alg', size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                        self.draft_actions], wrap=True, run_spacing=2, spacing=6),
                 self.case_converter, self.name_field,
                 ft.Row([ft.FilledButton('Save changes & use' if personal else 'Save & use my alg',
                                        on_click=lambda e, update=bool(personal): self._save_algorithm(update)),
@@ -457,6 +503,21 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             ft.Column(self.tool_controls, spacing=8, tight=True), self.case_details]
         self.error.visible, self.notice.visible = bool(self.error.value), bool(self.notice.value)
         self._layout()
+
+    def _sync_draft_badge(self):
+        self.draft_actions.visible = (self._editor_base is not None and self._editor_base !=
+                                      (self.case_converter.source, self.name_field.value or ''))
+
+    def _name_edited(self, e):
+        self._sync_draft_badge()
+        if self._page() is not None: self.draft_actions.update()
+
+    def _restore_selected(self, e=None):
+        if self.mode != 'library' or not self.draft_actions.visible: return
+        self._editor_key = None
+        self.error.value, self.notice.value = '', 'Restored the selected algorithm.'
+        self._render_library()
+        self._update()
 
     def _choose_variant(self, e):
         self.case_converter.cancel_pending()
@@ -562,7 +623,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
             self._analysis = self._identified = None
             self._playground_analysis_source = None
             self._load_viewer("R R'", None, (), 'playground-empty')
-            self.viewer.move_text.visible = False
+            self.viewer.set_sequence_visible(False)
             self.effect_area.controls = [ft.Text('Paste a commutator or final alg to inspect its effect.',
                 size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
             self.explorer_effect.value = ''
@@ -573,7 +634,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 targets = tuple(self._identified.split(':')) if self._identified else ()
                 self._load_viewer(source, None, targets, 'playground')
                 self._playground_analysis_source = source
-            self.viewer.move_text.visible = True
+            self.viewer.set_sequence_visible(True)
             self._render_effect()
         valid = converter.algorithm is not None
         self.viewer.play_button.disabled = not valid
@@ -755,9 +816,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         self.playground_converter.cancel_pending()
         matches = self.filtered_cases()
         if not any(case.id == key for case in matches):
-            self.search.value = ''
-            self.subset.value = self.first_target.value = self.second_target.value = self.status_filter.value = 'all'
-            self.favorites.value = False
+            self._reset_filter_values()
             matches = self.filtered_cases()
         index = next(i for i, case in enumerate(matches) if case.id == key)
         self.limit = max(self.limit, min(len(matches), (index // 50 + 1) * 50))
@@ -780,7 +839,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         alg = parse_algorithm(BASE_ALG)
         key = identify_case(alg)
         case = self.cases[key]
-        self.viewer.move_text.visible = True
+        self.viewer.set_sequence_visible(True)
         self._load_viewer(BASE_ALG, inverse_state(normalized_state(alg)), (case.first, case.second), 'lesson')
         self.detail_controls = [
             ft.Text('Your first commutator', size=20, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
@@ -952,9 +1011,9 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
         sidebar_width, gap, padding = 244, 10, 10
         detail_width = width - sidebar_width - gap if wide else width
         inner_width = detail_width - padding * 2
-        self.case_list.height = max(72, available - 294 - (86 if self.filter_more.expanded else 0)) if wide else 180
+        self.case_list.height = max(72, available - 306 - (86 if self.filter_more.expanded else 0)) if wide else 180
         sidebar_content = ft.Column([self.search, self.subset, self.first_target, self.second_target,
-            self.filter_more, self.list_meta, self.case_list, self.more_button], spacing=6, tight=True)
+            self.filter_more, self.list_summary, self.case_list, self.more_button], spacing=6, tight=True)
         if wide and inner_width >= 760:
             # Keep only algorithm work in the wider right pane. Case metadata
             # uses the room under the compact cube in the left pane.
@@ -1000,7 +1059,7 @@ class CaseLibraryPage(ThemeAwarePage, ft.Column):
                 self.mobile_browser = ft.ExpansionTile(title=self.browser_title, dense=True,
                     min_tile_height=38, tile_padding=ft.Padding.symmetric(horizontal=6),
                     expanded_cross_axis_alignment=ft.CrossAxisAlignment.START, maintain_state=True)
-            self.browser_title.value = f'Browse cases · {len(self.filtered_cases())} matching'
+            self.browser_title.value = f'Browse cases · {self.match_count} matching'
             if self.mobile_sidebar is None:
                 self.mobile_sidebar = ft.Column(spacing=6, tight=True)
             self.mobile_sidebar.controls = sidebar_content.controls

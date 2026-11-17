@@ -6,6 +6,7 @@ No application data or persistent settings are traversed or changed.
 """
 from dataclasses import fields, is_dataclass
 from enum import Enum
+from functools import lru_cache
 
 import flet as ft
 from ui.design import build_theme
@@ -50,15 +51,21 @@ def _defaults(control):
             }
 
 
+@lru_cache(maxsize=12)
+def _resolved_palette(dark, light_theme):
+    scheme = build_theme(dark, light_theme).color_scheme
+    palette = {f.name.replace('_', ''): getattr(scheme, f.name)
+               for f in fields(scheme) if getattr(scheme, f.name) is not None}
+    palette[SUCCESS_COLOR] = success_color(dark)
+    return palette
+
+
 def apply_palette(root, dark, light_theme=None):
     # Playback updates a few existing text controls between full page updates.
     # Retain their parent's last palette so newly built spans use that palette.
     light_theme = normalize_light_theme(light_theme if light_theme is not None else
                                        getattr(root, '_bld_light_theme', DEFAULT_LIGHT_THEME))
-    scheme = build_theme(dark, light_theme).color_scheme
-    palette = {f.name.replace('_', ''): getattr(scheme, f.name)
-               for f in fields(scheme) if getattr(scheme, f.name) is not None}
-    palette[SUCCESS_COLOR] = success_color(dark)
+    palette = _resolved_palette(dark, light_theme)
     seen = set()
 
     def resolve(value):
@@ -89,6 +96,8 @@ def apply_palette(root, dark, light_theme=None):
             name = field.name
             if name.startswith('_') or name in ('data', 'parent', 'theme', 'dark_theme'):
                 continue
+            if name == 'shapes' and getattr(obj, '_cube_fixed_paints', False):
+                continue  # Cube stickers and outlines are physical colors in every theme.
             value = getattr(obj, name)
             if name == 'color' or name.endswith('color'):
                 previous = roles.get(name)

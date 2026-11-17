@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.51.0
+
+- The shared cube renderer now draws visible, rigid layers and updates existing
+  canvas paths and labels in place. Camera drag events no longer trigger a
+  redundant page update; joins between turning slices remain visible in dark mode.
+- Playback controls sit under the cube. Select a move to pause before it or
+  use Reset view to restore the camera without losing your place. Hidden
+  algorithms also hide the written notation.
+- The case filters show scheme letters and sticker IDs and can be cleared
+  together. The algorithm editor distinguishes an unsaved edit from the selected
+  alternative and can restore the selected source and name without saving.
+- Practice links directly to the existing 3-style corner trainer alongside
+  Blind Timer and Progressive Memo. No new storage keys, dependencies or migration.
+- See UI_CHANGES.md for validation and the scope of the performance comparison.
+
 ## 2.50.0
 
 - Added separate **Scramble Memo** and **3-style corner analysis** actions for

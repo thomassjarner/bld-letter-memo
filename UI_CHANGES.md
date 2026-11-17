@@ -1,3 +1,48 @@
+# Smoother cube and faster case study — 2.51.0
+
+- Drag to look around in 3D. The viewer draws only the visible surfaces of the
+  layers in a turn. Paths and labels stay mounted between frames; colors and
+  coordinates update in place. Physical colors and piece highlights follow
+  the scheme and the same solver state as before. Thin exposed slice surfaces
+  stay visible against the dark background.
+- Playback sits directly under the cube. Select a turn on **Go to move** to
+  pause immediately before it. **Notation** identifies the written commutator.
+  The move list and notation hide together for self-testing. Reset view is
+  beside the display switches and leaves the move counter alone.
+- Both case target selectors pair your scheme letters with the sticker IDs.
+  Clear filters keeps the current case and draft. An unsaved algorithm or name
+  shows **Unsaved edit**; **Restore** reloads the selected alternative. Favorite
+  and status changes no longer reverify an already loaded case.
+- Practice has three direct routes: Blind Timer, Progressive Memo and 3-style
+  corner trainer. The last opens the same trainer as Home and Method Library.
+  Planned activities remain collapsed.
+- Timer, memo, tracing, the BLDDB catalog, saved preferences, storage version
+  and import/export are unchanged. The update uses the usual copy, commit and
+  push workflow.
+
+**Performance check.** The same 600 × 330 viewer and sample sequence were run
+on both releases using the shipped Pyodide Python runtime under Node. Each
+median covers 74 warm frames and includes geometry, Flet diffing and patch
+encoding, with labels enabled. The turn run mixes outer, wide, slice, whole
+cube and simultaneous moves.
+
+| Interaction | 2.50.0 | 2.51.0 | Median patch size, old → new |
+| --- | ---: | ---: | ---: |
+| Camera drag | 43.84 ms | 4.96 ms | 53,187 → 5,306 bytes |
+| Animated turn | 44.67 ms | 4.42 ms | 53,283 → 4,199 bytes |
+
+A typical frame in this sample created 240 new drawing controls in 2.50.0;
+the median in 2.51.0 was zero. These are frame-preparation and transport
+measurements, not physical display FPS. `python tools/benchmark_cube.py`
+runs the same workload with a local Python installation.
+
+All 774 tests pass. Additional checks used the web Python runtime at
+1440 × 900, 390 × 700 and 300 × 480 and exercised dragging while a timed
+algorithm was playing. They verified the final camera and cube state,
+visible controls, scheme labels, preserved data and all five palettes.
+Intermediate cube drawings were inspected separately; end-to-end screen
+refresh on a physical browser/device was not measured.
+
 # Timer actions, sorting and remembered workspace — 2.50.0
 
 The timer now uses the existing memo and walkthrough feature glyphs for its
