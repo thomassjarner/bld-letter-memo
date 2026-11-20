@@ -7,6 +7,8 @@ with an empty one.
 """
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 
 import flet as ft
@@ -23,6 +25,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
     SHADOW_KEY = "bld-letter-memo.app-data.shadow"
     ROLLBACK_KEY = "bld-letter-memo.app-data.rollback"
     PREFERENCES_KEY = "bld-letter-memo.workspace-preferences"
+    CLOUD_CURRENT_KEY = "bld-letter-memo.cloud-local-revision"
     asynchronous_saves = True
 
     def __init__(self, page: ft.Page, prefs: ft.SharedPreferences, initial: AppData, persisted_payload: str | None):
@@ -33,6 +36,10 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
         self._pending_payload: str | None = None
         self._flush_running = False
         self._save_status_callback = None
+        self._idle = asyncio.Event()
+        self._idle.set()
+        self.cloud_anchor = self.cloud_owner = None
+        self._cloud_tracking = None
 
     def on_save_status(self, callback):
         self._save_status_callback = callback
@@ -92,9 +99,26 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
             except Exception:
                 continue
 
+        # Only opt-in cloud copies have a commit marker. An intentional deletion
+        # in such a copy must not be resurrected by a richer old rollback.
+        anchor = owner = None
+        verified = None
+        try:
+            stored = await prefs.get(cls.CLOUD_CURRENT_KEY)
+            mark = json.loads(stored) if isinstance(stored, str) else {}
+            if isinstance(mark,dict) and type(mark.get("account")) is int:
+                owner = mark["account"]
+            for item in candidates:
+                if item[2] in (0, 1) and isinstance(mark.get("account"), int) and isinstance(mark.get("revision"), int) and mark.get("digest") == cls._digest(item[1]):
+                    anchor = (mark["account"], mark["revision"])
+                    verified = item
+                    break
+        except Exception:
+            pass  # Guest storage works even if the optional key is unavailable.
+
         if candidates:
             # Richness first; on ties prefer the primary, then shadow, rollback.
-            data, payload, _ = max(candidates, key=lambda item: (cls._richness(item[0]), -item[2]))
+            data, payload, _ = verified or max(candidates, key=lambda item: (cls._richness(item[0]), -item[2]))
             initial = data
             persisted_payload = payload
             # Heal missing/stale primary and shadow copies in the background.
@@ -125,7 +149,38 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
         except Exception:
             pass
 
-        return cls(page, prefs, initial, persisted_payload)
+        repo = cls(page, prefs, initial, persisted_payload)
+        repo.cloud_anchor,repo.cloud_owner = anchor,owner
+        return repo
+
+    @staticmethod
+    def _digest(text):
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    async def wait_saved(self):
+        await self._idle.wait()
+        if self._pending_payload is not None:
+            raise OSError("Browser save did not finish; cloud sync is paused.")
+
+    def stop_tracking_cloud(self):
+        self._cloud_tracking = None
+
+    async def track_cloud(self, account, revision):
+        await self.wait_saved()
+        self._cloud_tracking = (account, revision)
+        self.cloud_owner = account
+        if self._persisted_payload:
+            await self._mark_cloud_copy(self._persisted_payload)
+
+    async def _put(self,key,value):
+        if await self._prefs.set(key,value) is False:
+            raise OSError("Browser storage rejected the save.")
+
+    async def _mark_cloud_copy(self, payload):
+        account, revision = self._cloud_tracking
+        await self._put(self.CLOUD_CURRENT_KEY, json.dumps({
+            "account": account, "revision": revision, "digest": self._digest(payload)}))
+        self.cloud_anchor = (account, revision)
 
     def load(self) -> AppData:
         return self._data
@@ -134,6 +189,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
         self._data = data
         self._pending_payload = json.dumps(data.to_dict(), ensure_ascii=False)
         if not self._flush_running:
+            self._idle.clear()
             self._flush_running = True
             self._page.run_task(self._flush_pending)
 
@@ -147,14 +203,16 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
                     choices = {name: snapshot.get(name) for name in ('active_scheme', 'dark_mode', 'light_theme')}
                     # Save the small workspace selection first, before rotating
                     # potentially much larger history/algorithm backup copies.
-                    await self._prefs.set(self.PREFERENCES_KEY, json.dumps(choices, ensure_ascii=False))
+                    await self._put(self.PREFERENCES_KEY, json.dumps(choices, ensure_ascii=False))
                     # Preserve the last successfully persisted state before
                     # replacing it, then write two current copies.
                     if self._persisted_payload and self._persisted_payload != payload:
-                        await self._prefs.set(self.ROLLBACK_KEY, self._persisted_payload)
-                    await self._prefs.set(self.STORAGE_KEY, payload)
-                    await self._prefs.set(self.SHADOW_KEY, payload)
+                        await self._put(self.ROLLBACK_KEY, self._persisted_payload)
+                    await self._put(self.STORAGE_KEY, payload)
+                    await self._put(self.SHADOW_KEY, payload)
                     self._persisted_payload = payload
+                    if self._cloud_tracking is not None:
+                        await self._mark_cloud_copy(payload)
                     if self._pending_payload is None:
                         self._status('Saved')
                 except Exception:
@@ -166,5 +224,6 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
                     break
         finally:
             self._flush_running = False
+            self._idle.set()
             # Do not spin forever after a storage exception.  A subsequent user
             # edit will schedule another attempt automatically.

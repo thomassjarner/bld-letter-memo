@@ -3,7 +3,18 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.51.0**.
+or as a desktop app. Current version: **2.52.0**.
+
+## Optional WCA sign-in
+
+Use **Settings → Account & sync → Sign in with WCA** on a configured site. Select
+**Enable sync** to combine this device’s training history with your private cloud
+workspace. Added solves from separate devices are kept. If you edited the same
+letter-pair word differently, you can read both versions and pick one. A WCA
+competition ID is optional. Training and JSON backups still work without signing in.
+
+Site owner: [turn on WCA sign-in](docs/CLOUD_SYNC.md). New deployments default
+to local storage until you connect your own WCA application and sync service.
 
 ## Workspaces
 
@@ -21,8 +32,7 @@ or as a desktop app. Current version: **2.51.0**.
   recall, or the 3-style corner trainer for algorithm recall.
 - **Timer** — a dedicated destination with sessions, history, averages and
   full-cube, edges-only and corners-only training.
-- **Settings** — five light color themes, dark mode, playback preferences, browser-data management and
-  backup import/export.
+- **Settings** — optional WCA sign-in and cloud sync, five light color themes, dark mode, playback preferences and backup import/export.
 
 ## Finding your way around
 
@@ -140,7 +150,9 @@ For a manual static build or a custom domain, run the same step with the actual
 public URL after publishing:
 
 ```bash
-flet publish main.py --base-url /bld-letter-memo/
+python scripts/cloud_build.py --stage build/web-src
+(cd build/web-src && flet publish main.py --base-url /bld-letter-memo/ --distpath ../../dist)
+python scripts/cloud_build.py --output dist
 python scripts/web_metadata.py --output dist --site-url https://thomassjarner.github.io/bld-letter-memo/
 ```
 
@@ -406,7 +418,7 @@ never substituted to provide a commutator display.
 
 ## Saved data
 
-The published web app stores schemes, dictionaries, preferences, algorithm
+By default, the published web app stores schemes, dictionaries, preferences, algorithm
 libraries and training history in that browser for that site. Use
 **Settings → Export backup** and import/export controls to back up or move your
 data. Desktop saves use the system's application-data directory. Application
@@ -417,6 +429,8 @@ updates retain the existing persistence format and storage keys.
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
+# Optional sync service and browser login contract (Node.js 24+)
+node --test cloud/tests/*.test.mjs
 ```
 
 To measure cube frame preparation and patch encoding locally, run
@@ -430,6 +444,8 @@ The timings cover the renderer and Flet updates, not display FPS.
 | `ui/` | Flet pages, shared controls, themes and navigation |
 | `tests/` | Logic, persistence and UI-control regression tests |
 | `tools/` | Maintenance and catalog utilities |
+| `cloud/` | WCA login service, D1 schema, configuration example, and service tests |
+| `web_cloud/` | Static browser sign-in return page and session adapter |
 
 ## Updates and publishing
 
@@ -439,8 +455,7 @@ commands are in [PATCHING.md](PATCHING.md).
 
 The included GitHub Actions workflow publishes `main.py` and deploys to GitHub
 Pages on pushes to `main`. It derives the Pages base URL from the repository
-name. For a manual static build, use
-`flet publish main.py --base-url /your-repo-name/`; the output is in `dist/`.
+name. For a manual static build, follow the staged build example above, using a fresh staging directory and your actual Pages base URL. Staging includes only browser application files, excluding private backend configuration.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency notices.

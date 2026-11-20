@@ -1,5 +1,8 @@
 import flet as ft
 
+from data.cloud_client import BrowserCloud
+from data.cloud_sync import CloudSync
+from data.cloud_endpoint import SYNC_URL
 from data.shared_preferences_repository import SharedPreferencesAppDataRepository
 from ui.design import build_theme, icon_action
 from ui.feature_icons import feature_icon
@@ -28,7 +31,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.51.0"
+    page.title = "BLD Letter Memo · 2.52.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -142,7 +145,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.51.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.52.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 
@@ -280,6 +283,8 @@ async def main(page: ft.Page):
         rebuild_navigation()
     settings_page.navigation_callback = apply_navigation_style
 
+    cloud = None
+
     def navigate_to(index):
         nonlocal current_index, popout_open
         current_index = index
@@ -293,6 +298,8 @@ async def main(page: ft.Page):
         timer_page.set_active(index == TIMER_INDEX)
         practice_page.set_active(index == PRACTICE_INDEX)
         method_page.set_active(index == METHOD_INDEX)
+        if cloud and cloud.ready and index in (HOME_INDEX, SETTINGS_INDEX) and not cloud.differences:
+            cloud.request()
 
     def on_resize(e):
         # Reflow the existing timer body for every size change; its keyboard
@@ -302,9 +309,45 @@ async def main(page: ft.Page):
     state.on_change(lambda: pairs_page.refresh() if content_area.content is pairs_page else None)
     page.on_keyboard_event = lambda e: schemes_page.handle_keyboard_event(e) if content_area.content is schemes_page else None
     page.on_resize = on_resize
+    if SYNC_URL:
+        def app_visibility(e):
+            if cloud and cloud.ready and e.state==ft.AppLifecycleState.RESUME:
+                cloud.request()
+        page.on_app_lifecycle_state_change=app_visibility
     page.add(ft.Stack([content_area, top_nav, sidebar_nav, popout_panel, popout_button],
                       expand=True, fit=ft.StackFit.EXPAND))
     rebuild_navigation()
+
+    async def start_cloud():
+        nonlocal cloud
+        try:
+            client = await BrowserCloud.open()
+            if not client:
+                return
+            cloud = CloudSync(state, repository, client, page.run_task,
+                              safe=lambda: current_index in (HOME_INDEX, SETTINGS_INDEX))
+            settings_page.account.cloud = cloud
+            cloud.changed = lambda: settings_page.account.render(update=current_index==SETTINGS_INDEX)
+            def refresh_workspace():
+                settings_page.dark_mode_switch.value = state.data.dark_mode
+                settings_page.navigation_style_dropdown.value = state.data.navigation_style
+                settings_page.simultaneous_moves_switch.value = state.data.simultaneous_moves
+                settings_page.rating_mode_dropdown.value = state.data.letter_pair_rating_mode
+                settings_page.rating_levels_dropdown.value = str(state.data.rating_color_levels)
+                settings_page._rebuild_rating_palette()
+                settings_page.refresh_appearance()
+                page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
+                page.theme = build_theme(light_theme=state.data.light_theme)
+                rebuild_navigation()
+            cloud.applied = refresh_workspace
+            state.on_save_status(cloud.local_saved)
+            if client.returning: navigate_to(SETTINGS_INDEX)
+            await cloud.initialize()
+        except Exception:
+            settings_page.account.unavailable = "Could not open cloud sync. Your local workspace is still available."
+            settings_page.account.cloud = None
+            settings_page.account.render(update=current_index==SETTINGS_INDEX)
+    if SYNC_URL: page.run_task(start_cloud)
 
 
 def run():

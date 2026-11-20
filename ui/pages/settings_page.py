@@ -4,6 +4,7 @@ from datetime import date
 import flet as ft
 from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
+from ui.components.cloud_account import AccountPanel
 from data.models import AppData
 from data.color_themes import LIGHT_THEMES, light_theme
 from ui.state import AppState
@@ -121,11 +122,12 @@ class SettingsPage(ThemeAwarePage, ft.Column):
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.status_text,
             ], spacing=10, tight=True), col={"xs":12,"lg":6})
+        self.account=AccountPanel(self)
         self.controls = [
-            page_heading("Settings", "Appearance, playback, ratings, and backups."),
+            page_heading("Settings", "Appearance, account sync, playback, and backups."),
             ft.ResponsiveRow([
                 ft.Column([appearance, playback], spacing=12, tight=True, col={"xs":12,"lg":6}),
-                backup,
+                ft.Column([self.account.control, backup],spacing=12,tight=True,col={"xs":12,"lg":6}),
             ], spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.START),
             ratings,
         ]
@@ -274,6 +276,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             title=ft.Text("Import backup?", color=ft.Colors.ON_SURFACE),
             content=ft.Text(
                 "This will replace your current schemes, letter-pair data, timer sessions, practice histories, case library, saved playground algorithms, and settings with the selected backup."
+                + (" Sync is on: these changes will also be compared with your cloud copy." if self.account.cloud and self.account.cloud.consent else "")
             , color=ft.Colors.ON_SURFACE),
             actions=[
                 ft.TextButton("Cancel", on_click=self._close_dialog),

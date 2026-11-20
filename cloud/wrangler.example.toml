@@ -1,0 +1,17 @@
+name = "bld-letter-memo-sync"
+main = "worker/index.mjs"
+compatibility_date = "2025-10-01"
+workers_dev = true
+[vars]
+APP_URL = "https://thomassjarner.github.io/bld-letter-memo/"
+WCA_CLIENT_ID = "replace-with-the-WCA-application-ID"
+[[d1_databases]]
+binding = "DB"
+database_name = "bld-letter-memo"
+database_id = "replace-with-the-D1-database-ID"
+[triggers]
+crons = ["17 3 * * *"]
+[[ratelimits]]
+name = "LOGIN_LIMIT"
+namespace_id = "52520"
+simple = { limit = 25, period = 60 }

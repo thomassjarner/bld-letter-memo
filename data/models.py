@@ -113,9 +113,13 @@ class PracticeSolve:
     scramble: str
     dnf: bool = False
     plus2: bool = False
+    id: str = ""
+    recorded_at: int = 0  # UTC epoch milliseconds; unknown for legacy solves.
 
     def to_dict(self) -> dict:
         return {
+            **({"id": self.id} if self.id else {}),
+            **({"recorded_at": self.recorded_at} if self.recorded_at else {}),
             "centiseconds": int(self.centiseconds),
             "scramble": self.scramble,
             "dnf": bool(self.dnf),
@@ -129,6 +133,8 @@ class PracticeSolve:
             scramble=str(d.get("scramble", "")),
             dnf=bool(d.get("dnf", False)),
             plus2=bool(d.get("plus2", False)),
+            id=d.get("id") if isinstance(d.get("id"), str) else "",
+            recorded_at=d.get("recorded_at") if type(d.get("recorded_at")) is int and d["recorded_at"] > 0 else 0,
         )
 
 

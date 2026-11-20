@@ -1,3 +1,7 @@
+# 2.52.0 · Account & sync
+
+Settings groups the new account panel with backups. It shows whether you are using local storage, signed in but not syncing, up to date, or need to choose between edits. Each conflict displays the exact field and both versions; routine sync does not interrupt a training session or open a modal. Cloud deletion has an explicit confirmation and keeps local data.
+
 # Smoother cube and faster case study — 2.51.0
 
 - Drag to look around in 3D. The viewer draws only the visible surfaces of the

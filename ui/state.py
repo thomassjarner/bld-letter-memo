@@ -506,7 +506,10 @@ class AppState:
 
     def add_practice_solve(self, centiseconds: int, scramble: str, dnf: bool = False, plus2: bool = False) -> int:
         from data.models import PracticeSolve
+        from time import time_ns
+        from uuid import uuid4
         solve = PracticeSolve(
+            id=str(uuid4()), recorded_at=time_ns() // 1_000_000,
             centiseconds=max(0, int(centiseconds)),
             scramble=scramble,
             dnf=bool(dnf),

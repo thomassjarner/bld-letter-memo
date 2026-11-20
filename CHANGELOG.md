@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.52.0
+
+- Optional **Sign in with WCA** and **Account & sync** in Settings. An explicit first-device opt-in links local training data; guests keep their current browser workspace and JSON backups.
+- Independent changes merge across devices. Conflicting edits show both versions in review; only the user’s choice replaces a conflicting word or algorithm. Remote edits wait while a training or editing screen is active.
+- New timer solves carry IDs and recording times. Existing backups remain readable at data version 18; comparable legacy histories can be combined without inventing dates.
+- Adds a deployable WCA OAuth Worker, private D1 storage, version-checked writes, device sign-out and cloud deletion. The frontend is still published on GitHub Pages; its clean build stage excludes backend configuration. See [cloud setup](docs/CLOUD_SYNC.md).
+
 ## 2.51.0
 
 - The shared cube renderer now draws visible, rigid layers and updates existing
