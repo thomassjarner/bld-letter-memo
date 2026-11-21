@@ -18,6 +18,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BLD_SYNC_URL: ${{ vars.BLD_SYNC_URL }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -35,7 +37,18 @@ jobs:
         # site (https://<user>.github.io/<repo>/). It's derived automatically
         # from the repository name so this keeps working if the repo is
         # ever renamed.
-        run: flet publish main.py --base-url /${{ github.event.repository.name }}/
+        run: |
+          python scripts/cloud_build.py --stage "$RUNNER_TEMP/bld-site-src"
+          cd "$RUNNER_TEMP/bld-site-src"
+          flet publish main.py --base-url /${{ github.event.repository.name }}/ --distpath "$GITHUB_WORKSPACE/dist"
+
+      - name: Add account callback and sync client
+        run: python scripts/cloud_build.py --output dist
+
+      - name: Add branded link preview and app icons
+        run: >-
+          python scripts/web_metadata.py --output dist
+          --site-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
 
       - name: Upload build output
         uses: actions/upload-pages-artifact@v3
