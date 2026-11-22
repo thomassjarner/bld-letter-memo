@@ -1,3 +1,19 @@
+# 2.53.0 · Training statistics
+
+Home and Practice link directly to the charts. Timer opens the current session,
+and Progressive Memo opens its letter accuracy and timing view. Chart controls
+change the view without switching the active timer session or letter scheme.
+Attempt numbers, outcome markers, summaries and a recent-results list keep the
+charts readable across theme colors, phone and desktop layouts.
+
+Moving between the main pages, Practice destinations or the two statistics views
+uses a short fade. Editing a scheme, stepping through a memo pair and starting
+or stopping the timer do not trigger a page transition.
+
+# 2.52.1 · WCA sign-in
+
+If sign-in cannot finish, the return page explains the next step and shows a short reference that can be shared without sending a screenshot or opening developer tools.
+
 # 2.52.0 · Account & sync
 
 Settings groups the new account panel with backups. It shows whether you are using local storage, signed in but not syncing, up to date, or need to choose between edits. Each conflict displays the exact field and both versions; routine sync does not interrupt a training session or open a modal. Cloud deletion has an explicit confirmation and keeps local data.

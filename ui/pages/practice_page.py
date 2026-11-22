@@ -9,20 +9,8 @@ from ui.theme_colors import SUCCESS_COLOR, ThemeAwarePage, show_themed_dialog
 from ui.feature_icons import feature_icon
 
 from core.scramble_generator import ScrambleGenerator
+from core.training_statistics import effective_time as _effective_centiseconds, format_time as _format_centiseconds
 from ui.design import activity_card, page_heading, panel, eyebrow
-
-
-def _format_centiseconds(cs: int) -> str:
-    cs = max(0, int(cs))
-    minutes, rem = divmod(cs, 6000)
-    seconds = rem / 100.0
-    if minutes:
-        return f"{minutes}:{seconds:05.2f}"
-    return f"{seconds:.2f}"
-
-
-def _effective_centiseconds(solve) -> int:
-    return solve.centiseconds + (200 if getattr(solve, "plus2", False) else 0)
 
 
 def _wca_average(solves, count: int):
@@ -84,6 +72,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
     open_corner_walkthrough_callback = None
     open_timer_callback = None
     open_practice_callback = None
+    open_stats_callback = None
 
     """Practice hub plus Blind Timer.
 
@@ -294,11 +283,14 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
         self._stats_button = ft.IconButton(ft.Icons.INSIGHTS, tooltip="Session statistics",
                                            on_click=self._show_session_stats, visible=False)
+        self._trends_button = ft.TextButton("Statistics", icon=ft.Icons.SHOW_CHART, height=32,
+            tooltip="View accuracy and time trends for this session", on_click=self._open_statistics)
         self.history_panel = panel(ft.Column([
             ft.Container(ft.Row([
                 ft.Text("Session history", size=15, weight=ft.FontWeight.W_600,
                         color=ft.Colors.ON_SURFACE, expand=True),
                 self._stats_button,
+                self._trends_button,
                 ft.IconButton(ft.Icons.DELETE_SWEEP_OUTLINED, tooltip="Reset session",
                               icon_size=18, on_click=self._confirm_reset),
             ], spacing=2), height=32),
@@ -450,6 +442,10 @@ class PracticePage(ThemeAwarePage, ft.Column):
             actions=[ft.TextButton("Close", on_click=lambda e: self._close_session_stats())],
         )
         show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
+
+    def _open_statistics(self, e=None):
+        if self.open_stats_callback and not self.running and not self.holding_space:
+            self.open_stats_callback()
 
     def _close_session_stats(self):
         self.page.pop_dialog()
@@ -705,6 +701,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
     def _update_analysis_availability(self):
+        if hasattr(self, "_trends_button"):
+            self._trends_button.disabled = self.running or self.holding_space
         current_disabled = self.running or self.holding_space or not self.current_scramble or bool(self._scramble_error)
         eligible = self.last_solve_index is not None and 0 <= self.last_solve_index < len(self.state.data.practice_solves)
         result_disabled = self.running or self.holding_space or not eligible

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.53.0
+
+- Added Training statistics under Home and Practice, with shortcuts in both
+  training histories. Compare rolling accuracy and median time for 5, 12 or
+  50 attempts; Timer and Progressive Memo each use their own scoring rules.
+- Added short native fades for main pages, Practice destinations and the two
+  statistics views, respecting reduced-motion requests reported by the client.
+  Navigating no longer lays out and recolors all hidden workspaces on every click.
+- Uses existing histories. No change to the backup format, scoring, stored
+  preferences, Cloudflare Worker, or the GitHub Pages workflow.
+
+## 2.52.1
+
+- Fixed sign-in stopping after WCA authorization. The Cloudflare Worker now uses its supported manual redirect mode and rejects unexpected redirects from both WCA endpoints.
+- When browser sign-in cannot finish, the Worker shows where it stopped and a short public reference. The error page contains no login parameters. The fix works with the 2.52.0 Pages frontend and needs no database migration.
+
 ## 2.52.0
 
 - Optional **Sign in with WCA** and **Account & sync** in Settings. An explicit first-device opt-in links local training data; guests keep their current browser workspace and JSON backups.

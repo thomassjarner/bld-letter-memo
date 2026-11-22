@@ -6,6 +6,7 @@ from data.cloud_endpoint import SYNC_URL
 from data.shared_preferences_repository import SharedPreferencesAppDataRepository
 from ui.design import build_theme, icon_action
 from ui.feature_icons import feature_icon
+from ui.navigation_motion import route_switcher, set_reduced_motion
 from ui.theme_colors import apply_palette
 from ui.pages.home_page import build_home
 from ui.pages.case_library_page import CaseLibraryPage
@@ -31,7 +32,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.52.0"
+    page.title = "BLD Letter Memo · 2.53.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -50,8 +51,6 @@ async def main(page: ft.Page):
     settings_page = SettingsPage(data=state)
     method_page = CaseLibraryPage(data=state)
 
-    content_area = ft.Container(expand=True, left=0, right=0, top=64, bottom=0,
-                                padding=16)
     save_status = [ft.Text("Saved", size=11, color=ft.Colors.ON_SURFACE_VARIANT) for _ in range(3)]
 
     def on_save_status(status):
@@ -87,6 +86,11 @@ async def main(page: ft.Page):
     practice_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     scramble_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     practice_page.show_menu(update=False)
+    def open_statistics_from_timer():
+        if practice_page.open_statistics("timer", session=state.data.active_practice_session,
+                                         origin="timer", update=False):
+            navigate_to(PRACTICE_INDEX, refresh=False)
+    timer_page.open_stats_callback = open_statistics_from_timer
     def open_home_destination(name):
         if name == "Method Library":
             method_page._set_mode("overview")
@@ -103,13 +107,18 @@ async def main(page: ft.Page):
         elif name == "3-style corner trainer":
             method_page._set_mode("trainer")
             navigate_to(METHOD_INDEX)
+        elif name == "Training statistics":
+            if practice_page.open_statistics("timer", session=state.data.active_practice_session, update=False):
+                navigate_to(PRACTICE_INDEX, refresh=False)
         else:
             navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name))
 
     practice_page.open_trainer_callback = lambda: open_home_destination("3-style corner trainer")
     home_page = build_home(open_home_destination, data=state)
     pages = [home_page, schemes_page, pairs_page, scramble_page, method_page, practice_page, timer_page, settings_page]
-    content_area.content = home_page
+    for i, view in enumerate(pages):
+        view.key = f"workspace_{i}"
+    content_area = route_switcher(home_page, left=0, right=0, top=64, bottom=0)
 
     def apply_dark_mode(enabled):
         page.theme = build_theme(light_theme=state.data.light_theme)
@@ -145,7 +154,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.52.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.53.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 
@@ -199,7 +208,10 @@ async def main(page: ft.Page):
         left=12, bottom=12,
     )
 
+    previous_viewport = previous_palette = None
+
     def rebuild_navigation(update=True):
+        nonlocal previous_viewport, previous_palette
         page.bgcolor = build_theme(state.data.dark_mode, state.data.light_theme).color_scheme.surface_container_low
         width = page.width or 1200
         narrow = width < 1320
@@ -251,27 +263,27 @@ async def main(page: ft.Page):
         ], spacing=3, tight=True, scroll=ft.ScrollMode.AUTO,
            horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
         popout_panel.height = min(450, max(160, (page.height or 800) - 88))
-        content_area.left = 172 if style == "compact_sidebar" else 0
-        content_area.top = top_nav.height if style == "top_tabs" else 0
-        side_padding = 0 if width < 320 else 12 if width < 700 else 20
-        content_area.padding = ft.Padding.only(left=side_padding, top=12,
-            right=side_padding, bottom=64 if style == "popout" else 12)
-        horizontal_padding = side_padding * 2
-        bottom_padding = 64 if style == "popout" else 12
-        home_page.set_viewport(width - content_area.left - horizontal_padding,
-                               (page.height or 800) - content_area.top - 12 - bottom_padding)
-        timer_page.set_viewport(width - content_area.left - horizontal_padding,
-                                (page.height or 800) - content_area.top - 12 - bottom_padding)
-        pairs_page.set_viewport(width - content_area.left - horizontal_padding,
-                                (page.height or 800) - content_area.top - 12 - bottom_padding)
-        schemes_page.set_viewport(width - content_area.left - horizontal_padding,
-                                  (page.height or 800) - content_area.top - 12 - bottom_padding)
-        practice_page.set_viewport(width - content_area.left - horizontal_padding,
-                                   (page.height or 800) - content_area.top - 12 - bottom_padding)
-        method_page.set_viewport(width - content_area.left - horizontal_padding,
-                                 (page.height or 800) - content_area.top - 12 - bottom_padding)
-        for view in pages:
+        inset = 0 if width < 320 else 12 if width < 700 else 20
+        content_area.left = (172 if style == "compact_sidebar" else 0) + inset
+        content_area.right = inset
+        content_area.top = (top_nav.height if style == "top_tabs" else 0) + 12
+        content_area.bottom = 64 if style == "popout" else 12
+        viewport = (max(1,width - content_area.left - content_area.right),
+                    max(1,(page.height or 800) - content_area.top - content_area.bottom))
+        # A tab click doesn't resize every hidden workspace or repaint every
+        # offscreen sticker. Only a geometry/palette change needs that pass.
+        for view in (home_page, timer_page, pairs_page, schemes_page, practice_page, method_page):
+            if viewport != previous_viewport or view is pages[current_index]:
+                view.set_viewport(*viewport)
+        previous_viewport = viewport
+        # AnimatedSwitcher lays out its child loosely; even short pages need the
+        # full viewport so headers stay aligned with long, scrollable pages.
+        for view in (settings_page, scramble_page):
+            view.width, view.height = viewport
+        palette = (state.data.dark_mode, state.data.light_theme)
+        for view in (pages if palette != previous_palette else (pages[current_index],)):
             apply_palette(view, state.data.dark_mode, state.data.light_theme)
+        previous_palette = palette
         for chrome in (top_nav, sidebar_nav, popout_panel, popout_button):
             apply_palette(chrome, state.data.dark_mode, state.data.light_theme)
         if update:
@@ -285,11 +297,11 @@ async def main(page: ft.Page):
 
     cloud = None
 
-    def navigate_to(index):
+    def navigate_to(index, *, refresh=True):
         nonlocal current_index, popout_open
         current_index = index
         target = pages[index]
-        if hasattr(target, "refresh"):
+        if refresh and hasattr(target, "refresh"):
             target.refresh(update=False)
         content_area.content = target
         popout_open = False
@@ -317,6 +329,18 @@ async def main(page: ft.Page):
     page.add(ft.Stack([content_area, top_nav, sidebar_nav, popout_panel, popout_button],
                       expand=True, fit=ft.StackFit.EXPAND))
     rebuild_navigation()
+
+    if isinstance(page, ft.Page):
+        async def read_motion_preference():
+            try:
+                flags = await ft.SemanticsService().get_accessibility_features()
+            except (RuntimeError, ValueError, TimeoutError, ft.FletException):
+                return  # Older clients use Flutter's native animation behavior.
+            if flags.disable_animations:
+                for host in (content_area, practice_page.switcher, practice_page.statistics.chart_switcher):
+                    set_reduced_motion(host, True)
+                page.update()
+        page.run_task(read_motion_preference)
 
     async def start_cloud():
         nonlocal cloud

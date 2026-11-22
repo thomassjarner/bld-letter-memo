@@ -82,7 +82,7 @@ def test_home_has_routes_and_no_embedded_tools():
         button.on_click(None)
     assert routed == ["Letter Schemes", "Letter Pairs", "Scramble Memo", "Scramble walkthrough",
                       "Method Library", "Algorithm Playground", "Timer", "Progressive Memo",
-                      "3-style corner trainer", "Settings"]
+                      "3-style corner trainer", "Training statistics", "Settings"]
 
 
 def test_nav_order_and_home_default():

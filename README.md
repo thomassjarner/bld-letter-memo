@@ -3,7 +3,28 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.52.0**.
+or as a desktop app. Current version: **2.53.0**.
+
+## Training statistics
+
+Open **Practice → Training statistics**, the shortcut on Home, or **Statistics**
+in the Timer’s session history. Progressive Memo also has a chart button beside
+**Saved attempts**. Statistics uses the history already on this device, including
+history synced from another device. You do not need to sign in or retrace scrambles.
+
+- **Blind Timer:** choose one session. The success rate includes every attempt.
+  Successful +2 results include the penalty. A DNF appears as a cross below the
+  time chart and counts against accuracy. Median and best single use successes.
+- **Progressive Memo:** view all schemes or one saved scheme. Letter accuracy
+  divides correct letters by scored letters across the selected attempts.
+  See perfect rounds and median memo/recall times; switch the time chart between
+  total, memo and recall. A round with no scored letters is not a perfect round.
+- **Trends:** dots show individual attempts. The line uses a complete trailing
+  window of 5, 12 or 50 attempts. The change compares the latest window with
+  the immediately preceding, non-overlapping window: percentage points for
+  accuracy and seconds faster/slower for median time. The plot shows up to
+  100 attempts; summary cards cover the full selection. Older undated solves
+  keep their place using their saved order.
 
 ## Optional WCA sign-in
 
@@ -15,6 +36,7 @@ competition ID is optional. Training and JSON backups still work without signing
 
 Site owner: [turn on WCA sign-in](docs/CLOUD_SYNC.md). New deployments default
 to local storage until you connect your own WCA application and sync service.
+See [patching instructions](PATCHING.md) for a routine update or the earlier 2.52.0 Worker repair.
 
 ## Workspaces
 
@@ -28,8 +50,8 @@ to local storage until you connect your own WCA application and sync service.
 - **Method Library** — browse 378 UFR 3-style corner cases, save preferred
   algorithms, use linked move/commutator fields, explore arbitrary algorithms
   in the Playground, watch a Scramble walkthrough and train case recall.
-- **Practice** — open Blind Timer for timed solves, Progressive Memo for letter
-  recall, or the 3-style corner trainer for algorithm recall.
+- **Practice** — open Blind Timer, Progressive Memo, the 3-style corner trainer,
+  or Training statistics.
 - **Timer** — a dedicated destination with sessions, history, averages and
   full-cube, edges-only and corners-only training.
 - **Settings** — optional WCA sign-in and cloud sync, five light color themes, dark mode, playback preferences and backup import/export.
@@ -48,7 +70,7 @@ Home groups its shortcuts by what you want to do:
 | **Set up your memo** | Set up your letter scheme; Build your letter pairs |
 | **Analyze a scramble** | Scramble Memo; Scramble walkthrough |
 | **Learning material** | Method Library; Algorithm Playground |
-| **Practice** | Blind Timer; Progressive Memo; 3-style corner trainer |
+| **Practice** | Blind Timer; Progressive Memo; 3-style corner trainer; Training statistics |
 
 Each full-width feature row is one keyboard-accessible link. The four groups
 sit in two columns on wider screens and stack into one scrolling column on

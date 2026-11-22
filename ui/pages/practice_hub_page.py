@@ -2,7 +2,9 @@
 import flet as ft
 
 from ui.design import activity_card, page_heading
+from ui.navigation_motion import route_switcher
 from ui.pages.progressive_memo_page import ProgressiveMemoPage
+from ui.pages.statistics_page import StatisticsPage
 from ui.theme_colors import ThemeAwarePage
 
 
@@ -17,21 +19,35 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
     def state(self):
         return self.data
 
+    def _mounted(self):
+        try:
+            return self.page is not None
+        except RuntimeError:
+            return False
+
     def init(self):
         self.expand = True
         self.active = False
         self.mode = "menu"
         self._viewport = (1400, 760)
         self.progressive = ProgressiveMemoPage(data=self.state)
+        self.progressive.key = "practice_memo"
         self.progressive.back_callback = self.show_menu
+        self.progressive.open_stats_callback = lambda: self.open_statistics("memo", scheme=self.state.data.active_scheme, origin="memo")
+        self.statistics = StatisticsPage(data=self.state, key="practice_statistics")
+        self.menu = ft.Column(key="practice_activities", scroll=ft.ScrollMode.AUTO, spacing=12,
+                              horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
+        self.switcher = route_switcher(self.menu, expand=True)
+        self.controls = [self.switcher]
+        self.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
         self.show_menu(update=False)
 
     def show_menu(self, e=None, update=True):
         self.progressive.set_active(False)
         self.active = False
         self.mode = "menu"
-        self.scroll = ft.ScrollMode.AUTO
-        self.spacing = 12
+        self.scroll = None
+        self.spacing = 0
         activities = [
             activity_card("Blind Timer", "Time a blind solve and compare it with your session history.",
                           ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback(),
@@ -45,9 +61,11 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         ]
         for card in activities:
             card.col = {"xs": 12, "md": 6, "lg": 4}
-        self.controls = [
+        self.menu.controls = [
             page_heading("Practice", "Choose what to train: complete solves, memo, or corner algorithms."),
             ft.ResponsiveRow(activities, spacing=12, run_spacing=12),
+            ft.OutlinedButton("Training statistics", icon=ft.Icons.INSIGHTS,
+                on_click=lambda e: self.open_statistics("timer", session=self.state.data.active_practice_session)),
             ft.ExpansionTile(title=ft.Text("More practice modes", size=14, color=ft.Colors.ON_SURFACE),
                 subtitle=ft.Text("Planned activities", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 expanded=False, maintain_state=True, dense=True, tile_padding=0, controls_padding=8,
@@ -59,7 +77,8 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
                               ft.Icons.BOLT, "Coming soon", enabled=False, feature="drill"),
             ], spacing=12, run_spacing=12)]),
         ]
-        if update and self.page is not None:
+        self.switcher.content = self.menu
+        if update and self._mounted():
             self.update()
 
     def open_progressive(self, e=None):
@@ -67,11 +86,33 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.scroll = None
         self.spacing = 0
         self.progressive.open_scheme_callback = self.open_scheme_callback
-        self.controls = [self.progressive]
+        self.switcher.content = self.progressive
         self.progressive.refresh(update=False)
-        if self.page is not None:
+        if self._mounted():
             self.update()
         self.set_active(True)
+
+    def open_statistics(self, source="timer", *, session=None, scheme=None, origin="practice", update=True):
+        if self.mode == "progressive" and self.progressive.in_attempt:
+            return False
+        self.set_active(False)
+        self.mode = "statistics"
+        self.statistics.select(source, session=session, scheme=scheme)
+        def back():
+            if origin == "memo":
+                self.open_progressive()
+            elif origin == "timer":
+                self.show_menu(update=False)
+                self.open_timer_callback()
+            else:
+                self.show_menu()
+        self.statistics.back_callback = back
+        self.statistics.back_label = {"memo":"Back to Progressive Memo", "timer":"Back to Timer"}.get(origin,"Back to Practice")
+        self.statistics.refresh(update=False)
+        self.switcher.content = self.statistics
+        if update and self._mounted():
+            self.update()
+        return True
 
     def set_active(self, active):
         self.active = bool(active) and self.mode == "progressive"
@@ -80,9 +121,13 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
     def set_viewport(self, width, height):
         self.width, self.height = width, height
         self._viewport = (width, height)
+        self.menu.width, self.menu.height = width, height
+        self.statistics.width, self.statistics.height = width, height
         self.progressive.set_viewport(width, height)
 
     def refresh(self, update=True):
         if self.mode == "progressive":
             self.progressive.refresh(update=update)
+        elif self.mode == "statistics":
+            self.statistics.refresh(update=update)
 

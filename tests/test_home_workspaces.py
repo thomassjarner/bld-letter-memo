@@ -30,13 +30,13 @@ def test_home_groups_keep_setup_analysis_learning_and_practice_distinct():
         "setup": {"Set up your memo", "Set up your letter scheme", "Build your letter pairs"},
         "analyze": {"Analyze a scramble", "Scramble Memo", "Scramble walkthrough"},
         "learn": {"Learning material", "Method Library", "Algorithm Playground"},
-        "practice": {"Practice", "Blind Timer", "Progressive Memo", "3-style corner trainer"},
+        "practice": {"Practice", "Blind Timer", "Progressive Memo", "3-style corner trainer", "Training statistics"},
     }
     for key, labels in expected.items():
         group = next(c for c in walk(home) if c.key == f"home_group_{key}")
         assert labels <= set(text_values(group))
         buttons = [c for c in walk(group) if isinstance(c, ft.TextButton)]
-        assert len(buttons) == (3 if key == "practice" else 2)
+        assert len(buttons) == (4 if key == "practice" else 2)
         assert all(button.on_click and button.tooltip for button in buttons)
     assert home.scroll == ft.ScrollMode.AUTO
     assert not any(isinstance(c, (ft.TextField, ft.Dropdown, ft.KeyboardListener)) for c in walk(home))

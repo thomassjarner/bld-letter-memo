@@ -25,6 +25,7 @@ def order_label(order):
 class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
     back_callback = None
     open_scheme_callback = None
+    open_stats_callback = None
     INTRO_SECONDS = 1.0
     SPACE_KEYS = {" ", "Space", "Spacebar"}
     LEFT_KEYS = {"ArrowLeft", "Arrow Left", "Left"}
@@ -90,9 +91,12 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.history = ft.ListView(spacing=4, scroll=ft.ScrollMode.ALWAYS)
         self.older_button = ft.TextButton("Older attempts", height=32, on_click=self._older_attempts)
+        self.stats_button = ft.IconButton(ft.Icons.SHOW_CHART, tooltip="Progressive Memo statistics",
+            width=34, height=30, icon_size=19, padding=3,
+            on_click=lambda e: self.open_stats_callback() if self.open_stats_callback and not self.in_attempt else None)
         self.history_panel = panel(ft.Column([
             ft.Row([ft.Text("Saved attempts", size=14, weight=ft.FontWeight.W_600, expand=True),
-                    self.history_meta], height=28),
+                    self.history_meta, self.stats_button], height=30),
             self.history, self.older_button,
         ], spacing=8), padding=14)
         self.main_region = ft.Column(spacing=12)
@@ -204,6 +208,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
 
     def _render_stage(self):
         self.presentation = None
+        self.stats_button.disabled = self.in_attempt
         self.cancel_button.visible = self.in_attempt
         self.clock.visible = self.phase != "ready"
         if self.phase == "ready":

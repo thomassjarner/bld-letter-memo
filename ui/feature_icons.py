@@ -10,7 +10,7 @@ import flet.canvas as cv
 FEATURE_NAMES = (
     "home", "schemes", "pairs", "memo", "walkthrough", "library",
     "practice", "timer", "settings", "progressive", "cases", "trainer",
-    "playground", "lesson", "delayed", "drill",
+    "playground", "lesson", "delayed", "drill", "statistics",
 )
 
 
@@ -109,6 +109,11 @@ def feature_icon(name, size=22, *, selected=False, muted=False):
             line([(12, 2), (12, 5.5)], accent)
             line([(18.5, 5.5), (21, 8)], accent)
             line([(12, 9), (12, 14), (16, 16)], accent)
+    elif name == "statistics":
+        line([(3,3),(3,20),(21,20)])
+        line([(6,14),(10.5,10),(14,12),(20,5)], accent)
+        for x,y in ((6,14),(10.5,10),(14,12),(20,5)):
+            circle(x,y,1.2,accent,filled=True)
     elif name == "settings":
         for x, y in ((5, 8), (12, 16), (19, 8)):
             line([(x, 3), (x, y - 2.5)])
