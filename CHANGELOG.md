@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.55.0
+
+- Timer and Progressive Memo statistics default to the whole selected history.
+  Data range applies to the report, and chart smoothing is independent. Charts
+  include all attempts from first to latest, even in sessions longer than 100.
+- Moved session PBs to one small reference line. The timer footer takes less
+  vertical space and no longer searches for best averages while timing.
+- Removed the duplicate projected single. Estimated valid Ao5 now models five
+  new attempts; next-five odds distinguish any valid average, a streak of four,
+  and a clean five. Recorded average counts and streaks give a direct comparison.
+
 ## 2.54.0
 
 - Moved statistics into Blind Timer and Progressive Memo. Each activity has a

@@ -153,6 +153,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self._viewport = (width, height)
         self.width, self.height = width, height
         self.activity_header.resize(width)
+        if self.statistics is not None:
+            self.statistics.set_available_width(width)
         self.body_host.width = width
         main_height = height - self.header.height - self.spacing
         wide = width >= 1000
@@ -198,6 +200,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         if tab == "stats":
             if self.statistics is None:
                 self.statistics = StatisticsPage(source="memo", data=self.state)
+            self.statistics.set_available_width(self._viewport[0])
             self.statistics.open_for(self.state.data.active_scheme)
             self.body_host.content = self.statistics
         else:

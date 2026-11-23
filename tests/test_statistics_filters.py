@@ -50,13 +50,17 @@ async def exercise_filter_events(kind):
     nav = activity.activity_header.picker
     await choose(nav,"stats",True)
     stats = activity.statistics
-    stable = [nav, activity.body_host, stats, stats.filters, stats.filter_picker, stats.window_picker,
+    stable = [nav, activity.body_host, stats, stats.filters, stats.filter_picker, stats.scope_picker, stats.window_picker,
               stats.scroll_area, stats.report, stats.recent, stats.accuracy.canvas, stats.timing.canvas]
     parents = [c.parent for c in stable]
     async def check():
         assert activity.body_host.content is stats and nav.selected == ["stats"]
         assert all(session.index.get(c._i) is c and c.parent is p for c,p in zip(stable,parents))
         assert not errors, errors
+    assert stats.scope_picker.value == stats.window_picker.value == "all"
+    for value in ("50","5","all"):
+        await choose(stats.scope_picker,value)
+        await check()
     for window in ("5","50","12","5"):
         await choose(stats.window_picker,window)
         await check()
@@ -66,8 +70,10 @@ async def exercise_filter_events(kind):
             assert chart.width == 250+int(window)
             assert len(chart.canvas.shapes) >= 3
         if kind == "timer":
-            assert stats.accuracy.headline.value == "20.0%" and stats.single.value.value == "5:13.42"
-            assert stats.ao5.value.value == "DNF" and stats.timing.headline.value == "5:13.42"
+            assert stats.accuracy.headline.value == "20.0%"
+            assert stats.metrics[1].value.value == "5:13.42" and stats.metrics[2].value.value == "—"
+            assert [label.value for label in stats.odds.values] == ["0.67%","0.29%","0.03%"]
+            assert stats.observed.values[1].value == "DNF" and stats.timing.headline.value == "5:13.42"
             await choose(stats.filter_picker,"Session 2")
             assert stats.empty.visible and not stats.report.visible
             await check()
@@ -78,7 +84,7 @@ async def exercise_filter_events(kind):
                 await choose(stats.phase_picker,"recall")
                 assert stats.timing.headline.value == "2.00"
                 await choose(stats.phase_picker,"memo")
-                assert stats.timing.title.value == "Rolling median memo time"
+                assert stats.timing.title.value == "Median memo time over time"
             await check()
     await choose(nav,"train",True)
     assert activity.body_host.content is activity.keyboard_listener and nav._i in session.index

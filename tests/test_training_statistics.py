@@ -5,7 +5,7 @@ from unittest.mock import patch
 import flet as ft
 import pytest
 
-from core.training_statistics import PLOT_LIMIT, format_time, memo_attempts, projected_ao5, summarize, timer_attempts, trimmed_time
+from core.training_statistics import PLOT_LIMIT, block, format_time, memo_attempts, select_range, summarize, timer_attempts, trimmed_time
 from data.models import PracticeSolve, ProgressiveMemoAttempt
 from ui.navigation_motion import set_reduced_motion
 from test_navigation import click_nav, mount, no_client_mount, text_values
@@ -34,21 +34,13 @@ def test_five_solve_session_with_window_of_fifty_uses_every_available_result():
     assert [p.rolling.attempts for p in s.points] == [1,2,3,4,5]
     assert [p.rolling.accuracy for p in s.points] == [0,0,0,25,20]
     assert [p.rolling.median for p in s.points] == [None,None,None,31342,31342]
-    assert projected_ao5(rows, s.recent.median) == "DNF"
     assert summarize([], 50).recent is None and not summarize([], 5).points
     failures = timer_attempts([solve(1,True)]*4)
     assert summarize(failures,5).recent.accuracy == 0 and summarize(failures,5).best is None
-    assert projected_ao5(failures, None) == "DNF"
     assert summarize(timer_attempts([solve(0)]), 12).recent.median == 0
 
 
-def test_next_ao5_uses_last_four_actual_results_and_one_estimated_success():
-    rows = timer_attempts([solve(1,True), solve(1000,plus2=True), solve(1300), solve(1500), solve(10000)])
-    # Previous DNF has rolled off; drop the 12.00 and 100.00 from the next five.
-    assert projected_ao5(rows, 2000) == 1600
-    assert projected_ao5(rows[:4], 1800) == round((1300+1500+1800)/3)
-    assert projected_ao5(rows[:3], 1800) is None
-    assert projected_ao5(rows, None) is None
+def test_actual_trimmed_times_keep_penalties_and_dnf_rules():
     assert trimmed_time([1200,1200,1200,1200,1200]) == 1200
     assert trimmed_time([900,700,None,None,1000]) == "DNF"
 
@@ -66,12 +58,35 @@ def test_memo_accuracy_is_by_scored_letter_and_timings_stay_separate():
     assert summarize(memo_attempts([memo(0,0)]*5),5).recent.accuracy is None
 
 
-def test_old_solves_keep_attempt_order_and_rolling_prefill_before_display_range():
-    rows=timer_attempts([solve(i*10, i%7==0) for i in range(200)])
-    s=summarize(rows,12)
-    assert len(s.points)==PLOT_LIMIT and [p.number for p in s.points]==list(range(101,201))
-    assert s.points[0].rolling==summarize(rows[:101],12).recent
-    assert s.overall.attempts==200
+def test_all_history_is_included_in_both_cumulative_and_grouped_charts():
+    history = timer_attempts([solve(300+i%311, i%7==0, i%5==0) for i in range(340)])
+    # One early outlier and a group with a mixture of successes and DNFs.
+    history[:1] = timer_attempts([solve(5)])
+    for window in (None,12):
+        s = summarize(history,window)
+        assert len(s.points)==PLOT_LIMIT and (s.points[0].number,s.points[-1].number)==(1,340)
+        assert [p.number for p in s.latest] == list(range(329,341))
+        start = 0
+        for p in s.points:
+            end = p.number
+            assert p.group == block(history[start:end])
+            assert p.rolling == block(history[max(0,end-window) if window is not None else 0:end])
+            start = end
+        assert s.overall == block(history) and s.best == 5
+        assert sum(p.group.scored for p in s.points) == 340
+    rows,offset = select_range(history,12)
+    s=summarize(rows,offset=offset)
+    assert [p.number for p in s.points] == list(range(329,341))
+    assert s.overall == block(history[-12:]) and s.recent == s.overall
+
+
+def test_large_memo_groups_weight_letters_and_include_unscored_rounds():
+    rows = memo_attempts([memo(1,1),memo(0,9),memo(0,0)]*91)
+    s=summarize(rows)
+    assert s.overall.accuracy==10
+    assert sum(p.group.scored for p in s.points)==910
+    assert sum(p.group.correct for p in s.points)==91
+    assert s.points[-1].rolling==s.overall
 
 
 def event(value):
@@ -100,7 +115,14 @@ def test_activity_filters_stay_local_and_do_not_change_training_setup(width):
     stats = timer.statistics
     assert page.root.controls[0].content is timer and timer.body_host.content is stats
     assert stats.session == "Session 2" and stats.recent_rows[0].controls[0].value == "#12"
+    assert stats.scope is None and stats.window is None and stats.scope_picker.value == "all"
     assert stats.metrics[0].value.value == "91.7%"
+    assert len(stats.metrics) == 3 and not any("PB" in m.title.value or "single" in m.title.value.lower() for m in stats.metrics)
+    records = [p.value for p in stats.pb_values]
+    stats._change_scope(event("5"))
+    assert stats.metrics[0].value.value == "80.0%" and stats.accuracy.start.value == "#8"
+    assert [p.value for p in stats.pb_values] == records
+    stats._change_scope(event("all"))
     for window in (5,50,12):
         stats._change_window(event(str(window)))
         assert stats.window == window and timer.body_host.content is stats and stats.report.visible
@@ -123,7 +145,7 @@ def test_activity_filters_stay_local_and_do_not_change_training_setup(width):
     ms._change_filter(event("*"))
     assert ms.metrics[0].value.value == "75.0%"
     ms._change_filter(event(":Speffz")); ms._change_phase(event("recall"))
-    assert ms.metrics[0].value.value == "66.7%" and ms.timing.title.value == "Rolling median recall time"
+    assert ms.metrics[0].value.value == "66.7%" and ms.timing.title.value == "Median recall time over time"
     activity._start(); activity._key_down(SimpleNamespace(key="Space"))
     assert activity.run is None
     activity.activity_header.back.on_click(None)

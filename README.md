@@ -3,34 +3,40 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.54.0**.
+or as a desktop app. Current version: **2.55.0**.
 
 ## Training statistics
 
-Open **Blind Timer → Statistics** for solves, or **Progressive Memo → Statistics**
-for letter recall. The activity tab beside **Statistics** takes you back to
-your current scramble or memo result. Review filters do not switch your active
-timer session or letter scheme. Your existing local and synced history works
-immediately; there is no need to analyze the scrambles again.
+Open **Blind Timer → Statistics** or **Progressive Memo → Statistics**. Both
+start with **all attempts** in the selected session or memo scheme. **Data
+range** can restrict the report to the last 5, 12 or 50 attempts. The separate
+**Chart line** setting changes the line without changing your sample, odds
+or training setup.
 
-- **Timer results:** success rate uses every attempt. Successful times include
-  +2 penalties; a DNF counts against accuracy and appears as a cross below the
-  time chart. Typical time and best single use successful solves. **Latest Ao5**
-  is the actual trimmed average of the five most recent attempts.
-- **Next-solve estimates:** the projected successful single is the median
-  successful time in the chosen rolling window. The projected next Ao5 uses
-  the last four actual solves and that estimated fifth time, dropping the best
-  and worst. Two DNFs already in the last four make that average a DNF even if
-  the next solve succeeds. Estimates show the sample behind them and never
-  enter your solve history.
-- **Progressive Memo:** filter by saved letter scheme or view all schemes.
-  Accuracy is correct letters divided by scored letters. Compare memo, recall
-  or total duration, and see how many rounds were perfect.
-- **Reading the charts:** dots are individual attempts. The rolling line starts
-  with the first attempt and uses up to the most recent 5, 12 or 50 at each
-  point. For example, one success in five solves shows 20% even with a window
-  of 50. The chart displays the latest 100 attempts; the summary covers the
-  entire selection, including older solves without a date.
+- **Timer:** see your success rate and typical successful solve (the median,
+  including +2 penalties). The timer footer shows success count, Ao5 and Ao12.
+  The single, Ao5 and Ao12 **session PBs** share one small line below the
+  charts in Statistics; they always refer to the whole timer session.
+- **Estimated valid Ao5:** the estimated time *if a new set of five produces
+  a valid average*. It uses your recorded success rate and the distribution
+  of successful times; it does not reuse the previous four solves. It
+  accounts for both five successes (drop fastest and slowest) and four
+  successes with one DNF (drop the DNF and fastest success). The estimate
+  appears after three successful times. No projected solves are saved.
+- **Odds for the next five:** valid Ao5 (four or five successes in any order),
+  four consecutive successes somewhere in the five, and all five successful.
+  These are estimates assuming independent attempts at the selected success
+  rate. The adjacent recorded indicators show what actually happened:
+  valid overlapping five-attempt windows, the last Ao5, and success streaks.
+- **Progressive Memo:** letter accuracy is correct letters divided by scored
+  letters. Review perfect rounds and memo, recall or total times. Filter by
+  scheme without switching your active scheme.
+- **Charts:** the default line accumulates every attempt from the start of the
+  selected range. Rolling lines of 5, 12 or 50 are optional. Long histories
+  span the full horizontal axis: nearby attempts share a mark (their weighted
+  success rate or median time). Every attempt contributes, including older
+  undated solves; the latest table shows individual results. A × indicates
+  a DNF in that attempt or group.
 
 ## Optional WCA sign-in
 

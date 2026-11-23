@@ -22,19 +22,6 @@ def _wca_average(solves, count: int):
     return trimmed_time([None if s.dnf else _effective_centiseconds(s) for s in solves[-count:]])
 
 
-def _best_wca_average(solves, count: int):
-    """Best valid WCA-style average of `count` across the current session."""
-    if len(solves) < count:
-        return None
-    best = None
-    for end in range(count, len(solves) + 1):
-        value = _wca_average(solves[end-count:end], count)
-        if value is None or value == "DNF":
-            continue
-        if best is None or value < best:
-            best = value
-    return best
-
 @ft.control
 class PracticePage(ThemeAwarePage, ft.Column):
     @property
@@ -119,8 +106,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
             on_click=lambda e: self._sort_history('date'))
         self.time_sort_button = ft.TextButton('Fastest', height=28, width=68,
             on_click=lambda e: self._sort_history('time'))
-        self.metric_values = [ft.Text("—", size=17, weight=ft.FontWeight.W_600,
-                                      color=ft.Colors.ON_SURFACE) for _ in range(6)]
+        self.metric_values = [ft.Text("—", size=15, weight=ft.FontWeight.W_600,
+                                      color=ft.Colors.ON_SURFACE) for _ in range(3)]
         self._viewport = (1400, 760)
         self.session_dropdown = ft.Dropdown(
             label="Session",
@@ -252,11 +239,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button,
         ], spacing=8, run_spacing=4, wrap=True, alignment=ft.MainAxisAlignment.CENTER)
         self._stats_panel = panel(ft.Row([
-            ft.Column([
-                ft.Text(label, size=10, color=ft.Colors.ON_SURFACE_VARIANT), value,
-            ], spacing=4, expand=True)
-            for label, value in zip(("Success / total", "Ao5", "Ao12", "Best single", "Best Ao5", "Best Ao12"), self.metric_values)
-        ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=14)
+            ft.Row([ft.Text(label, size=13, color=ft.Colors.ON_SURFACE_VARIANT), value], spacing=8, tight=True)
+            for label, value in zip(("Success / total", "Ao5", "Ao12"), self.metric_values)
+        ], spacing=24, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=ft.Padding.symmetric(horizontal=14, vertical=6))
         self._timer_workspace = ft.Column([
             self._timer_stage, self._result_row, self._stats_panel,
         ], spacing=12)
@@ -307,6 +292,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
             return
         self.width, self.height = width, height
         self.activity_header.resize(width)
+        if self.statistics is not None:
+            self.statistics.set_available_width(width)
         self.body_host.width = width
         wide = width >= 1000
         scramble_height = 72 if wide else (90 if width >= 600 else 104)
@@ -360,11 +347,11 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._timer_stage.width = timer_width
         self._stats_panel.width = timer_width
         self._result_row.width = timer_width
-        self._stats_panel.height = 76
+        self._stats_panel.height = 40
         self._result_row.height = 64 if width < 600 else 40
         # Desktop gives the time the full remaining left panel. Compact
         # screens keep statistics accessible from the history header.
-        self._timer_stage.height = max(24, timer_height - (self._result_row.height + (100 if wide else 12)))
+        self._timer_stage.height = max(24, timer_height - (self._result_row.height + (self._stats_panel.height + 24 if wide else 12)))
         self._timer_stage.content.controls = [self.timer_text]
         if self._timer_stage.height >= 64:
             self._timer_stage.content.controls.append(self.status_text)
@@ -431,6 +418,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         if tab == "stats":
             if self.statistics is None:
                 self.statistics = StatisticsPage(source="timer", data=self.state)
+            self.statistics.set_available_width(self._viewport[0])
             self.statistics.open_for(self.state.data.active_practice_session)
             self.body_host.content = self.statistics
         else:
@@ -847,13 +835,14 @@ class PracticePage(ThemeAwarePage, ft.Column):
         if self._history_session != self.state.data.active_practice_session:
             self._history_session = self.state.data.active_practice_session
             self.history_limit = 50
-        successes = sum(1 for s in solves if not s.dnf)
+        successes, best = 0, None
+        for solve in solves:
+            if not solve.dnf:
+                successes += 1
+                t = _effective_centiseconds(solve)
+                best = t if best is None else min(t,best)  # The fastest history entry stays green.
         ao5 = _wca_average(solves, 5)
         ao12 = _wca_average(solves, 12)
-        best_ao5 = _best_wca_average(solves, 5)
-        best_ao12 = _best_wca_average(solves, 12)
-        best = min((_effective_centiseconds(s) for s in solves if not s.dnf), default=None)
-
         def fmt_avg(value):
             if value is None:
                 return "—"
@@ -861,17 +850,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 return "DNF"
             return _format_centiseconds(value)
 
-        self.stats_text.value = (
-            f"Successful / total: {successes}/{len(solves)}    "
-            f"Ao5: {fmt_avg(ao5)}    Ao12: {fmt_avg(ao12)}    "
-            f"Best single: {_format_centiseconds(best) if best is not None else '—'}    "
-            f"Best Ao5: {fmt_avg(best_ao5)}    Best Ao12: {fmt_avg(best_ao12)}"
-        )
-
-        metric_texts = (
-            f"{successes}/{len(solves)}", fmt_avg(ao5), fmt_avg(ao12),
-            _format_centiseconds(best) if best is not None else "—", fmt_avg(best_ao5), fmt_avg(best_ao12),
-        )
+        metric_texts = (f"{successes}/{len(solves)}", fmt_avg(ao5), fmt_avg(ao12))
+        self.stats_text.value = (f"Successful / total: {metric_texts[0]}    "
+                                 f"Ao5: {metric_texts[1]}    Ao12: {metric_texts[2]}")
         for control, value in zip(self.metric_values, metric_texts):
             control.value = value
         shown = min(len(solves), self.history_limit)

@@ -1,5 +1,6 @@
 """Read-only training statistics. Attempt order works even for undated backups."""
 from dataclasses import dataclass
+from heapq import heappop, heappush
 from statistics import median
 
 
@@ -73,6 +74,7 @@ class Point:
     number: int
     attempt: Attempt
     rolling: Block
+    group: Block  # All attempts since the preceding chart point, including this one.
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,23 +85,72 @@ class Summary:
     perfect: int
     memo_median: float | None
     recall_median: float | None
-    points: tuple
+    points: tuple[Point, ...]
+    latest: tuple[Point, ...]
 
 
-def summarize(rows, window=12):
-    if window not in WINDOWS:
-        raise ValueError("Unsupported rolling window")
+def select_range(rows, limit=None):
+    """Keep original attempt numbering inside the selected session or scheme."""
+    if limit is not None and limit not in WINDOWS:
+        raise ValueError("Unsupported history range")
+    offset = max(0, len(rows)-limit) if limit is not None else 0
+    return (rows[offset:] if offset else rows), offset
+
+
+def _prefix_blocks(rows, wanted):
+    # Two heaps keep exact cumulative medians without sorting every prefix.
+    lower, upper, result = [], [], {}
+    correct = scored = 0
+    for i, row in enumerate(rows):
+        correct += row.correct
+        scored += row.scored
+        value = row.time
+        if value is not None:
+            if not lower or value <= -lower[0]:
+                heappush(lower, -value)
+            else:
+                heappush(upper, value)
+            if len(lower) > len(upper)+1:
+                heappush(upper, -heappop(lower))
+            elif len(upper) > len(lower):
+                heappush(lower, -heappop(upper))
+        if i in wanted:
+            mid = (None if not lower else -lower[0] if len(lower) > len(upper)
+                   else (-lower[0]+upper[0])/2)
+            result[i] = Block(i+1, correct, scored, mid, len(lower)+len(upper))
+    return result
+
+
+def _single(row):
+    return Block(1, row.correct, row.scored, row.time, int(row.time is not None))
+
+
+def summarize(rows, window=None, *, offset=0):
+    """Cumulative by default. The optional chart window never changes the sample."""
+    if window is not None and window not in WINDOWS:
+        raise ValueError("Unsupported chart window")
     n = len(rows)
-    # Bound chart work for long histories; the first visible point can still
-    # use earlier attempts. No tracing, time-based guesses or synthetic DNFs.
-    points = tuple(Point(end, rows[end - 1], block(rows[max(0, end-window):end]))
-                   for end in range(max(1, n-PLOT_LIMIT+1), n+1))
-    return Summary(
-        block(rows), points[-1].rolling if points else None,
-        min((r.time for r in rows if r.time is not None), default=None),
-        sum(r.scored > 0 and r.correct == r.scored for r in rows),
-        median_of(r.memo for r in rows), median_of(r.recall for r in rows), points,
-    )
+    # Adjacent groups (no gaps). Large plots retain both endpoints and account
+    # for every attempt; the recent table still contains the actual last 12.
+    ends = (list(range(n)) if n <= PLOT_LIMIT else
+            [i*(n-1)//(PLOT_LIMIT-1) for i in range(PLOT_LIMIT)])
+    tail = range(max(0,n-12),n)
+    wanted = set(ends).union(tail)
+    trends = (_prefix_blocks(rows,wanted) if window is None else
+              {i:block(rows[max(0,i+1-window):i+1]) for i in wanted})
+    points = []
+    first = 0
+    for i in ends:
+        group = _single(rows[i]) if i == first else block(rows[first:i+1])
+        points.append(Point(offset+i+1, rows[i], trends[i], group))
+        first = i+1
+    latest = tuple(Point(offset+i+1, rows[i], trends[i], _single(rows[i])) for i in tail)
+    recent = trends.get(n-1)
+    overall = recent if window is None and recent is not None else block(rows)
+    return Summary(overall, recent, min((r.time for r in rows if r.time is not None), default=None),
+                   sum(r.scored > 0 and r.correct == r.scored for r in rows),
+                   median_of(r.memo for r in rows), median_of(r.recall for r in rows),
+                   tuple(points), latest)
 
 
 def trimmed_time(times):
@@ -113,14 +164,3 @@ def trimmed_time(times):
     middle = finite[1:] if dnfs else finite[1:-1]
     return round(sum(middle) / len(middle))
 
-
-def projected_ao5(rows, next_single):
-    """Conditional next Ao5, not a simulated run of five future solves."""
-    if len(rows) < 4:
-        return None
-    last_four = [r.time for r in rows[-4:]]
-    if last_four.count(None) >= 2:
-        return "DNF"  # Even a successful fifth solve cannot rescue this average.
-    if next_single is None:
-        return None
-    return trimmed_time([*last_four, round(next_single)])

@@ -41,8 +41,9 @@ class TrendChart:
         self.canvas = cv.Canvas(height=PLOT_HEIGHT, expand=True, on_resize=self._resize, resize_interval=60)
         self.start, self.end = note(), note()
         self.x_axis = ft.Row([self.start, self.end], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-        legend = [legend_mark("Attempt", 6, 6, ft.Colors.ON_SURFACE_VARIANT),
-                  legend_mark("Rolling", 17, 3, ft.Colors.PRIMARY)]
+        self.observed_key = legend_mark("Attempt", 6, 6, ft.Colors.ON_SURFACE_VARIANT)
+        self.line_key = legend_mark("Cumulative", 17, 3, ft.Colors.PRIMARY)
+        legend = [self.observed_key, self.line_key]
         if timer and not percent:
             legend.append(ft.Row([ft.Text("×", size=16, color=ft.Colors.ERROR), note("DNF")], spacing=4, tight=True))
         if not percent:
@@ -54,13 +55,19 @@ class TrendChart:
             ft.Row(legend, spacing=14, run_spacing=3, wrap=True),
         ], spacing=5, tight=True), col={"xs":12,"lg":6}, padding=14)
 
-    def set_series(self, title, headline, detail, points):
+    def set_series(self, title, headline, detail, points, window=None):
         self.title.value, self.headline.value, self.description.value = title, headline, detail
-        raw = [(100*p.attempt.correct/p.attempt.scored if p.attempt.scored else None)
-               if self.percent else p.attempt.time for p in points]
+        grouped = any(p.group.attempts > 1 for p in points)
+        self.observed_key.controls[1].value = ("Group rate" if self.percent else "Group median") if grouped else "Attempt"
+        self.line_key.controls[1].value = "Cumulative" if window is None else f"Rolling {window}"
+        # Cumulative endpoint numbers already appear in the summary above.
+        self.headline.visible = window is not None
+        raw = [p.group.accuracy if self.percent else p.group.median for p in points]
         trend = [p.rolling.accuracy if self.percent else p.rolling.median for p in points]
         values = [v for v in raw+trend if v is not None]
         lo, hi = chart_bounds(values, self.percent)
+        self.numbers = [p.number for p in points]
+        self.misses = [i for i,p in enumerate(points) if p.group.timed < p.group.attempts]
         self.series = (raw, trend, lo, hi, bool(values))
         for label, value in zip(self.axis, (hi, (hi+lo)/2, lo)):
             label.visible = bool(values)
@@ -92,7 +99,8 @@ class TrendChart:
     def _draw(self):
         raw, trend, low, high, has_values = self.series
         width = self.width
-        def x(i): return width/2 if len(raw) == 1 else 5+(width-10)*i/(len(raw)-1)
+        span = self.numbers[-1] - self.numbers[0]
+        def x(i): return width/2 if not span else 5+(width-10)*(self.numbers[i]-self.numbers[0])/span
         def y(v): return BOTTOM-(v-low)/(high-low)*(BOTTOM-TOP)
         def stroke(color, weight):
             return ft.Paint(color=color, stroke_width=weight, style=ft.PaintingStyle.STROKE,
@@ -115,11 +123,10 @@ class TrendChart:
                            cv.Points(marks, paint=stroke(ft.Colors.PRIMARY, 3.5))])
         if self.timer and not self.percent:
             crosses = []
-            for i, v in enumerate(raw):
-                if v is None:
-                    xx = x(i)
-                    crosses.extend([cv.Path.MoveTo(xx-2.5,MISS_Y-2.5),cv.Path.LineTo(xx+2.5,MISS_Y+2.5),
-                                    cv.Path.MoveTo(xx-2.5,MISS_Y+2.5),cv.Path.LineTo(xx+2.5,MISS_Y-2.5)])
+            for i in self.misses:
+                xx = x(i)
+                crosses.extend([cv.Path.MoveTo(xx-2.5,MISS_Y-2.5),cv.Path.LineTo(xx+2.5,MISS_Y+2.5),
+                                cv.Path.MoveTo(xx-2.5,MISS_Y+2.5),cv.Path.LineTo(xx+2.5,MISS_Y-2.5)])
             if crosses:
                 shapes.append(cv.Path(crosses, paint=stroke(ft.Colors.ERROR, 1.7)))
         self.canvas.shapes = shapes

@@ -1,3 +1,14 @@
+# 2.55.0 · Whole-session statistics
+
+Accuracy and typical pace come first, alongside the expected time of a valid
+Ao5. A compact panel separates estimated probabilities from recorded windows
+and streaks. Session personal bests are a footer reference. The live timer
+keeps its current averages, with a 40-pixel summary strip on desktop.
+
+**Data range** starts at **Entire session** (or **All rounds** in Progressive
+Memo). The chart's own **Cumulative / Rolling** choice affects only the line.
+Charts retain the entire selected time span on narrow and wide screens.
+
 # 2.54.0 · Statistics inside each activity
 
 Open Blind Timer or Progressive Memo and select **Statistics** beside **Timer**
