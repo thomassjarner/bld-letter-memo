@@ -149,13 +149,14 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         return changed
 
     def set_viewport(self, width, height):
-        width, height = max(280.0, float(width)), max(300.0, float(height))
-        self._viewport = (width, height)
+        self._viewport = (max(1,float(width)),max(1,float(height)))
+        width, height = max(280,self._viewport[0]),max(300,self._viewport[1])
         self.width, self.height = width, height
-        self.activity_header.resize(width)
+        self.activity_header.resize(self._viewport[0])
+        self.body_host.width = self._viewport[0]
+        self.body_host.height = max(1,self._viewport[1]-self.activity_header.view.height-self.spacing)
         if self.statistics is not None:
-            self.statistics.set_available_width(width)
-        self.body_host.width = width
+            self.statistics.set_viewport(self.body_host.width,self.body_host.height)
         main_height = height - self.header.height - self.spacing
         wide = width >= 1000
         history_width = min(360, width * 0.28) if wide else width
@@ -200,7 +201,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         if tab == "stats":
             if self.statistics is None:
                 self.statistics = StatisticsPage(source="memo", data=self.state)
-            self.statistics.set_available_width(self._viewport[0])
+            self.statistics.set_viewport(self.body_host.width,self.body_host.height)
             self.statistics.open_for(self.state.data.active_scheme)
             self.body_host.content = self.statistics
         else:

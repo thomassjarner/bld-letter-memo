@@ -1,3 +1,14 @@
+# 2.56.0 · Inspecting training trends
+
+Hover over a chart to place a guide on the nearest mark; tap to inspect it
+on a touch screen. The readout shows both the recorded result and the line
+value. On longer charts it identifies exactly which attempts share a mark.
+The full report scrolls below the session and data range controls.
+
+Timer odds now explain how much recent attempts count. Expand **Time goal**
+and enter a target to compare the chance of a single and a valid Ao5 below it.
+The recorded success rate remains visible beside the forecast information.
+
 # 2.55.0 · Whole-session statistics
 
 Accuracy and typical pace come first, alongside the expected time of a valid

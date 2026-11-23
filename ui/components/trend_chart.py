@@ -1,4 +1,6 @@
-"""A responsive chart with a persistent canvas, axes and labels."""
+"""A responsive chart with a persistent canvas and pointer/touch readout."""
+from bisect import bisect_left
+
 import flet as ft
 import flet.canvas as cv
 
@@ -33,12 +35,24 @@ class TrendChart:
         self.percent, self.timer, self.state = percent, timer, state
         self.width = 220
         self.series = None
+        self.points = self.numbers = ()
+        self.selected_index = None
+        self.idle = ""
         self.title = ft.Text(size=17, weight=ft.FontWeight.W_600)
         self.headline = ft.Text(size=21, weight=ft.FontWeight.W_600, color=ft.Colors.PRIMARY)
         self.description = note(size=13)
         self.axis = [ft.Text(left=0, top=y-8, size=11, color=ft.Colors.ON_SURFACE_VARIANT)
                      for y in (TOP, (TOP+BOTTOM)/2, BOTTOM)]
-        self.canvas = cv.Canvas(height=PLOT_HEIGHT, expand=True, on_resize=self._resize, resize_interval=60)
+        self.canvas = cv.Canvas(height=PLOT_HEIGHT, on_resize=self._resize, resize_interval=60)
+        self.guide = ft.Container(left=0, top=TOP, bottom=PLOT_HEIGHT-MISS_Y, width=1.5,
+                                  bgcolor=ft.Colors.PRIMARY, opacity=0, ignore_interactions=True)
+        # No scroll or drag recognizer here: a wheel or vertical swipe over the
+        # plot belongs to the report. A tap leaves the touch readout on screen.
+        self.inspector = ft.GestureDetector(content=ft.Container(bgcolor=ft.Colors.TRANSPARENT),
+            mouse_cursor=ft.MouseCursor.PRECISE, hover_interval=32, on_enter=self._inspect,
+            on_hover=self._inspect, on_exit=self._leave, on_tap_up=self._inspect)
+        plot = ft.Stack([self.canvas,self.guide,self.inspector], fit=ft.StackFit.EXPAND,
+                        height=PLOT_HEIGHT, expand=True)
         self.start, self.end = note(), note()
         self.x_axis = ft.Row([self.start, self.end], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
         self.observed_key = legend_mark("Attempt", 6, 6, ft.Colors.ON_SURFACE_VARIANT)
@@ -49,14 +63,17 @@ class TrendChart:
         if not percent:
             legend.append(note("Lower is faster"))
         self.view = panel(ft.Column([
-            self.title, self.headline, self.description,
-            ft.Row([ft.Stack(self.axis, width=56, height=PLOT_HEIGHT), self.canvas], spacing=4, height=PLOT_HEIGHT),
+            self.title, self.headline, ft.Container(self.description,height=52),
+            ft.Row([ft.Stack(self.axis, width=56, height=PLOT_HEIGHT), plot], spacing=4, height=PLOT_HEIGHT),
             ft.Container(self.x_axis, padding=ft.Padding.only(left=60)),
             ft.Row(legend, spacing=14, run_spacing=3, wrap=True),
         ], spacing=5, tight=True), col={"xs":12,"lg":6}, padding=14)
 
     def set_series(self, title, headline, detail, points, window=None):
-        self.title.value, self.headline.value, self.description.value = title, headline, detail
+        self.title.value, self.headline.value = title, headline
+        self.points = points
+        self.idle = detail + " Hover or tap for values."
+        self.clear_inspection()
         grouped = any(p.group.attempts > 1 for p in points)
         self.observed_key.controls[1].value = ("Group rate" if self.percent else "Group median") if grouped else "Attempt"
         self.line_key.controls[1].value = "Cumulative" if window is None else f"Rolling {window}"
@@ -78,6 +95,74 @@ class TrendChart:
         self.x_axis.alignment = ft.MainAxisAlignment.CENTER if single else ft.MainAxisAlignment.SPACE_BETWEEN
         self._draw()
 
+    def clear_inspection(self):
+        self.selected_index = None
+        self.guide.opacity = 0
+        self.description.value = self.idle
+
+    def _x(self, i):
+        span = self.numbers[-1] - self.numbers[0]
+        return self.width/2 if not span else 5+(self.width-10)*(self.numbers[i]-self.numbers[0])/span
+
+    def _nearest(self, x):
+        # Use the same logical pixels and actual attempt numbers as the canvas,
+        # including unequal-size bins at the end of a long session.
+        first,last = self.numbers[0],self.numbers[-1]
+        target = first+(x-5)*(last-first)/(self.width-10)
+        right = min(bisect_left(self.numbers,target),len(self.numbers)-1)
+        return right-1 if right and target-self.numbers[right-1] <= self.numbers[right]-target else right
+
+    def _readout(self, i):
+        p = self.points[i]
+        group,a = p.group,p.attempt
+        def rate(v): return "—" if v is None else f"{v:.1f}%"
+        def time(v): return "—" if v is None else format_time(v)
+        if group.attempts > 1:
+            label = f"#{p.number-group.attempts+1}–{p.number}"
+            value = (f"{rate(group.accuracy)} · {group.correct}/{group.scored}" if self.percent else
+                     f"Median {time(group.median)}")
+            if self.timer and not self.percent and (misses := group.attempts-group.timed):
+                value += f" · {misses} DNF" + ("s" if misses != 1 else "")
+        else:
+            label = f"#{p.number}"
+            if self.timer and a.time is None:
+                result = "DNF" if a.dnf_elapsed is None else f"DNF ({time(a.dnf_elapsed)})"
+            else:
+                result = time(a.time)
+            if a.plus2:
+                result += " (+2)"
+            if self.percent:
+                value = rate(group.accuracy) + " · " + (result if self.timer else f"{a.correct}/{a.scored} letters")
+            else:
+                value = result
+        trend = rate(p.rolling.accuracy) if self.percent else time(p.rolling.median)
+        return f"{label} · {value}\n{self.line_key.controls[1].value}: {trend}"
+
+    def _update_if_mounted(self, *controls):
+        try:
+            page = self.canvas.page
+        except RuntimeError:
+            return
+        if page is not None and self.canvas._i in page.session.index:
+            page.update(*controls)
+
+    def _inspect(self, e):
+        ft.context.disable_auto_update()
+        if not self.points or e.local_position is None:
+            return
+        i = self._nearest(e.local_position.x)
+        if i != self.selected_index:
+            self.selected_index = i
+            self.guide.left, self.guide.opacity = self._x(i)-.75, .8
+            self.description.value = self._readout(i)
+            self._update_if_mounted(self.guide,self.description)
+
+    def _leave(self, e):
+        ft.context.disable_auto_update()
+        if self.selected_index is not None:
+            self.clear_inspection()
+            self._update_if_mounted(self.guide,self.description)
+
     def _resize(self, e):
         width = max(12, round(e.width))
         if width == self.width or e.width <= 0:
@@ -93,14 +178,15 @@ class TrendChart:
         if page is None or self.canvas._i not in page.session.index:
             return
         self._draw()
+        if self.selected_index is not None:
+            self.guide.left = self._x(self.selected_index)-.75
         apply_palette(self.canvas, self.state.data.dark_mode, self.state.data.light_theme)
-        self.canvas.update()
+        page.update(self.canvas,self.guide)
 
     def _draw(self):
         raw, trend, low, high, has_values = self.series
         width = self.width
-        span = self.numbers[-1] - self.numbers[0]
-        def x(i): return width/2 if not span else 5+(width-10)*(self.numbers[i]-self.numbers[0])/span
+        x = self._x
         def y(v): return BOTTOM-(v-low)/(high-low)*(BOTTOM-TOP)
         def stroke(color, weight):
             return ft.Paint(color=color, stroke_width=weight, style=ft.PaintingStyle.STROKE,

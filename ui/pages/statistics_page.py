@@ -3,7 +3,7 @@ from dataclasses import field
 
 import flet as ft
 
-from core.ao5_statistics import MIN_TIMED_SOLVES, session_records, timer_insights
+from core.ao5_statistics import HALF_LIFE, MIN_TIMED_SOLVES, parse_goal, session_records, timer_insights
 from core.training_statistics import (WINDOWS, format_time, memo_attempts, select_range,
                                       summarize, timer_attempts, trimmed_time)
 from ui.components.trend_chart import TrendChart
@@ -81,9 +81,10 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         self.scope = self.window = None  # Full dataset; cumulative line from its first attempt.
         self.phase = "total"
         self._history, self._records, self._filter_options = [], None, None
-        self.filter_picker = ft.Dropdown(width=179, dense=True, label="Timer session" if timer else "Letter scheme",
+        self._forecast = self._goal = None
+        self.filter_picker = ft.Dropdown(width=179, height=48, dense=True, label="Timer session" if timer else "Letter scheme",
                                          on_select=self._change_filter)
-        self.scope_picker = ft.Dropdown(width=166, dense=True, label="Data range", value="all",
+        self.scope_picker = ft.Dropdown(width=166, height=48, dense=True, label="Data range", value="all",
             options=[ft.DropdownOption("all", "Entire session" if timer else "All rounds")] +
                     [ft.DropdownOption(str(w), f"Last {w} "+("solves" if timer else "rounds")) for w in WINDOWS],
             on_select=self._change_scope)
@@ -94,7 +95,7 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         self.phase_picker = ft.Dropdown(width=145, height=44, dense=True, label="Time trend", value=self.phase,
             options=[ft.DropdownOption(k,v) for k,v in (("total","Total time"),("memo","Memo time"),("recall","Recall time"))],
             on_select=self._change_phase)
-        self.filters = ft.Row([self.filter_picker, self.scope_picker], wrap=True, spacing=10, run_spacing=6)
+        self.filters = ft.Row([self.filter_picker, self.scope_picker], height=52, spacing=10)
         self.empty = panel(ft.Text("No saved solves in this session yet." if timer else
                                    "No saved memo rounds in this selection yet.", size=16), padding=16)
         self.coverage = ft.Text(size=13, weight=ft.FontWeight.W_600)
@@ -119,8 +120,16 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             self.observed = NumberList("Recorded in this range", ["Valid Ao5s / completed windows",
                                                                   "Latest recorded Ao5", "Current / longest success streak"])
             self.odds_note = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+            self.goal_field = ft.TextField(label="Beat this time", hint_text="1:30.00", width=160, dense=True,
+                                          on_submit=self._apply_goal, on_change=self._edit_goal)
+            self.goal_button = ft.OutlinedButton("Check odds", on_click=self._apply_goal)
+            self.goal_result = ft.Text(size=14, selectable=True)
+            goal = ft.ExpansionTile(title="Time goal", dense=True, maintain_state=True,
+                controls_padding=ft.Padding.symmetric(horizontal=8,vertical=4),
+                controls=[ft.Column([ft.Row([self.goal_field,self.goal_button],wrap=True,spacing=8),
+                    self.goal_result],tight=True,spacing=4)])
             items.append(panel(ft.Column([ft.ResponsiveRow([self.odds.view,self.observed.view],
-                                  spacing=24,run_spacing=12), self.odds_note],spacing=7,tight=True),padding=12))
+                                  spacing=24,run_spacing=12), self.odds_note,goal],spacing=7,tight=True),padding=12))
         items.extend([ft.Row([ft.Text("Trends", size=16,weight=ft.FontWeight.W_600),
                               self.window_picker] + ([] if timer else [self.phase_picker]),
                              wrap=True,spacing=12,run_spacing=6),
@@ -131,15 +140,62 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             items.append(ft.Row([ft.Text("Session PBs",size=12,weight=ft.FontWeight.W_600),
                                  *self.pb_values],wrap=True,spacing=14,run_spacing=3,
                                 tooltip="Personal bests across this entire timer session."))
-        self.report = ft.Column(items, spacing=9, horizontal_alignment=ft.CrossAxisAlignment.STRETCH, visible=False)
-        self.scroll_area = ft.Column([self.empty,self.report], expand=True,scroll=ft.ScrollMode.AUTO,
-                                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
+        self.report = ft.Column(items, spacing=9, tight=True, horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                                visible=False)
+        # One native vertical viewport; content gets its natural height, rather
+        # than asking nested expanding Columns to decide what should scroll.
+        self.scroll_area = ft.ListView([self.empty,self.report], key="statistics_scroll_"+self.source,
+            build_controls_on_demand=False, auto_scroll=False, spacing=0,
+            scroll=ft.Scrollbar(thumb_visibility=True,interactive=True,thickness=8),
+            padding=ft.Padding.only(right=12,bottom=12))
         self.controls = [self.filters,self.scroll_area]
 
-    def set_available_width(self, width):
-        compact = width < 360
-        self.filter_picker.width = (width-10)*.51 if compact else 179
-        self.scope_picker.width = (width-10)*.49 if compact else 166
+    def set_viewport(self,width,height):
+        self.width,self.height = max(1,width),max(1,height)
+        self.scroll_area.width = self.width
+        self.scroll_area.height = max(1,self.height-self.filters.height-self.spacing)
+        compact = self.width < 360
+        free = max(2,self.width-self.filters.spacing)
+        self.filter_picker.width = free*.51 if compact else 179
+        self.scope_picker.width = free*.49 if compact else 166
+
+    def _edit_goal(self,e):
+        self._goal = None
+        self.goal_field.error = None
+        self.goal_result.value = "Press Enter or Check odds." if (self.goal_field.value or "").strip() else ""
+        self._update_goal_controls()
+
+    def _apply_goal(self,e=None):
+        self.goal_field.error = None
+        try:
+            self._goal = parse_goal(self.goal_field.value)
+        except ValueError as err:
+            self._goal = None
+            self.goal_field.error = str(err)
+        self._show_goal()
+        self._update_goal_controls()
+
+    def _update_goal_controls(self):
+        # Input and output are siblings; update them without touching the list.
+        ft.context.disable_auto_update()
+        try:
+            page = self.page
+        except RuntimeError:
+            return
+        if page is not None and self.goal_field._i in page.session.index:
+            page.update(self.goal_field,self.goal_result)
+
+    def _show_goal(self):
+        if self._goal is None or self._forecast is None:
+            self.goal_result.value = ""
+            return
+        single,ao5,sampled = self._forecast.goal_odds(self._goal)
+        avg_label = ("Need 3 successful times" if ao5 is None else
+                     ("≈" if sampled else "")+odds_label(ao5))
+        self.goal_result.value = (f"Under {clock(self._goal)} · Single: {odds_label(single)}"
+                                  f" · Valid Ao5: {avg_label}")
+        self.goal_result.tooltip = ("Both estimates include DNFs as misses. The Ao5 is for five new attempts; "
+                                    "≈ denotes a repeatable sample from the weighted times.")
 
     def open_for(self, context):
         if context != self._last_context:
@@ -198,6 +254,13 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         self.scope_picker.value, self.window_picker.value = choice(self.scope), choice(self.window)
         rows, offset = select_range(self._history,self.scope)
         self.empty.visible, self.report.visible = not rows, bool(rows)
+        if not rows:
+            self._forecast = None
+            for chart in (self.accuracy,self.timing):
+                chart.points = ()
+                chart.clear_inspection()
+            if self.source == "timer":
+                self._show_goal()
         if rows:
             s = summarize(rows,self.window,offset=offset)
             if not charts_only:
@@ -221,13 +284,15 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         if timer:
             times = [r.time for r in rows]
             insights = timer_insights(times,recorded=self._records.ao5 if not offset else None)
+            self._forecast = insights.forecast
+            self._show_goal()
             self.metrics[0].show(pct(total.accuracy),
                 f"{count(total.correct,'success','successes')} · {count(total.attempts-total.correct,'DNF')}")
             self.metrics[1].show(clock(total.median), f"Median of {count(total.timed,'successful solve')}")
             needed = MIN_TIMED_SOLVES-total.timed
             self.metrics[2].show(clock(insights.valid_pace), "Expected time if the next five give a valid average."
                 if needed <= 0 else f"{count(needed,'more successful solve')} needed for a time estimate.")
-            self.metrics[2].view.tooltip = ("Uses the successful times and success rate in this range. "
+            self.metrics[2].view.tooltip = ("Weights recent outcomes and successful times more heavily. "
                 "Projects five new attempts and drops the best and worst. A DNF can be the dropped worst result.")
             odds = insights.odds
             self.odds.show(odds_label(odds.valid),odds_label(odds.run_of_four),odds_label(odds.clean))
@@ -236,7 +301,8 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             self.observed.show(f"{recorded.valid} / {recorded.windows}",clock(latest),
                                f"{insights.current_streak} / {insights.longest_streak}")
             self.odds_note.value = (("Small sample. " if len(rows)<10 else "") +
-                f"Estimates assume independent solves at your {pct(total.accuracy)} success rate. Recorded Ao5 windows overlap.")
+                f"Forecast success rate: {pct(100*self._forecast.success_rate)}. "
+                f"Each {HALF_LIFE} attempts back halves a solve’s weight. Next-five odds assume independent attempts.")
             for target,label,value in zip(self.pb_values,("Single","Ao5","Ao12"),
                                           (self._records.single,self._records.ao5.best,self._records.ao12.best)):
                 target.value = f"{label}  {clock(value)}"

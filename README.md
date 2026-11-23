@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.55.0**.
+or as a desktop app. Current version: **2.56.0**.
 
 ## Training statistics
 
@@ -18,25 +18,31 @@ or training setup.
   The single, Ao5 and Ao12 **session PBs** share one small line below the
   charts in Statistics; they always refer to the whole timer session.
 - **Estimated valid Ao5:** the estimated time *if a new set of five produces
-  a valid average*. It uses your recorded success rate and the distribution
-  of successful times; it does not reuse the previous four solves. It
+  a valid average*. It gives recent outcomes and successful times more weight.
+  Relative to the latest attempt, one 20 attempts back has half the weight;
+  one 40 back has a quarter. DNFs count as attempts. The forecast
   accounts for both five successes (drop fastest and slowest) and four
   successes with one DNF (drop the DNF and fastest success). The estimate
   appears after three successful times. No projected solves are saved.
 - **Odds for the next five:** valid Ao5 (four or five successes in any order),
   four consecutive successes somewhere in the five, and all five successful.
-  These are estimates assuming independent attempts at the selected success
-  rate. The adjacent recorded indicators show what actually happened:
+  These estimates use the recency-weighted success rate and assume independent
+  attempts. The adjacent recorded indicators show what actually happened:
   valid overlapping five-attempt windows, the last Ao5, and success streaks.
+- **Time goal:** enter a time such as `90` or `1:30.00` to estimate the chance
+  of beating it with the next single or a valid Ao5 over five new attempts.
+  A DNF single or DNF average does not beat a goal. With varied time histories,
+  an ≈ beside the Ao5 odds identifies a repeatable sampling estimate.
 - **Progressive Memo:** letter accuracy is correct letters divided by scored
   letters. Review perfect rounds and memo, recall or total times. Filter by
   scheme without switching your active scheme.
 - **Charts:** the default line accumulates every attempt from the start of the
   selected range. Rolling lines of 5, 12 or 50 are optional. Long histories
-  span the full horizontal axis: nearby attempts share a mark (their weighted
-  success rate or median time). Every attempt contributes, including older
-  undated solves; the latest table shows individual results. A × indicates
-  a DNF in that attempt or group.
+  span the full horizontal axis: nearby attempts share a mark (their observed
+  accuracy or median time). Hover or tap to see the attempt number or group
+  range, the plotted value and the trend there. A × indicates a DNF; a single
+  DNF shows its elapsed time in parentheses. Scroll the report below the
+  pinned session/scheme and range filters to reach recent attempts and PBs.
 
 ## Optional WCA sign-in
 

@@ -26,10 +26,12 @@ class Attempt:
     plus2: bool = False
     memo: int | None = None
     recall: int | None = None
+    dnf_elapsed: int | None = None  # For inspecting one attempt, never used in time statistics.
 
 
 def timer_attempts(solves):
-    return [Attempt(int(not s.dnf), 1, None if s.dnf else effective_time(s), s.plus2 and not s.dnf)
+    return [Attempt(int(not s.dnf), 1, None if s.dnf else effective_time(s), s.plus2 and not s.dnf,
+                    dnf_elapsed=s.centiseconds if s.dnf else None)
             for s in solves]
 
 

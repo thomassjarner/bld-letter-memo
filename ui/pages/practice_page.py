@@ -286,15 +286,16 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def set_viewport(self, width, height):
         """Bound both panels to available space without rebuilding keyboard input."""
-        width, height = max(280, float(width)), max(300, float(height))
-        self._viewport = (width, height)
+        self._viewport = (max(1,float(width)),max(1,float(height)))
+        width, height = max(280,self._viewport[0]),max(300,self._viewport[1])
         if self.mode != "timer" or not hasattr(self, "_main_region"):
             return
         self.width, self.height = width, height
-        self.activity_header.resize(width)
+        self.activity_header.resize(self._viewport[0])
+        self.body_host.width = self._viewport[0]
+        self.body_host.height = max(1,self._viewport[1]-self.activity_header.view.height-self.spacing)
         if self.statistics is not None:
-            self.statistics.set_available_width(width)
-        self.body_host.width = width
+            self.statistics.set_viewport(self.body_host.width,self.body_host.height)
         wide = width >= 1000
         scramble_height = 72 if wide else (90 if width >= 600 else 104)
         main_height = max(120, height - self.activity_header.view.height - scramble_height - 24)
@@ -418,7 +419,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         if tab == "stats":
             if self.statistics is None:
                 self.statistics = StatisticsPage(source="timer", data=self.state)
-            self.statistics.set_available_width(self._viewport[0])
+            self.statistics.set_viewport(self.body_host.width,self.body_host.height)
             self.statistics.open_for(self.state.data.active_practice_session)
             self.body_host.content = self.statistics
         else:

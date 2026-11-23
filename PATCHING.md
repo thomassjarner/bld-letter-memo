@@ -1,4 +1,4 @@
-# Update to 2.55.0: whole-session statistics
+# Update to 2.56.0: timer forecasts and interactive statistics charts
 
 Use the existing Git repository on your Desktop. Merge the updated **core**,
 **ui** and **tests** folders and the four Markdown files from the extracted
@@ -9,7 +9,7 @@ already there, run this directly:
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web &&
 git add -- core ui tests README.md CHANGELOG.md UI_CHANGES.md PATCHING.md &&
-{ git diff --cached --quiet || git commit -m "Show whole-session stats and estimated Ao5 odds"; } &&
+{ git diff --cached --quiet || git commit -m "Weight recent solves and fix statistics chart interactions"; } &&
 git push origin main
 ```
 

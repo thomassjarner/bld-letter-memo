@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.56.0
+
+- Weight timer forecasts by recency, with a half-life of 20 attempts. Added
+  single and valid-Ao5 odds for a chosen time goal. Recorded accuracy, medians,
+  streaks and personal bests still use the actual results.
+- Inspect Timer and Progressive Memo charts by hovering or tapping. Show
+  the observed value, the trend at that point, and the range for grouped marks.
+- Give each activity’s statistics a bounded scrolling report and an interactive
+  scrollbar. The scope filters stay above the report.
+
 ## 2.55.0
 
 - Timer and Progressive Memo statistics default to the whole selected history.
