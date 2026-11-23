@@ -3,28 +3,34 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.53.0**.
+or as a desktop app. Current version: **2.54.0**.
 
 ## Training statistics
 
-Open **Practice → Training statistics**, the shortcut on Home, or **Statistics**
-in the Timer’s session history. Progressive Memo also has a chart button beside
-**Saved attempts**. Statistics uses the history already on this device, including
-history synced from another device. You do not need to sign in or retrace scrambles.
+Open **Blind Timer → Statistics** for solves, or **Progressive Memo → Statistics**
+for letter recall. The activity tab beside **Statistics** takes you back to
+your current scramble or memo result. Review filters do not switch your active
+timer session or letter scheme. Your existing local and synced history works
+immediately; there is no need to analyze the scrambles again.
 
-- **Blind Timer:** choose one session. The success rate includes every attempt.
-  Successful +2 results include the penalty. A DNF appears as a cross below the
-  time chart and counts against accuracy. Median and best single use successes.
-- **Progressive Memo:** view all schemes or one saved scheme. Letter accuracy
-  divides correct letters by scored letters across the selected attempts.
-  See perfect rounds and median memo/recall times; switch the time chart between
-  total, memo and recall. A round with no scored letters is not a perfect round.
-- **Trends:** dots show individual attempts. The line uses a complete trailing
-  window of 5, 12 or 50 attempts. The change compares the latest window with
-  the immediately preceding, non-overlapping window: percentage points for
-  accuracy and seconds faster/slower for median time. The plot shows up to
-  100 attempts; summary cards cover the full selection. Older undated solves
-  keep their place using their saved order.
+- **Timer results:** success rate uses every attempt. Successful times include
+  +2 penalties; a DNF counts against accuracy and appears as a cross below the
+  time chart. Typical time and best single use successful solves. **Latest Ao5**
+  is the actual trimmed average of the five most recent attempts.
+- **Next-solve estimates:** the projected successful single is the median
+  successful time in the chosen rolling window. The projected next Ao5 uses
+  the last four actual solves and that estimated fifth time, dropping the best
+  and worst. Two DNFs already in the last four make that average a DNF even if
+  the next solve succeeds. Estimates show the sample behind them and never
+  enter your solve history.
+- **Progressive Memo:** filter by saved letter scheme or view all schemes.
+  Accuracy is correct letters divided by scored letters. Compare memo, recall
+  or total duration, and see how many rounds were perfect.
+- **Reading the charts:** dots are individual attempts. The rolling line starts
+  with the first attempt and uses up to the most recent 5, 12 or 50 at each
+  point. For example, one success in five solves shows 20% even with a window
+  of 50. The chart displays the latest 100 attempts; the summary covers the
+  entire selection, including older solves without a date.
 
 ## Optional WCA sign-in
 
@@ -50,8 +56,7 @@ See [patching instructions](PATCHING.md) for a routine update or the earlier 2.5
 - **Method Library** — browse 378 UFR 3-style corner cases, save preferred
   algorithms, use linked move/commutator fields, explore arbitrary algorithms
   in the Playground, watch a Scramble walkthrough and train case recall.
-- **Practice** — open Blind Timer, Progressive Memo, the 3-style corner trainer,
-  or Training statistics.
+- **Practice** — open Blind Timer, Progressive Memo, or the 3-style corner trainer.
 - **Timer** — a dedicated destination with sessions, history, averages and
   full-cube, edges-only and corners-only training.
 - **Settings** — optional WCA sign-in and cloud sync, five light color themes, dark mode, playback preferences and backup import/export.
@@ -70,7 +75,7 @@ Home groups its shortcuts by what you want to do:
 | **Set up your memo** | Set up your letter scheme; Build your letter pairs |
 | **Analyze a scramble** | Scramble Memo; Scramble walkthrough |
 | **Learning material** | Method Library; Algorithm Playground |
-| **Practice** | Blind Timer; Progressive Memo; 3-style corner trainer; Training statistics |
+| **Practice** | Blind Timer; Progressive Memo; 3-style corner trainer |
 
 Each full-width feature row is one keyboard-accessible link. The four groups
 sit in two columns on wider screens and stack into one scrolling column on

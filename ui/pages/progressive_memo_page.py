@@ -13,7 +13,9 @@ from core.scramble_generator import ScrambleGenerator
 from core.tracer import ScrambleError
 from data.models import ProgressiveMemoAttempt
 from ui.design import panel
-from ui.pages.practice_page import _format_centiseconds
+from core.training_statistics import format_time as _format_centiseconds
+from ui.components.activity_tabs import ActivityHeader
+from ui.pages.statistics_page import StatisticsPage
 from ui.theme_colors import ThemeAwarePage, apply_palette
 
 
@@ -25,7 +27,6 @@ def order_label(order):
 class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
     back_callback = None
     open_scheme_callback = None
-    open_stats_callback = None
     INTRO_SECONDS = 1.0
     SPACE_KEYS = {" ", "Space", "Spacebar"}
     LEFT_KEYS = {"ArrowLeft", "Arrow Left", "Left"}
@@ -48,6 +49,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.spacing = 12
         self.scroll = None
         self.active = False
+        self.activity_tab = "train"
+        self.statistics = None
         self.generator = ScrambleGenerator()
         self.current_scramble = self.generator.generate()
         self.run: ProgressiveRun | None = None
@@ -65,13 +68,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
 
         self.clock = ft.Text("0.00", size=14, font_family="monospace", color=ft.Colors.ON_SURFACE)
         self.cancel_button = ft.TextButton("Cancel", on_click=self._cancel)
-        self.title_text = ft.Text("Progressive Memo", size=23, weight=ft.FontWeight.W_600,
-                                  expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
-        self.header = ft.Row([
-            ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", on_click=self._back),
-            self.title_text,
-            self.clock, self.cancel_button,
-        ], height=40, spacing=8)
+        self.activity_header = ActivityHeader("Progressive Memo", self._back,
+            ft.Row([self.clock, self.cancel_button], tight=True, spacing=6), "Train", self._select_activity_tab)
+        self.header, self.title_text = self.activity_header.view, self.activity_header.title
         self.scheme_dropdown = ft.Dropdown(label="Letter scheme", width=280, dense=True,
                                           on_select=self._choose_scheme)
         self.display_letters = ft.Text("", size=84, weight=ft.FontWeight.W_600,
@@ -91,12 +90,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.history = ft.ListView(spacing=4, scroll=ft.ScrollMode.ALWAYS)
         self.older_button = ft.TextButton("Older attempts", height=32, on_click=self._older_attempts)
-        self.stats_button = ft.IconButton(ft.Icons.SHOW_CHART, tooltip="Progressive Memo statistics",
-            width=34, height=30, icon_size=19, padding=3,
-            on_click=lambda e: self.open_stats_callback() if self.open_stats_callback and not self.in_attempt else None)
         self.history_panel = panel(ft.Column([
             ft.Row([ft.Text("Saved attempts", size=14, weight=ft.FontWeight.W_600, expand=True),
-                    self.history_meta, self.stats_button], height=30),
+                    self.history_meta], height=30),
             self.history, self.older_button,
         ], spacing=8), padding=14)
         self.main_region = ft.Column(spacing=12)
@@ -105,7 +101,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             on_key_up=self._key_up,
             on_key_repeat=lambda e: None, autofocus=True,
         )
-        self.controls = [self.header, self.keyboard_listener]
+        self.body_host = ft.Container(content=self.keyboard_listener, expand=True)
+        self.controls = [self.header, self.body_host]
         self.set_viewport(*self._viewport)
         self.refresh(update=False)
 
@@ -155,9 +152,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         width, height = max(280.0, float(width)), max(300.0, float(height))
         self._viewport = (width, height)
         self.width, self.height = width, height
-        self.header.width = width
-        self.title_text.size = 23 if width >= 600 else 18
-        main_height = height - 52
+        self.activity_header.resize(width)
+        self.body_host.width = width
+        main_height = height - self.header.height - self.spacing
         wide = width >= 1000
         history_width = min(360, width * 0.28) if wide else width
         stage_width = width - history_width - 16 if wide else width
@@ -189,7 +186,31 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         elif self.active and self.in_attempt:
             self._focus(self.phase == "recall")
 
+    def _select_activity_tab(self, tab):
+        if tab not in {"train", "stats"} or self.in_attempt:
+            self.activity_header.select(self.activity_tab)
+            self._update()
+            return
+        if tab == self.activity_tab:
+            return
+        self.activity_tab = tab
+        self.activity_header.select(tab)
+        if tab == "stats":
+            if self.statistics is None:
+                self.statistics = StatisticsPage(source="memo", data=self.state)
+            self.statistics.open_for(self.state.data.active_scheme)
+            self.body_host.content = self.statistics
+        else:
+            self.body_host.content = self.keyboard_listener
+            self.refresh(update=False)
+        self._update()
+
     def refresh(self, update=True):
+        if self.activity_tab == "stats":
+            self.statistics.open_for(self.state.data.active_scheme)
+            if update:
+                self._update()
+            return
         self.scheme_dropdown.options = [ft.DropdownOption(name, name) for name in self.state.scheme_names]
         self.scheme_dropdown.value = self.state.data.active_scheme
         if self.result and not any(item.id == self.result.id for item in self.state.data.progressive_memo_history):
@@ -208,7 +229,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
 
     def _render_stage(self):
         self.presentation = None
-        self.stats_button.disabled = self.in_attempt
+        self.activity_header.picker.disabled = self.in_attempt
         self.cancel_button.visible = self.in_attempt
         self.clock.visible = self.phase != "ready"
         if self.phase == "ready":
@@ -324,6 +345,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.refresh()
 
     def _start(self, e=None):
+        if self.activity_tab != "train":
+            return
         if not self.active or self.in_attempt or self.state.active_scheme is None:
             return
         try:
@@ -380,6 +403,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             await asyncio.sleep(0.2)
 
     def _key_down(self, e):
+        if self.activity_tab != "train":
+            return
         if self.active and self.phase == "recall":
             if e.key in self.LEFT_KEYS:
                 self._previous()
@@ -399,6 +424,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         # This avoids a keyboard callback reading a stale final typed letter.
 
     def _key_up(self, e):
+        if self.activity_tab != "train":
+            return
         if e.key in self.SPACE_KEYS:
             self._space_submitted = False
             self._last_space_letters = ""
@@ -520,6 +547,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.refresh(update=update)
 
     def _back(self, e=None):
+        if self.activity_tab == "stats":
+            self._select_activity_tab("train")
+            return
         if self.back_callback:
             self.back_callback()
 
@@ -529,7 +559,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                    self._focus_revision, selected)
 
     async def _focus_async(self, recall, token, index, revision=None, selected=None):
-        if not self.active or token != self._generation or not self.in_attempt:
+        if self.activity_tab != "train" or not self.active or token != self._generation or not self.in_attempt:
             return
         if recall != (self.phase == "recall"):
             return

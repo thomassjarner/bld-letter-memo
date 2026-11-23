@@ -1,23 +1,21 @@
-# Update to 2.53.0: training statistics
+# Update to 2.54.0: activity statistics
 
-If WCA sync already works, this release only needs the ordinary GitHub Pages
-push. You do **not** need to deploy a Worker, change a secret, migrate the
-database, or sign in again. Keep your existing Desktop project folder.
-
-Extract the ZIP in Downloads, then paste into Terminal:
+Use the existing Git repository on your Desktop. Merge the updated **core**,
+**ui** and **tests** folders and the four Markdown files from the extracted
+release into `~/Desktop/letterpairscheme-helper-web`. Keep your local
+configuration, including `cloud/wrangler.toml`. If the updated files are
+already there, run this directly:
 
 ```bash
-rsync -av --exclude='/.git/' --exclude='/.github/' --exclude='/cloud/' --exclude='.dev.vars*' \
-  ~/Downloads/bld-letter-memo-web-2.53.0/ ~/Desktop/letterpairscheme-helper-web/ &&
 cd ~/Desktop/letterpairscheme-helper-web &&
 git add -- core ui tests README.md CHANGELOG.md UI_CHANGES.md PATCHING.md &&
-git commit -m "Add training statistics and smooth page transitions" &&
-git push
+{ git diff --cached --quiet || git commit -m "Move statistics into each activity and add projected times"; } &&
+git push origin main
 ```
 
-After the Pages deployment finishes, open **Practice → Training statistics**.
-The charts use your existing history immediately. The exclusions above leave
-your working cloud configuration and Pages workflow in place.
+After GitHub Pages deploys, open **Blind Timer → Statistics** or **Progressive
+Memo → Statistics**. Existing solves and synced data work immediately. This
+update does not change the Pages workflow, Worker or database.
 
 ## Previous update: 2.52.1 WCA return repair (only if still on the old Worker)
 

@@ -24,7 +24,6 @@ HOME_GROUPS = (
         ("timer", "Blind Timer", "Time your solves and review sessions and history.", "Timer"),
         ("progressive", "Progressive Memo", "Memo a real scramble, then test your typed recall.", "Progressive Memo"),
         ("trainer", "3-style corner trainer", "Recall your algorithms and review each case.", "3-style corner trainer"),
-        ("statistics", "Training statistics", "See rolling accuracy and how your times change.", "Training statistics"),
     )),
 )
 

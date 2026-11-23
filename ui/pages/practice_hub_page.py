@@ -4,7 +4,6 @@ import flet as ft
 from ui.design import activity_card, page_heading
 from ui.navigation_motion import route_switcher
 from ui.pages.progressive_memo_page import ProgressiveMemoPage
-from ui.pages.statistics_page import StatisticsPage
 from ui.theme_colors import ThemeAwarePage
 
 
@@ -33,8 +32,6 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.progressive = ProgressiveMemoPage(data=self.state)
         self.progressive.key = "practice_memo"
         self.progressive.back_callback = self.show_menu
-        self.progressive.open_stats_callback = lambda: self.open_statistics("memo", scheme=self.state.data.active_scheme, origin="memo")
-        self.statistics = StatisticsPage(data=self.state, key="practice_statistics")
         self.menu = ft.Column(key="practice_activities", scroll=ft.ScrollMode.AUTO, spacing=12,
                               horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
         self.switcher = route_switcher(self.menu, expand=True)
@@ -64,8 +61,6 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.menu.controls = [
             page_heading("Practice", "Choose what to train: complete solves, memo, or corner algorithms."),
             ft.ResponsiveRow(activities, spacing=12, run_spacing=12),
-            ft.OutlinedButton("Training statistics", icon=ft.Icons.INSIGHTS,
-                on_click=lambda e: self.open_statistics("timer", session=self.state.data.active_practice_session)),
             ft.ExpansionTile(title=ft.Text("More practice modes", size=14, color=ft.Colors.ON_SURFACE),
                 subtitle=ft.Text("Planned activities", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 expanded=False, maintain_state=True, dense=True, tile_padding=0, controls_padding=8,
@@ -92,28 +87,6 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
             self.update()
         self.set_active(True)
 
-    def open_statistics(self, source="timer", *, session=None, scheme=None, origin="practice", update=True):
-        if self.mode == "progressive" and self.progressive.in_attempt:
-            return False
-        self.set_active(False)
-        self.mode = "statistics"
-        self.statistics.select(source, session=session, scheme=scheme)
-        def back():
-            if origin == "memo":
-                self.open_progressive()
-            elif origin == "timer":
-                self.show_menu(update=False)
-                self.open_timer_callback()
-            else:
-                self.show_menu()
-        self.statistics.back_callback = back
-        self.statistics.back_label = {"memo":"Back to Progressive Memo", "timer":"Back to Timer"}.get(origin,"Back to Practice")
-        self.statistics.refresh(update=False)
-        self.switcher.content = self.statistics
-        if update and self._mounted():
-            self.update()
-        return True
-
     def set_active(self, active):
         self.active = bool(active) and self.mode == "progressive"
         self.progressive.set_active(self.active and self.mode == "progressive")
@@ -122,12 +95,9 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.width, self.height = width, height
         self._viewport = (width, height)
         self.menu.width, self.menu.height = width, height
-        self.statistics.width, self.statistics.height = width, height
         self.progressive.set_viewport(width, height)
 
     def refresh(self, update=True):
         if self.mode == "progressive":
             self.progressive.refresh(update=update)
-        elif self.mode == "statistics":
-            self.statistics.refresh(update=update)
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.54.0
+
+- Moved statistics into Blind Timer and Progressive Memo. Each activity has a
+  local Statistics tab and remembers its own review filters.
+- Kept filters, charts and recent-attempt controls mounted while changing the
+  rolling window, session, scheme or timing phase. Empty selections remain navigable.
+- Rolling accuracy and median time start with the first saved attempt. Removed
+  the two-window comparison and show the actual sample counts instead.
+- Added a recent-pace estimate for a successful single and a conditional next
+  Ao5 beside the last recorded Ao5. Penalties and DNFs use the timer's rules.
+
 ## 2.53.0
 
 - Added Training statistics under Home and Practice, with shortcuts in both

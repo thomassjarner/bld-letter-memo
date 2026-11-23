@@ -7,9 +7,11 @@ import time
 import flet as ft
 from ui.theme_colors import SUCCESS_COLOR, ThemeAwarePage, show_themed_dialog
 from ui.feature_icons import feature_icon
+from ui.components.activity_tabs import ActivityHeader
+from ui.pages.statistics_page import StatisticsPage
 
 from core.scramble_generator import ScrambleGenerator
-from core.training_statistics import effective_time as _effective_centiseconds, format_time as _format_centiseconds
+from core.training_statistics import effective_time as _effective_centiseconds, format_time as _format_centiseconds, trimmed_time
 from ui.design import activity_card, page_heading, panel, eyebrow
 
 
@@ -17,34 +19,7 @@ def _wca_average(solves, count: int):
     """Return centiseconds, 'DNF', or None using WCA-style trimmed average."""
     if len(solves) < count:
         return None
-    window = list(solves[-count:])
-    dnfs = sum(1 for s in window if s.dnf)
-    if dnfs >= 2:
-        return "DNF"
-
-    values = [None if s.dnf else _effective_centiseconds(s) for s in window]
-    finite = [v for v in values if v is not None]
-    if not finite:
-        return "DNF"
-
-    best = min(finite)
-    removed_best = False
-    remaining = []
-    for value in values:
-        if value == best and not removed_best:
-            removed_best = True
-            continue
-        remaining.append(value)
-
-    if None in remaining:
-        remaining.remove(None)
-    elif remaining:
-        remaining.remove(max(remaining))
-
-    if not remaining:
-        return None
-    return int(round(sum(remaining) / len(remaining)))
-
+    return trimmed_time([None if s.dnf else _effective_centiseconds(s) for s in solves[-count:]])
 
 
 def _best_wca_average(solves, count: int):
@@ -72,7 +47,6 @@ class PracticePage(ThemeAwarePage, ft.Column):
     open_corner_walkthrough_callback = None
     open_timer_callback = None
     open_practice_callback = None
-    open_stats_callback = None
 
     """Practice hub plus Blind Timer.
 
@@ -103,6 +77,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
         self.mode = "menu"
         self.active = False
+        self.activity_tab = "train"
+        self.statistics = None
 
         self._scramble_context_key = None
         self._scramble_error = ""
@@ -218,6 +194,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self._show_timer()
 
     def _back_to_practice(self, e=None):
+        if self.activity_tab == "stats":
+            self._select_activity_tab("train")
+            return
         if self.running:
             return
         if self.open_practice_callback:
@@ -252,8 +231,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _show_timer(self, e=None, update=True):
         self.mode = "timer"
+        self.activity_tab = "train"
         self.scroll = None
-        self.spacing = 0
+        self.spacing = 12
 
         self.scramble_text.expand = True
         self._scramble_panel = panel(ft.Row([
@@ -283,14 +263,11 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
         self._stats_button = ft.IconButton(ft.Icons.INSIGHTS, tooltip="Session statistics",
                                            on_click=self._show_session_stats, visible=False)
-        self._trends_button = ft.TextButton("Statistics", icon=ft.Icons.SHOW_CHART, height=32,
-            tooltip="View accuracy and time trends for this session", on_click=self._open_statistics)
         self.history_panel = panel(ft.Column([
             ft.Container(ft.Row([
                 ft.Text("Session history", size=15, weight=ft.FontWeight.W_600,
                         color=ft.Colors.ON_SURFACE, expand=True),
                 self._stats_button,
-                self._trends_button,
                 ft.IconButton(ft.Icons.DELETE_SWEEP_OUTLINED, tooltip="Reset session",
                               icon_size=18, on_click=self._confirm_reset),
             ], spacing=2), height=32),
@@ -300,14 +277,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=4), height=28),
         ], spacing=8), padding=12)
         self._main_region = ft.Column(spacing=0)
+        self.activity_header = ActivityHeader("Blind Timer", self._back_to_practice, self.session_dropdown,
+                                              "Timer", self._select_activity_tab)
         self._timer_body = ft.Column([
-            ft.Container(ft.Row([
-                ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", icon_size=19,
-                              on_click=self._back_to_practice),
-                ft.Text("Blind Timer", size=23, weight=ft.FontWeight.W_600,
-                        color=ft.Colors.ON_SURFACE, expand=True),
-                self.session_dropdown,
-            ], spacing=8), height=44),
             self._scramble_panel,
             self._main_region,
         ], spacing=12, expand=True)
@@ -318,7 +290,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
             on_key_down=self._on_key_down, on_key_repeat=self._on_key_repeat,
             on_key_up=self._on_key_up, expand=True,
         )
-        self.controls = [self.keyboard_listener]
+        self.body_host = ft.Container(content=self.keyboard_listener, expand=True)
+        self.controls = [self.activity_header.view, self.body_host]
         self._timer_layout_wide = None
         self.set_viewport(*self._viewport)
         self._refresh_stats_and_history(update=False)
@@ -332,9 +305,12 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._viewport = (width, height)
         if self.mode != "timer" or not hasattr(self, "_main_region"):
             return
+        self.width, self.height = width, height
+        self.activity_header.resize(width)
+        self.body_host.width = width
         wide = width >= 1000
         scramble_height = 72 if wide else (90 if width >= 600 else 104)
-        main_height = max(120, height - 44 - scramble_height - 24)
+        main_height = max(120, height - self.activity_header.view.height - scramble_height - 24)
         # Very short phone windows can scroll the complete workspace rather
         # than clip the second row of named analysis actions or history footer.
         short = not wide and main_height < 240
@@ -443,9 +419,26 @@ class PracticePage(ThemeAwarePage, ft.Column):
         )
         show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
-    def _open_statistics(self, e=None):
-        if self.open_stats_callback and not self.running and not self.holding_space:
-            self.open_stats_callback()
+    def _select_activity_tab(self, tab):
+        if tab not in {"train", "stats"} or self.running or self.holding_space:
+            self.activity_header.select(self.activity_tab)
+            self._safe_update()
+            return
+        if tab == self.activity_tab:
+            return
+        self.activity_tab = tab
+        self.activity_header.select(tab)
+        if tab == "stats":
+            if self.statistics is None:
+                self.statistics = StatisticsPage(source="timer", data=self.state)
+            self.statistics.open_for(self.state.data.active_practice_session)
+            self.body_host.content = self.statistics
+        else:
+            self.body_host.content = self.keyboard_listener
+            self.refresh(update=False)
+        self._safe_update()
+        if tab == "train":
+            self._focus_keyboard_listener()
 
     def _close_session_stats(self):
         self.page.pop_dialog()
@@ -455,10 +448,15 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.active = bool(active)
         if not self.active:
             self._reset_hold_state()
-        elif self.mode == "timer":
+        elif self.mode == "timer" and self.activity_tab == "train":
             self._focus_keyboard_listener()
 
     def refresh(self, update: bool = True):
+        if self.activity_tab == "stats":
+            self.statistics.open_for(self.state.data.active_practice_session)
+            if update:
+                self._safe_update()
+            return
         self.session_dropdown.value = self.state.data.active_practice_session
         if not self.running:
             self._sync_scramble_context()
@@ -551,12 +549,13 @@ class PracticePage(ThemeAwarePage, ft.Column):
         # In Flet 0.86 focus() is async. Calling it without awaiting only creates
         # a coroutine and does not reliably move browser focus, which can leave
         # the timer deaf to Space after navigation.
-        if self.page is not None:
+        if self.active and self.activity_tab == "train" and self.page is not None:
             self.page.run_task(self._focus_keyboard_listener_async)
 
     async def _focus_keyboard_listener_async(self):
         try:
-            if self.keyboard_listener is not None and self.keyboard_listener.page is not None:
+            if (self.active and self.activity_tab == "train" and self.keyboard_listener is not None
+                    and self.keyboard_listener.page is not None):
                 await self.keyboard_listener.focus()
         except Exception:
             # Autofocus remains as a fallback when the control is first mounted.
@@ -569,7 +568,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self.timer_text.color = ft.Colors.ON_SURFACE
 
     def _on_key_down(self, e: ft.KeyDownEvent):
-        if not self.active or self.mode != "timer":
+        if not self.active or self.mode != "timer" or self.activity_tab != "train":
             return
 
         now = time.monotonic()
@@ -603,7 +602,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self.page.run_task(self._arm_after_delay)
 
     def _on_key_up(self, e: ft.KeyUpEvent):
-        if not self.active or self.mode != "timer":
+        if not self.active or self.mode != "timer" or self.activity_tab != "train":
             return
         if e.key not in self.SPACE_KEYS or not self.holding_space:
             return
@@ -701,8 +700,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
     def _update_analysis_availability(self):
-        if hasattr(self, "_trends_button"):
-            self._trends_button.disabled = self.running or self.holding_space
+        if hasattr(self, "activity_header"):
+            self.activity_header.picker.disabled = self.running or self.holding_space
         current_disabled = self.running or self.holding_space or not self.current_scramble or bool(self._scramble_error)
         eligible = self.last_solve_index is not None and 0 <= self.last_solve_index < len(self.state.data.practice_solves)
         result_disabled = self.running or self.holding_space or not eligible

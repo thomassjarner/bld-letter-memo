@@ -72,14 +72,13 @@ def block(rows):
 class Point:
     number: int
     attempt: Attempt
-    rolling: Block | None
+    rolling: Block
 
 
 @dataclass(frozen=True, slots=True)
 class Summary:
     overall: Block
     recent: Block | None
-    previous: Block | None
     best: int | None
     perfect: int
     memo_median: float | None
@@ -93,12 +92,35 @@ def summarize(rows, window=12):
     n = len(rows)
     # Bound chart work for long histories; the first visible point can still
     # use earlier attempts. No tracing, time-based guesses or synthetic DNFs.
-    points = tuple(Point(end, rows[end - 1], block(rows[end-window:end]) if end >= window else None)
+    points = tuple(Point(end, rows[end - 1], block(rows[max(0, end-window):end]))
                    for end in range(max(1, n-PLOT_LIMIT+1), n+1))
     return Summary(
         block(rows), points[-1].rolling if points else None,
-        block(rows[n-2*window:n-window]) if n >= 2*window else None,
         min((r.time for r in rows if r.time is not None), default=None),
         sum(r.scored > 0 and r.correct == r.scored for r in rows),
         median_of(r.memo for r in rows), median_of(r.recall for r in rows), points,
     )
+
+
+def trimmed_time(times):
+    """The timer's Ao5/Ao12 rule: drop best and worst; None is a DNF."""
+    if len(times) < 3:
+        return None
+    finite = sorted(t for t in times if t is not None)
+    dnfs = len(times) - len(finite)
+    if dnfs >= 2:
+        return "DNF"
+    middle = finite[1:] if dnfs else finite[1:-1]
+    return round(sum(middle) / len(middle))
+
+
+def projected_ao5(rows, next_single):
+    """Conditional next Ao5, not a simulated run of five future solves."""
+    if len(rows) < 4:
+        return None
+    last_four = [r.time for r in rows[-4:]]
+    if last_four.count(None) >= 2:
+        return "DNF"  # Even a successful fifth solve cannot rescue this average.
+    if next_single is None:
+        return None
+    return trimmed_time([*last_four, round(next_single)])

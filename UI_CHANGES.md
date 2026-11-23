@@ -1,3 +1,16 @@
+# 2.54.0 · Statistics inside each activity
+
+Open Blind Timer or Progressive Memo and select **Statistics** beside **Timer**
+or **Train**. On phones, the tabs sit below the title. Filters stay above the
+scrolling report, including when a selected timer session has no history.
+An in-progress attempt keeps the training controls active. Returning from
+statistics preserves the scramble or the memo result.
+
+The first row shows recorded results. The timer labels the projected single
+and next Ao5 separately and explains how many successes support the estimate.
+Charts immediately show the available samples; expanding Recent attempts
+keeps the row list open when a filter changes.
+
 # 2.53.0 · Training statistics
 
 Home and Practice link directly to the charts. Timer opens the current session,

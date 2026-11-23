@@ -32,7 +32,7 @@ HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_I
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.53.0"
+    page.title = "BLD Letter Memo · 2.54.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -86,11 +86,7 @@ async def main(page: ft.Page):
     practice_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     scramble_page.open_scheme_callback = lambda: navigate_to(SCHEMES_INDEX)
     practice_page.show_menu(update=False)
-    def open_statistics_from_timer():
-        if practice_page.open_statistics("timer", session=state.data.active_practice_session,
-                                         origin="timer", update=False):
-            navigate_to(PRACTICE_INDEX, refresh=False)
-    timer_page.open_stats_callback = open_statistics_from_timer
+
     def open_home_destination(name):
         if name == "Method Library":
             method_page._set_mode("overview")
@@ -107,9 +103,6 @@ async def main(page: ft.Page):
         elif name == "3-style corner trainer":
             method_page._set_mode("trainer")
             navigate_to(METHOD_INDEX)
-        elif name == "Training statistics":
-            if practice_page.open_statistics("timer", session=state.data.active_practice_session, update=False):
-                navigate_to(PRACTICE_INDEX, refresh=False)
         else:
             navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name))
 
@@ -154,7 +147,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.53.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text("Blindfold training · v2.54.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 
@@ -337,7 +330,7 @@ async def main(page: ft.Page):
             except (RuntimeError, ValueError, TimeoutError, ft.FletException):
                 return  # Older clients use Flutter's native animation behavior.
             if flags.disable_animations:
-                for host in (content_area, practice_page.switcher, practice_page.statistics.chart_switcher):
+                for host in (content_area, practice_page.switcher):
                     set_reduced_motion(host, True)
                 page.update()
         page.run_task(read_motion_preference)
