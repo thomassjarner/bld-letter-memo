@@ -35,6 +35,7 @@ class TrendChart:
         self.percent, self.timer, self.state = percent, timer, state
         self.width = 220
         self.series = None
+        self.ao5 = False
         self.points = self.numbers = ()
         self.selected_index = None
         self.idle = ""
@@ -67,19 +68,23 @@ class TrendChart:
             ft.Row([ft.Stack(self.axis, width=56, height=PLOT_HEIGHT), plot], spacing=4, height=PLOT_HEIGHT),
             ft.Container(self.x_axis, padding=ft.Padding.only(left=60)),
             ft.Row(legend, spacing=14, run_spacing=3, wrap=True),
-        ], spacing=5, tight=True), col={"xs":12,"lg":6}, padding=14)
+        ], spacing=5, tight=True,horizontal_alignment=ft.CrossAxisAlignment.STRETCH), padding=14)
 
-    def set_series(self, title, headline, detail, points, window=None):
+    def set_series(self, title, headline, detail, points, window=None, *, ao5=False):
         self.title.value, self.headline.value = title, headline
         self.points = points
+        self.ao5 = ao5
         self.idle = detail + " Hover or tap for values."
         self.clear_inspection()
         grouped = any(p.group.attempts > 1 for p in points)
         self.observed_key.controls[1].value = ("Group rate" if self.percent else "Group median") if grouped else "Attempt"
         self.line_key.controls[1].value = "Cumulative" if window is None else f"Rolling {window}"
+        self.observed_key.visible = not ao5
+        if ao5:
+            self.line_key.controls[1].value = "Group median Ao5" if grouped else "Recorded Ao5"
         # Cumulative endpoint numbers already appear in the summary above.
-        self.headline.visible = window is not None
-        raw = [p.group.accuracy if self.percent else p.group.median for p in points]
+        self.headline.visible = not ao5 and window is not None
+        raw = [None if ao5 else p.group.accuracy if self.percent else p.group.median for p in points]
         trend = [p.rolling.accuracy if self.percent else p.rolling.median for p in points]
         values = [v for v in raw+trend if v is not None]
         lo, hi = chart_bounds(values, self.percent)
@@ -117,6 +122,12 @@ class TrendChart:
         group,a = p.group,p.attempt
         def rate(v): return "—" if v is None else f"{v:.1f}%"
         def time(v): return "—" if v is None else format_time(v)
+        if self.ao5:
+            if group.attempts == 1:
+                result = time(a.time) if a.time is not None else "DNF"
+                return f"Ao5 · {result}\nAttempts #{p.number-4}–{p.number}"
+            return (f"Ao5s ending #{p.number-group.attempts+1}–{p.number} · Median {time(group.median)}\n"
+                    f"{group.timed}/{group.attempts} valid averages")
         if group.attempts > 1:
             label = f"#{p.number-group.attempts+1}–{p.number}"
             value = (f"{rate(group.accuracy)} · {group.correct}/{group.scored}" if self.percent else

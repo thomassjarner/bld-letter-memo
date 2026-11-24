@@ -120,7 +120,7 @@ def test_activity_filters_stay_local_and_do_not_change_training_setup(width):
     assert len(stats.metrics) == 3 and not any("PB" in m.title.value or "single" in m.title.value.lower() for m in stats.metrics)
     records = [p.value for p in stats.pb_values]
     stats._change_scope(event("5"))
-    assert stats.metrics[0].value.value == "80.0%" and stats.accuracy.start.value == "#8"
+    assert stats.metrics[0].value.value == "80.0%" and stats.timing.start.value == "#8"
     assert [p.value for p in stats.pb_values] == records
     stats._change_scope(event("all"))
     for window in (5,50,12):
@@ -144,7 +144,9 @@ def test_activity_filters_stay_local_and_do_not_change_training_setup(width):
     assert hub.mode == "progressive" and ms is not stats and ms.source == "memo"
     ms._change_filter(event("*"))
     assert ms.metrics[0].value.value == "75.0%"
-    ms._change_filter(event(":Speffz")); ms._change_phase(event("recall"))
+    ms._change_filter(event(":Speffz"))
+    ms._change_metric(SimpleNamespace(control=SimpleNamespace(selected=["time"])))
+    ms._change_phase(event("recall"))
     assert ms.metrics[0].value.value == "66.7%" and ms.timing.title.value == "Median recall time over time"
     activity._start(); activity._key_down(SimpleNamespace(key="Space"))
     assert activity.run is None

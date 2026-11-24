@@ -20,11 +20,10 @@ class AverageRecord:
     best: int | None
 
 
-def average_record(times, width):
-    """Visit every overlapping group once; a None is a DNF, not a zero time."""
+def rolling_averages(times, width):
+    """One result for each *completed* window, in order. None means DNF."""
     ordered = []
-    total = valid = 0
-    best = None
+    total = 0
     for i, t in enumerate(times):
         if i >= width:
             old = times[i-width]
@@ -34,13 +33,24 @@ def average_record(times, width):
         if t is not None:
             total += t
             insort(ordered, t)
-        if i+1 < width or len(ordered) < width-1:
+        if i+1 < width:
+            continue
+        if len(ordered) < width-1:
+            yield None
             continue
         middle = total - ordered[0] - (ordered[-1] if len(ordered) == width else 0)
-        value = round(middle / (width-2))
-        best = value if best is None else min(best, value)
-        valid += 1
-    return AverageRecord(valid, max(0,len(times)-width+1), best)
+        yield round(middle / (width-2))
+
+
+def average_record(times, width):
+    """Visit every overlapping group once; a None is a DNF, not a zero time."""
+    valid = 0
+    best = None
+    for value in rolling_averages(times,width):
+        if value is not None:
+            best = value if best is None else min(best,value)
+            valid += 1
+    return AverageRecord(valid,max(0,len(times)-width+1),best)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,9 +60,9 @@ class Records:
     ao12: AverageRecord
 
 
-def session_records(times):
+def session_records(times, *, known_ao5=None):
     return Records(min((t for t in times if t is not None), default=None),
-                   average_record(times,5), average_record(times,12))
+                   known_ao5 if known_ao5 is not None else average_record(times,5),average_record(times,12))
 
 
 @dataclass(frozen=True, slots=True)

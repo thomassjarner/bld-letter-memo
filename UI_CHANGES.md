@@ -1,3 +1,15 @@
+# 2.57.0 · Session overview
+
+Open the Statistics tab inside an activity. The overview and one inspectable
+graph come first. **Time / Accuracy** changes the graph and **Chart view** picks
+the trend, distribution or (in the timer) recorded Ao5. The session and range
+stay pinned. Progressive Memo starts with accuracy; its phase control appears
+only when looking at time.
+
+In Blind Timer the latest Ao5 is a recorded result, with its attempt numbers.
+The separate **Forecasts & time goal** section compares actual results against
+predicted odds. Recent attempts and the small session PB line are below it.
+
 # 2.56.0 · Inspecting training trends
 
 Hover over a chart to place a guide on the nearest mark; tap to inspect it

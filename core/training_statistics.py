@@ -127,6 +127,12 @@ def _single(row):
     return Block(1, row.correct, row.scored, row.time, int(row.time is not None))
 
 
+def plot_ends(n):
+    """End index of every plotted group. Groups are consecutive with no gaps."""
+    return (list(range(n)) if n <= PLOT_LIMIT else
+            [i*(n-1)//(PLOT_LIMIT-1) for i in range(PLOT_LIMIT)])
+
+
 def summarize(rows, window=None, *, offset=0):
     """Cumulative by default. The optional chart window never changes the sample."""
     if window is not None and window not in WINDOWS:
@@ -134,8 +140,7 @@ def summarize(rows, window=None, *, offset=0):
     n = len(rows)
     # Adjacent groups (no gaps). Large plots retain both endpoints and account
     # for every attempt; the recent table still contains the actual last 12.
-    ends = (list(range(n)) if n <= PLOT_LIMIT else
-            [i*(n-1)//(PLOT_LIMIT-1) for i in range(PLOT_LIMIT)])
+    ends = plot_ends(n)
     tail = range(max(0,n-12),n)
     wanted = set(ends).union(tail)
     trends = (_prefix_blocks(rows,wanted) if window is None else

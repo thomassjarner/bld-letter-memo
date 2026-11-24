@@ -3,21 +3,23 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.56.0**.
+or as a desktop app. Current version: **2.57.0**.
 
 ## Training statistics
 
 Open **Blind Timer → Statistics** or **Progressive Memo → Statistics**. Both
 start with **all attempts** in the selected session or memo scheme. **Data
 range** can restrict the report to the last 5, 12 or 50 attempts. The separate
-**Chart line** setting changes the line without changing your sample, odds
+**Chart view** setting changes the graph without changing your sample, odds
 or training setup.
 
-- **Timer:** see your success rate and typical successful solve (the median,
-  including +2 penalties). The timer footer shows success count, Ao5 and Ao12.
+- **Timer overview:** see attempts, successes, DNFs, actual time on the timer,
+  and the latest recorded Ao5. Timer time includes failed attempts and excludes
+  breaks and added penalties. The median and middle 50% (25th to 75th percentile)
+  describe successful times, including +2. The timer footer still shows success count, Ao5 and Ao12.
   The single, Ao5 and Ao12 **session PBs** share one small line below the
   charts in Statistics; they always refer to the whole timer session.
-- **Estimated valid Ao5:** the estimated time *if a new set of five produces
+- **Forecasts & time goal:** below the chart, **Estimated valid Ao5** is the estimated time *if a new set of five produces
   a valid average*. It gives recent outcomes and successful times more weight.
   Relative to the latest attempt, one 20 attempts back has half the weight;
   one 40 back has a quarter. DNFs count as attempts. The forecast
@@ -27,17 +29,25 @@ or training setup.
 - **Odds for the next five:** valid Ao5 (four or five successes in any order),
   four consecutive successes somewhere in the five, and all five successful.
   These estimates use the recency-weighted success rate and assume independent
-  attempts. The adjacent recorded indicators show what actually happened:
-  valid overlapping five-attempt windows, the last Ao5, and success streaks.
+  attempts. **Recent attempts** shows the recorded count of valid overlapping
+  five-attempt windows and current/longest success streaks.
 - **Time goal:** enter a time such as `90` or `1:30.00` to estimate the chance
   of beating it with the next single or a valid Ao5 over five new attempts.
+  Compare that with actual attempts and completed Ao5s under the same goal,
+  using the selected range. Equal times do not beat the goal.
   A DNF single or DNF average does not beat a goal. With varied time histories,
   an ≈ beside the Ao5 odds identifies a repeatable sampling estimate.
 - **Progressive Memo:** letter accuracy is correct letters divided by scored
-  letters. Review perfect rounds and memo, recall or total times. Filter by
-  scheme without switching your active scheme.
-- **Charts:** the default line accumulates every attempt from the start of the
-  selected range. Rolling lines of 5, 12 or 50 are optional. Long histories
+  letters. The overview shows rounds, scored letters, perfect rounds, typical
+  memo and recall times, and separate edge and corner accuracy when saved
+  answers are available. Older summary-only rounds still count in the
+  overall numbers. Filter by scheme without switching your active scheme.
+- **Charts:** switch between **Time** and **Accuracy**. Time includes a
+  distribution with exact counts per band; **Recorded Ao5** in Blind Timer
+  plots consecutive five-attempt averages, starting at the fifth attempt in
+  the selected range. Two DNFs make an Ao5 a DNF. The default trend line
+  accumulates every attempt from the start of the selected range. Rolling
+  median and accuracy lines of 5, 12 or 50 are optional. Long histories
   span the full horizontal axis: nearby attempts share a mark (their observed
   accuracy or median time). Hover or tap to see the attempt number or group
   range, the plotted value and the trend there. A × indicates a DNF; a single

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.57.0
+
+- Put session totals, actual elapsed timer time, the latest recorded Ao5, and
+  the middle 50% of successful solve times at the top of Blind Timer statistics.
+- Show one graph at a time. Time and Accuracy remember their own views; Time
+  adds a distribution and the timer also has a recorded Ao5 graph.
+- Group forecasts below the chart. A time goal now compares recorded singles
+  and Ao5s under the target with the existing recency-weighted odds.
+- Add edge and corner accuracy to Progressive Memo's overview using stored
+  answers where available. Existing histories and backups need no migration.
+
 ## 2.56.0
 
 - Weight timer forecasts by recency, with a half-life of 20 attempts. Added
