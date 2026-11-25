@@ -124,8 +124,9 @@ async def exercise_filter_events(kind):
             if kind=="timer" and metric=="accuracy":
                 assert chart.headline.value == "20.0%"
         if kind == "timer":
-            assert stats.metrics[1].value.value == "5:13.42" and stats.metrics[2].value.value == "DNF"
-            assert stats.metrics[2].detail.value=="Attempts #1–5" and "2 more successful solves" in stats.forecast_caption.value
+            assert stats.metrics[1].value.value == stats.metrics[2].value.value == "5:13.42"
+            assert stats.observed.values[1].value=="DNF" and stats.observed.values[1].tooltip=="Attempts #1–5"
+            assert "2 more successful solves" in stats.forecast_caption.value
             assert [label.value for label in stats.odds.values] == ["0.76%","0.33%","0.04%"]
             assert stats.observed.values[0].value == "0 / 1" and stats.timing.headline.value == "5:13.42"
             await choose(stats.filter_picker,"Session 2")

@@ -1,4 +1,4 @@
-# Update to 2.57.0: session overview and Ao5 charts
+# Update to 2.58.0: successful solve times in the timer overview
 
 Use the existing Git repository on your Desktop. Merge the updated **core**,
 **ui** and **tests** folders and the four Markdown files from the extracted
@@ -9,7 +9,7 @@ already there, run this directly:
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web &&
 git add -- core ui tests README.md CHANGELOG.md UI_CHANGES.md PATCHING.md &&
-{ git diff --cached --quiet || git commit -m "Redesign session statistics around recorded Ao5"; } &&
+{ git diff --cached --quiet || git commit -m "Show mean and median successful solve times in the timer overview"; } &&
 git push origin main
 ```
 

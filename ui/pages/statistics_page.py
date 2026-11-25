@@ -122,10 +122,12 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
                     size=14,color=ft.Colors.ON_SURFACE_VARIANT)],spacing=5,tight=True),padding=16)
         self.coverage = ft.Text(size=13, weight=ft.FontWeight.W_600)
         self.elapsed = ft.Text(size=13,color=ft.Colors.ON_SURFACE_VARIANT)
-        labels = (("Success rate", "Typical successful solve", "Latest Ao5") if timer else
+        labels = (("Success rate", "Mean of successful solves", "Median successful solve") if timer else
                   ("Letter accuracy", "Typical memo", "Typical recall", "Perfect rounds"))
         if timer:
-            self.metrics = [Metric(k, {"xs":12 if i==1 else 6, "sm":4}) for i,k in enumerate(labels)]
+            self.metrics = [Metric(k, {"xs":12 if i==2 else 6, "sm":4}) for i,k in enumerate(labels)]
+            self.metrics[1].view.tooltip="Average of every successful time in this range, including +2 penalties. DNFs are excluded."
+            self.metrics[2].view.tooltip="Middle successful time when sorted by speed; for an even count, the mean of the two middle times. Includes +2 penalties."
         else:
             self.metrics = [Metric(k, {"xs":6,"md":3}) for k in labels]
         self.accuracy = TrendChart(True, timer, self.data)
@@ -142,8 +144,7 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         overview_items = [
             ft.Row([ft.Text("Session overview" if timer else "Memo overview",size=19,weight=ft.FontWeight.W_600),
                     self.coverage,self.elapsed],wrap=True,spacing=14,run_spacing=3),
-            ft.ResponsiveRow([self.metrics[i].view for i in ((0,2,1) if timer else (0,1,2,3))],
-                             spacing=12,run_spacing=8),
+            ft.ResponsiveRow([m.view for m in self.metrics],spacing=12,run_spacing=8),
         ]
         if not timer:
             self.edge_note,self.corner_note = [ft.Text(size=14,weight=ft.FontWeight.W_600) for _ in range(2)]
@@ -161,7 +162,7 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             self.odds = NumberList("Odds for the next five", ["Valid Ao5 · at least 4 of 5",
                                                               "4 in a row within 5", "All 5 successful"])
             self.observed = NumberList("Recorded in this range", ["Valid Ao5s / completed windows",
-                                                                  "Current / longest success streak"])
+                                                                  "Latest recorded Ao5", "Current / longest success streak"])
             self.odds_note = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
             self.goal_field = ft.TextField(label="Time goal", hint_text="1:30.00", width=148, dense=True,
                                           on_submit=self._apply_goal, on_change=self._edit_goal)
@@ -374,17 +375,12 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             self._show_goal()
             self.metrics[0].show(pct(total.accuracy),
                 f"{count(total.correct,'success','successes')} · {count(total.attempts-total.correct,'DNF')}")
+            self.metrics[1].show(clock(self._profile.mean),f"Across {count(total.timed,'successful solve')}"
+                                 if total.timed else "No successful times yet")
             spread=self._profile.middle_half
             detail=(f"Middle 50%: {clock(spread[0])} – {clock(spread[1])}" if spread is not None else
                     "One successful time" if total.timed else "No successful times yet")
-            self.metrics[1].show(clock(total.median),detail)
-            self.metrics[1].view.tooltip="Median and 25th–75th percentiles of successful times. Includes +2 penalties."
-            if self._ao5.values:
-                latest=self._ao5.values[-1]
-                self.metrics[2].show("DNF" if latest is None else clock(latest),
-                                     f"Attempts #{offset+len(rows)-4}–{offset+len(rows)}")
-            else:
-                self.metrics[2].show("—",f"{count(5-len(rows),'more attempt')} for the first Ao5")
+            self.metrics[2].show(clock(total.median),detail)
             needed = MIN_TIMED_SOLVES-total.timed
             self.forecast_caption.value=("Estimated valid Ao5 · "+clock(insights.valid_pace) if needed<=0 else
                 f"Estimated valid Ao5 · {count(needed,'more successful solve')} needed")
@@ -392,7 +388,12 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             odds = insights.odds
             self.odds.show(odds_label(odds.valid),odds_label(odds.run_of_four),odds_label(odds.clean))
             recorded = insights.recorded
-            self.observed.show(f"{recorded.valid} / {recorded.windows}",f"{insights.current_streak} / {insights.longest_streak}")
+            averages=self._ao5.values
+            latest=clock("DNF" if averages[-1] is None else averages[-1]) if averages else "—"
+            self.observed.show(f"{recorded.valid} / {recorded.windows}", latest,
+                               f"{insights.current_streak} / {insights.longest_streak}")
+            self.observed.values[1].tooltip=(f"Attempts #{offset+len(rows)-4}–{offset+len(rows)}" if averages else
+                                             f"{count(5-len(rows),'more attempt')} for the first Ao5")
             self.odds_note.value = (("Small sample. " if len(rows)<10 else "") +
                 f"Forecast success rate: {pct(100*self._forecast.success_rate)}. "
                 f"Each {HALF_LIFE} attempts back halves a solve’s weight. Next-five odds assume independent attempts.")

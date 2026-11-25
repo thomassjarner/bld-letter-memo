@@ -19,8 +19,10 @@ def test_clock_time_does_not_add_penalties_or_drop_dnf_elapsed():
 
 def test_recorded_consistency_and_target_use_successful_adjusted_times_and_strict_goal():
     p=TimeProfile.from_times([None,100,0,130,60])
-    assert p.total==5 and p.middle_half==(45,107.5)
+    assert p.total==5 and p.mean==72.5 and p.middle_half==(45,107.5)
     assert p.under(100)==2 and p.under(131)==4
+    assert TimeProfile.from_times([None,None]).mean is None
+    assert TimeProfile.from_times([None,0]).mean==0
     assert TimeProfile.from_times([None,42]).middle_half is None
 
 
@@ -68,13 +70,22 @@ def test_goal_counts_scope_and_sparse_ao5_are_independent_of_chart_view():
     event=lambda value:SimpleNamespace(control=SimpleNamespace(value=value))
     assert s.report.controls.index(s.overview)<s.report.controls.index(s.chart_area)
     assert s.report.controls.index(s.chart_area)<s.report.controls.index(s.recent)
-    assert s.metrics[2].value.value=="DNF" and s.metrics[0].value.value=="75.0%"
+    assert [m.title.value for m in s.metrics]==["Success rate","Mean of successful solves","Median successful solve"]
+    assert [m.value.value for m in s.metrics]==["75.0%","1:26.50","1:26.50"]
+    assert s.observed.values[1].value=="DNF"
     s.goal_field.value="1:30";s._apply_goal()
     assert s.goal_recorded.value=="Recorded under 1:30.00: 4/8 attempts (50.0%) · 3/4 Ao5s (75.0%)"
     s._change_scope(event("5"))
+    # The last five include two DNFs and a +2. Their successful results are 86, 87 and 91 s.
+    assert [m.value.value for m in s.metrics]==["60.0%","1:28.00","1:27.00"]
     assert s.goal_recorded.value=="Recorded under 1:30.00: 2/5 attempts (40.0%) · 0/1 Ao5s (0.0%)"
     s._change_window(event("ao5"))
     assert s.timing._readout(0)=="Ao5 · DNF\nAttempts #4–8"
     s._change_filter(event("Session 2"))
     assert s.ao5_wait_panel.visible and "1 of 5" in s.ao5_wait.value and not s.timing.view.visible
-    assert "No completed Ao5 yet" in s.goal_recorded.value and s.metrics[2].value.value=="—"
+    assert "No completed Ao5 yet" in s.goal_recorded.value and s.observed.values[1].value=="—"
+    assert [m.value.value for m in s.metrics]==["100.0%","1:13.00","1:13.00"]
+    repo.data.practice_sessions["Session 2"][0].dnf=True
+    s.refresh(update=False)
+    assert [m.value.value for m in s.metrics]==["0.0%","—","—"]
+    assert s.metrics[2].detail.value=="No successful times yet"

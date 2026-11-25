@@ -3,7 +3,7 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.57.0**.
+or as a desktop app. Current version: **2.58.0**.
 
 ## Training statistics
 
@@ -13,10 +13,11 @@ range** can restrict the report to the last 5, 12 or 50 attempts. The separate
 **Chart view** setting changes the graph without changing your sample, odds
 or training setup.
 
-- **Timer overview:** see attempts, successes, DNFs, actual time on the timer,
-  and the latest recorded Ao5. Timer time includes failed attempts and excludes
-  breaks and added penalties. The median and middle 50% (25th to 75th percentile)
-  describe successful times, including +2. The timer footer still shows success count, Ao5 and Ao12.
+- **Timer overview:** success rate uses every attempt in the selected range.
+  The mean gives every successful time equal weight; the median shows the
+  middle successful time, with the middle 50% of times underneath. Both
+  exclude DNFs and include +2 penalties. Total time on the timer includes
+  failed attempts and excludes breaks and added penalties.
   The single, Ao5 and Ao12 **session PBs** share one small line below the
   charts in Statistics; they always refer to the whole timer session.
 - **Forecasts & time goal:** below the chart, **Estimated valid Ao5** is the estimated time *if a new set of five produces
@@ -29,8 +30,8 @@ or training setup.
 - **Odds for the next five:** valid Ao5 (four or five successes in any order),
   four consecutive successes somewhere in the five, and all five successful.
   These estimates use the recency-weighted success rate and assume independent
-  attempts. **Recent attempts** shows the recorded count of valid overlapping
-  five-attempt windows and current/longest success streaks.
+  attempts. **Recent attempts** shows the latest recorded Ao5, the count of
+  valid overlapping five-attempt windows, and current/longest success streaks.
 - **Time goal:** enter a time such as `90` or `1:30.00` to estimate the chance
   of beating it with the next single or a valid Ao5 over five new attempts.
   Compare that with actual attempts and completed Ao5s under the same goal,

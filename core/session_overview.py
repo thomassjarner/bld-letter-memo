@@ -29,6 +29,11 @@ class TimeProfile:
         return bisect_left(self.timed,goal)
 
     @property
+    def mean(self):
+        """Arithmetic mean of the observed times in this range, in centiseconds."""
+        return sum(self.timed) / len(self.timed) if self.timed else None
+
+    @property
     def middle_half(self):
         """Inclusive, linearly interpolated 25th and 75th percentiles."""
         if len(self.timed)<2:

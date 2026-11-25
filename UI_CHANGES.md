@@ -1,3 +1,10 @@
+# 2.58.0 · Success rate, mean and median
+
+The Blind Timer overview pairs completion rate with two measures of successful
+pace. Longer successful solves pull the mean up; the median still describes
+the middle result. Its middle-50% range stays beneath it. Open **Recent
+attempts** for the latest recorded Ao5, or **Time → Recorded Ao5** for its trend.
+
 # 2.57.0 · Session overview
 
 Open the Statistics tab inside an activity. The overview and one inspectable

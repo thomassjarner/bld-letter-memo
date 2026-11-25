@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.58.0
+
+- The Blind Timer overview now shows success rate, mean of successful solves
+  and median successful solve for the selected range. The latest recorded Ao5
+  is available in Recent attempts and the Recorded Ao5 chart.
+
 ## 2.57.0
 
 - Put session totals, actual elapsed timer time, the latest recorded Ao5, and
