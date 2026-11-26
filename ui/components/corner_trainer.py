@@ -1,4 +1,6 @@
 """A shuffled, self-rated recall round for the fixed UFR corner library."""
+from core.messages import message, compose, join_text, error_message
+from ui.language import present, tr
 import asyncio
 
 import flet as ft
@@ -34,19 +36,19 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
         self.viewer = AlgorithmCube()
         self._viewer_controls = list(self.viewer.controls)
         self.viewer.letter_switch.value = self.viewer.focus_switch.value = False
-        self.subsets = {s: ft.Checkbox(label=s, value=True, label_style=ft.TextStyle(size=13),
+        self.subsets = {s: ft.Checkbox(label=present(s), value=True, label_style=ft.TextStyle(size=13),
                        on_change=self._filter_changed) for s in SUBSETS}
-        self.statuses = {s: ft.Checkbox(label=s.title(), value=True, label_style=ft.TextStyle(size=13),
+        self.statuses = {s: ft.Checkbox(label=tr(s.title()), value=True, label_style=ft.TextStyle(size=13),
                         on_change=self._filter_changed) for s in STATUSES}
         def target(label):
-            return ft.Dropdown(label=label, value='all', dense=True, height=42, text_size=13,
+            return ft.Dropdown(label=present(label), value='all', dense=True, height=42, text_size=13,
                 color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
                 on_select=self._filter_changed, col={'xs':12,'sm':6})
-        self.first_target, self.second_target = target('First target'), target('Second target')
-        self.favorites = ft.Checkbox(label='Favorites only', value=False, label_style=ft.TextStyle(size=13),
+        self.first_target, self.second_target = target(message('First target')), target(message('Second target'))
+        self.favorites = ft.Checkbox(label=tr('Favorites only'), value=False, label_style=ft.TextStyle(size=13),
                                     on_change=self._filter_changed)
         self.match_text = ft.Text(size=13, weight=ft.FontWeight.W_600, color=ft.Colors.PRIMARY)
-        self.start_button = action_button('Start session', primary=True, icon=ft.Icons.PLAY_ARROW, on_click=self._start)
+        self.start_button = action_button(message('Start session'), primary=True, icon=ft.Icons.PLAY_ARROW, on_click=self._start)
         self.listing = ft.ListView(spacing=12, build_controls_on_demand=False, scroll=ft.ScrollMode.AUTO)
         self.controls = [self.listing]
         self._render()
@@ -66,21 +68,21 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
 
     def _filter_changed(self, e=None):
         matches = matching_cases(self.filters(), self.state.data.corner_case_library)
-        self.match_text.value = f'{len(matches)} matching cases · one shuffled pass, no repeats'
+        self.match_text.value = tr('{0} matching cases · one shuffled pass, no repeats', len(matches))
         self.start_button.disabled = not matches
         self._update()
 
     def refresh(self, scheme, update=True):
         self.scheme = scheme
-        for field, name in ((self.first_target, 'first'), (self.second_target, 'second')):
+        for field, name in ((self.first_target, message('first')), (self.second_target, message('second'))):
             def label(sticker):
                 letter = scheme.corners.stickers.get(sticker, '') if scheme else ''
-                return f'{letter} · {sticker}' if letter and letter != 'BUFFER' else sticker
-            field.options = [ft.DropdownOption('all', f'Any {name} target')] + [ft.DropdownOption(s, label(s)) for s in TARGETS]
+                return compose('{0} · {1}', letter, sticker) if letter and letter != 'BUFFER' else sticker
+            field.options = [ft.DropdownOption('all', tr('Any {0} target', message(name)))] + [ft.DropdownOption(s, present(label(s))) for s in TARGETS]
         self.viewer.dark_mode = self.state.data.dark_mode
         self.viewer.set_simultaneous_moves(self.state.data.simultaneous_moves)
         if self.view == 'filters':
-            self.match_text.value = f'{len(matching_cases(self.filters(), self.state.data.corner_case_library))} matching cases · one shuffled pass, no repeats'
+            self.match_text.value = tr('{0} matching cases · one shuffled pass, no repeats', len(matching_cases(self.filters(), self.state.data.corner_case_library)))
             self.start_button.disabled = not matching_cases(self.filters(), self.state.data.corner_case_library)
         self._render()
         if update: self._update()
@@ -91,7 +93,7 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
             self.session = CornerRecallSession(choices, scheme if scheme is not None else self.scheme,
                                                self.state.data.corner_case_library)
         except ValueError as ex:
-            self.error = str(ex); self._render(); self._update(); return
+            self.error = present(error_message(ex)); self._render(); self._update(); return
         self.view = 'recall'
         self._loaded_card = None
         self._prepare()
@@ -120,7 +122,7 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
             self._load_card(card)
         except (ValueError, KeyError) as ex:
             if token != self._token: return
-            self.error = f'Could not prepare this case: {ex}'
+            self.error = tr('Could not prepare this case: {0}', ex)
         self.busy = False
         self._render(); self._update()
 
@@ -182,21 +184,21 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
         if self.open_case_callback: self.open_case_callback(card.case_id, card.algorithm_id)
 
     def _solution(self, card):
-        controls = [ft.Text(card.letters if '?' not in card.letters else card.first + ' / ' + card.second,
+        controls = [ft.Text(present(card.letters if '?' not in card.letters else card.first + ' / ' + card.second),
                       size=24, weight=ft.FontWeight.W_600, color=ft.Colors.PRIMARY, selectable=True),
-            ft.Text(f'UFR → {card.first} → {card.second} · {card.subset}', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text('Commutator', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text(card.commutator or 'No commutator found for this algorithm.', size=13, selectable=True,
+            ft.Text(present(f'UFR → {card.first} → {card.second} · {card.subset}'), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(tr('Commutator'), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(present(card.commutator or message('No commutator found for this algorithm.')), size=13, selectable=True,
                     font_family='monospace', color=ft.Colors.ON_SURFACE),
-            ft.Text('Full alg', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text(' '.join(card.moves), size=13, selectable=True, font_family='monospace', color=ft.Colors.ON_SURFACE),
-            ft.Text(f'{len(card.moves)} moves · {card.name}', size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.TextButton('Open case & edit alg', icon=ft.Icons.OPEN_IN_NEW, height=36,
+            ft.Text(tr('Full alg'), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(present(join_text(' ', card.moves)), size=13, selectable=True, font_family='monospace', color=ft.Colors.ON_SURFACE),
+            ft.Text(tr('{0} moves · {1}', len(card.moves), card.name), size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.TextButton(tr('Open case & edit alg'), icon=ft.Icons.OPEN_IN_NEW, height=36,
                           on_click=lambda e,c=card:self._open_case(c))]
         if '?' in card.letters:
-            controls.insert(1, ft.Text(f'Letters: {card.letters} · some stickers are unassigned.', size=12,
+            controls.insert(1, ft.Text(tr('Letters: {0} · some stickers are unassigned.', card.letters), size=12,
                                       color=ft.Colors.ON_SURFACE_VARIANT))
-        if card.warning: controls.append(ft.Text(card.warning, size=12, color=ft.Colors.TERTIARY))
+        if card.warning: controls.append(ft.Text(present(card.warning), size=12, color=ft.Colors.TERTIARY))
         return controls
 
     def _render(self):
@@ -206,64 +208,60 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
         self.listing.width, self.listing.height = width, height
         if self.view == 'filters':
             self.listing.controls = [
-                section_title('3-style corner trainer', ft.Icons.PSYCHOLOGY),
-                ft.Text('UFR buffer · set up your cube, recall the alg, then rate each case once.', size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+                section_title(message('3-style corner trainer'), ft.Icons.PSYCHOLOGY),
+                ft.Text(tr('UFR buffer · set up your cube, recall the alg, then rate each case once.'), size=13, color=ft.Colors.ON_SURFACE_VARIANT),
                 panel(ft.Column([
-                    ft.Text('Target layers · choose one or more', size=13, color=ft.Colors.ON_SURFACE),
+                    ft.Text(tr('Target layers · choose one or more'), size=13, color=ft.Colors.ON_SURFACE),
                     ft.Row(list(self.subsets.values()), wrap=True, spacing=12),
                     ft.ResponsiveRow([self.first_target,self.second_target], spacing=12, run_spacing=10),
-                    ft.Text('Learning status · choose one or more', size=13, color=ft.Colors.ON_SURFACE),
+                    ft.Text(tr('Learning status · choose one or more'), size=13, color=ft.Colors.ON_SURFACE),
                     ft.Row(list(self.statuses.values()), wrap=True, spacing=12), self.favorites,
                     self.match_text,
                     ft.Row([self.start_button], wrap=True),
                 ], spacing=12, tight=True)),
-                ft.Text('Use a solved cube for each setup. Recall ratings are separate from your saved learning status.',
+                ft.Text(tr('Use a solved cube for each setup. Recall ratings are separate from your saved learning status.'),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
-            if self.error: self.listing.controls.append(ft.Text(self.error, color=ft.Colors.ERROR))
+            if self.error: self.listing.controls.append(ft.Text(present(self.error), color=ft.Colors.ERROR))
             return
         session = self.session
         if self.view == 'summary':
             reviewed = len(session.results)
-            self.listing.controls = [section_title('Session summary', ft.Icons.INSIGHTS),
-                ft.Text(f'{session.remembered} remembered · {reviewed-session.remembered} missed · '
-                        f'{session.recall_rate:.0f}% self-rated recall' if reviewed else 'No cases rated yet.',
+            self.listing.controls = [section_title(message('Session summary'), ft.Icons.INSIGHTS),
+                ft.Text(present(message('{0} remembered · {1} missed · {2:.0f}% self-rated recall', session.remembered, reviewed - session.remembered, session.recall_rate) if reviewed else message('No cases rated yet.')),
                         size=18, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text(f'{reviewed} / {len(session.deck)} reviewed · '
-                        f'{sum(r.revealed for r in session.results)} reveals before rating · '
-                        f'Scheme: {session.scheme.name if session.scheme else "sticker IDs"}', size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
-            actions = [action_button('New session', on_click=self._new)]
-            if not session.complete: actions.insert(0, action_button('Resume session', primary=True, on_click=self._resume))
+                ft.Text(tr('{0} / {1} reviewed · {2} reveals before rating · Scheme: {3}', reviewed, len(session.deck), sum((r.revealed for r in session.results)), session.scheme.name if session.scheme else message('sticker IDs')), size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
+            actions = [action_button(message('New session'), on_click=self._new)]
+            if not session.complete: actions.insert(0, action_button(message('Resume session'), primary=True, on_click=self._resume))
             elif any(not r.remembered for r in session.results):
-                actions.insert(0, action_button('Retry missed cases', primary=True, on_click=self._retry))
+                actions.insert(0, action_button(message('Retry missed cases'), primary=True, on_click=self._retry))
             self.listing.controls.append(ft.Row(actions, wrap=True, spacing=8))
-            for remembered, label in ((False,'Missed cases'),(True,'Remembered cases')):
+            for remembered, label in ((False,message('Missed cases')),(True,message('Remembered cases'))):
                 results = [r for r in session.results if r.remembered == remembered]
-                self.listing.controls.append(ft.Text(f'{label} · {len(results)}', size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE))
+                self.listing.controls.append(ft.Text(present(compose('{0} · {1}', label, len(results))), size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE))
                 for result in results:
                     card = result.card
                     label = card.letters if '?' not in card.letters else card.first + ' / ' + card.second
                     self.listing.controls.append(ft.ExpansionTile(
-                        title=ft.Text(label + (' · reveal used' if result.revealed else ''), size=13, color=ft.Colors.ON_SURFACE),
-                        subtitle=ft.Text(f'{card.first} → {card.second} · {card.subset}', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                        title=ft.Text(present(label + (message(' · reveal used') if result.revealed else '')), size=13, color=ft.Colors.ON_SURFACE),
+                        subtitle=ft.Text(present(compose('{0} → {1} · {2}', card.first, card.second, card.subset)), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                         leading=ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE if remembered else ft.Icons.CANCEL_OUTLINED,
                                         color=ft.Colors.PRIMARY if remembered else ft.Colors.ERROR, size=20),
                         dense=True, expanded_cross_axis_alignment=ft.CrossAxisAlignment.STRETCH,
                         controls=[ft.Column(self._solution(card), spacing=8, tight=True)]))
             return
         progress = ft.Row([
-            ft.Text(f'Case {session.position+1} / {len(session.deck)} · '
-                    f'{session.remembered} remembered · {len(session.results)-session.remembered} missed',
+            ft.Text(tr('Case {0} / {1} · {2} remembered · {3} missed', session.position + 1, len(session.deck), session.remembered, len(session.results) - session.remembered),
                     size=13, color=ft.Colors.ON_SURFACE, expand=True),
-            ft.TextButton('End session', height=32, on_click=self._summary),
+            ft.TextButton(tr('End session'), height=32, on_click=self._summary),
         ], spacing=8)
         self.listing.controls = [progress]
         if self.error:
-            self.listing.controls += [ft.Text(self.error,color=ft.Colors.ERROR),
-                ft.TextButton('Try again',on_click=lambda e:self._prepare())]
+            self.listing.controls += [ft.Text(present(self.error),color=ft.Colors.ERROR),
+                ft.TextButton(tr('Try again'),on_click=lambda e:self._prepare())]
             return
         if self.busy or session.card is None:
             self.listing.controls += [ft.Row([ft.ProgressRing(width=20,height=20),
-                ft.Text('Preparing a verified setup…', size=13, color=ft.Colors.ON_SURFACE_VARIANT)], spacing=10)]
+                ft.Text(tr('Preparing a verified setup…'), size=13, color=ft.Colors.ON_SURFACE_VARIANT)], spacing=10)]
             return
         card = session.card
         shown = session.revealed or session.answered
@@ -272,33 +270,32 @@ class CornerTrainer(ThemeAwarePage, ft.Column):
         self.viewer.set_viewport(max(180, (width*.56 if width>=980 else width)-28),
                                  min(360 if width>=980 else 260, max(150, height-280)))
         self.listing.controls.append(panel(ft.Column([
-            ft.Text('Setup · from a solved cube', size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text(' '.join(card.setup), size=14, selectable=True, font_family='monospace', color=ft.Colors.ON_SURFACE),
-            ft.Text(f'UFR buffer · Scheme: {session.scheme.name if session.scheme else "sticker IDs"} · '
-                    'hold the cube in your scheme’s U/F orientation.',size=11,color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(tr('Setup · from a solved cube'), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(present(join_text(' ', card.setup)), size=14, selectable=True, font_family='monospace', color=ft.Colors.ON_SURFACE),
+            ft.Text(tr('UFR buffer · Scheme: {0} · hold the cube in your scheme’s U/F orientation.', session.scheme.name if session.scheme else message('sticker IDs')),size=11,color=ft.Colors.ON_SURFACE_VARIANT),
         ], spacing=5, tight=True), padding=12))
         actions = []
         if not session.answered:
-            actions = [action_button('Show alg', primary=True, icon=ft.Icons.VISIBILITY_OUTLINED,
+            actions = [action_button(message('Show alg'), primary=True, icon=ft.Icons.VISIBILITY_OUTLINED,
                         on_click=self._show, disabled=session.revealed),
-                action_button('Remembered', icon=ft.Icons.CHECK, on_click=lambda e:self._grade(True)),
-                action_button('Missed', icon=ft.Icons.CLOSE, on_click=lambda e:self._grade(False),
+                action_button(message('Remembered'), icon=ft.Icons.CHECK, on_click=lambda e:self._grade(True)),
+                action_button(message('Missed'), icon=ft.Icons.CLOSE, on_click=lambda e:self._grade(False),
                               style=ft.ButtonStyle(color=ft.Colors.ERROR))]
         else:
             result = session.results[-1]
-            actions = [action_button('View summary' if session.complete else 'Next case', primary=True,
+            actions = [action_button(message('View summary') if session.complete else message('Next case'), primary=True,
                                     icon=ft.Icons.ARROW_FORWARD,on_click=self._next)]
         detail = []
         if session.answered:
             result = session.results[-1]
-            detail.append(ft.Text('Recorded · ' + ('Remembered' if result.remembered else 'Missed'),
+            detail.append(ft.Text(present(message('Recorded · ') + (message('Remembered') if result.remembered else message('Missed'))),
                 size=13, weight=ft.FontWeight.W_600, color=ft.Colors.PRIMARY if result.remembered else ft.Colors.ERROR))
         detail += [ft.Row(actions, spacing=8, run_spacing=6, wrap=True)]
         if shown:
             detail += self._solution(card)
-            detail.append(ft.Text('Solve this case before applying the next setup.', size=12,color=ft.Colors.ON_SURFACE_VARIANT))
+            detail.append(ft.Text(tr('Solve this case before applying the next setup.'), size=12,color=ft.Colors.ON_SURFACE_VARIANT))
         else:
-            detail.append(ft.Text('Recall and execute your alg. Show alg reveals the target letters, commutator and full moves.',
+            detail.append(ft.Text(tr('Recall and execute your alg. Show alg reveals the target letters, commutator and full moves.'),
                                   size=13,color=ft.Colors.ON_SURFACE_VARIANT))
         if width>=980:
             self.listing.controls.append(ft.Row([

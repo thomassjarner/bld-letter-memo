@@ -1,3 +1,5 @@
+from core.messages import message, compose, join_text, error_message
+from ui.language import present, tr
 import flet as ft
 from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
@@ -32,11 +34,11 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         self.scroll = ft.ScrollMode.AUTO
         self.tracer = ScrambleTracer()
         self.scramble = ft.TextField(
-            label="Scramble",
+            label=tr('Scramble'),
             multiline=True,
             min_lines=1,
             max_lines=3, dense=True, text_size=13,
-            hint_text="Paste a 3x3 scramble here",
+            hint_text=tr('Paste a 3x3 scramble here'),
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.error = ft.Text("", color=ft.Colors.ERROR)
         self.details = ft.Text("", size=12, color=ft.Colors.ON_SURFACE_VARIANT, selectable=True)
@@ -50,32 +52,32 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         self.edge_break_overrides: dict[int, CycleBreakOverride] = {}
         self.last_trace_input_key = None
         self.scheme_context = ft.Text('', size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-        self.setup_scheme_button = action_button("Set up a letter scheme", icon=ft.Icons.GRID_VIEW,
+        self.setup_scheme_button = action_button(message('Set up a letter scheme'), icon=ft.Icons.GRID_VIEW,
             on_click=lambda e: self.open_scheme_callback() if self.open_scheme_callback else None)
-        self.toggle_button = action_button("Show words", icon=ft.Icons.TRANSLATE, on_click=self._toggle_words)
+        self.toggle_button = action_button(message('Show words'), icon=ft.Icons.TRANSLATE, on_click=self._toggle_words)
         self.reset_breaks_button = ft.OutlinedButton(
-            "Reset to priority",
+            tr('Reset to priority'),
             icon=ft.Icons.RESTART_ALT,
             on_click=self._reset_cycle_breaks,
             visible=False, height=36,
         )
-        self.trace_diagnostics = ft.ExpansionTile(title=ft.Text("Diagnostic trace", size=13, color=ft.Colors.ON_SURFACE), controls=[self.details])
+        self.trace_diagnostics = ft.ExpansionTile(title=ft.Text(tr('Diagnostic trace'), size=13, color=ft.Colors.ON_SURFACE), controls=[self.details])
 
         self.controls = [
-            page_heading("Scramble Memo", "Trace a real scramble through your own letter scheme."),
+            page_heading(message('Scramble Memo'), message('Trace a real scramble through your own letter scheme.')),
             panel(ft.Column([
                 self.scheme_context,
                 self.setup_scheme_button,
                 self.scramble,
                 ft.Row([
-                    action_button("Generate memo", primary=True, icon=ft.Icons.PLAY_ARROW, on_click=self.generate),
+                    action_button(message('Generate memo'), primary=True, icon=ft.Icons.PLAY_ARROW, on_click=self.generate),
                     self.toggle_button, self.reset_breaks_button,
                 ], wrap=True, spacing=8),
                 self.error,
             ], spacing=10)),
             panel(ft.Column([
-                section_title("Memo", ft.Icons.NOTES),
-                ft.Text("Underlined targets open temporary cycle-break choices.",
+                section_title(message('Memo'), ft.Icons.NOTES),
+                ft.Text(tr('Underlined targets open temporary cycle-break choices.'),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.result_area,
             ], spacing=10)),
@@ -140,20 +142,27 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
             self.error.value = ""
             self.last_result = r
             self.last_scheme_signature = self._scheme_signature(scheme)
-            self.details.value = (
-                f"Corner targets: {' '.join(r.corner_targets) or '—'}\n"
-                f"Corner letters: {' '.join(r.corner_letters) or '—'}\n"
-                f"Corner cycles: {' '.join('—' if x is None else str(x + 1) for x in r.corner_cycle_ids) or '—'}\n"
-                f"Edge targets: {' '.join(r.edge_targets) or '—'}\n"
-                f"Edge letters: {' '.join(r.edge_letters) or '—'}\n"
-                f"Edge cycles: {' '.join('—' if x is None else str(x + 1) for x in r.edge_cycle_ids) or '—'}\n"
-                f"Corner cycle breaks: {', '.join(f'{b.chosen_sticker} ({b.chosen_piece})' for b in r.corner_cycle_breaks) or '—'}\n"
-                f"Edge cycle breaks: {', '.join(f'{b.chosen_sticker} ({b.chosen_piece})' for b in r.edge_cycle_breaks) or '—'}\n"
-                f"3-style parity memo-swap: {'yes' if r.three_style_parity_applied else 'no'}"
+            def joined(values):
+                return " ".join(values) or "—"
+
+            def cycles(ids):
+                return joined("—" if i is None else str(i + 1) for i in ids)
+
+            def breaks(items):
+                return ", ".join(f"{item.chosen_sticker} ({item.chosen_piece})" for item in items) or "—"
+
+            self.details.value = tr(
+                "Corner targets: {0}\nCorner letters: {1}\nCorner cycles: {2}\n"
+                "Edge targets: {3}\nEdge letters: {4}\nEdge cycles: {5}\n"
+                "Corner cycle breaks: {6}\nEdge cycle breaks: {7}\n3-style parity memo-swap: {8}",
+                joined(r.corner_targets), joined(r.corner_letters), cycles(r.corner_cycle_ids),
+                joined(r.edge_targets), joined(r.edge_letters), cycles(r.edge_cycle_ids),
+                breaks(r.corner_cycle_breaks), breaks(r.edge_cycle_breaks),
+                message("yes") if r.three_style_parity_applied else message("no"),
             )
             self.reset_breaks_button.visible = bool(self.corner_break_overrides or self.edge_break_overrides)
         except (ScrambleError, ValueError) as ex:
-            self.error.value = str(ex)
+            self.error.value = present(error_message(ex))
             self.last_result = None
             self.details.value = ""
             self.reset_breaks_button.visible = bool(self.corner_break_overrides or self.edge_break_overrides)
@@ -175,7 +184,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
     def generate(self, e):
         scheme = self.state.active_scheme
         if not scheme:
-            self.error.value = "Create or select a letter scheme first."
+            self.error.value = tr('Create or select a letter scheme first.')
             self.last_result = None
             self._render_result()
             self.update()
@@ -190,7 +199,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
 
     def _toggle_words(self, e):
         self.show_words = not self.show_words
-        self.toggle_button.content = "Show letters" if self.show_words else "Show words"
+        self.toggle_button.content = present(message('Show letters') if self.show_words else message('Show words'))
         self._render_result()
         self.update()
 
@@ -241,34 +250,33 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
                 letter = cat.stickers.get(sticker, "")
                 if not letter or letter == "BUFFER":
                     letter = "?"
-                suffix = " · preferred" if sticker == preferred else ""
+                suffix = message(' · preferred') if sticker == preferred else ""
                 button = ft.FilledButton if selected else ft.OutlinedButton
                 buttons.append(button(
-                    f"{letter} · {sticker}{suffix}",
+                    compose('{0} · {1}{2}', letter, sticker, suffix),
                     icon=ft.Icons.CHECK if selected else None,
-                    tooltip=f"Use {sticker} on {piece}",
+                    tooltip=message('Use {0} on {1}', sticker, piece),
                     on_click=lambda e, p=piece, s=sticker: choose((p, s)),
                 ))
             option_controls.append(ft.Column([
-                ft.Text(f"{piece}" + (" · priority piece" if recommended else ""),
+                ft.Text(present(compose('{0}', piece) + (message(' · priority piece') if recommended else '')),
                         size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Row(buttons, spacing=6, run_spacing=6, wrap=True),
             ], spacing=4))
         option_controls.append(ft.Divider())
         option_controls.append(
             ft.TextButton(
-                "Reset to priority",
+                tr('Reset to priority'),
                 icon=ft.Icons.RESTART_ALT,
                 on_click=lambda e: choose(None),
             )
         )
         dialog = ft.AlertDialog(
-            title=ft.Text(f"Temporary {category[:-1]} cycle break", color=ft.Colors.ON_SURFACE),
+            title=ft.Text(tr('Temporary {0} cycle break', message(category[:-1])), color=ft.Colors.ON_SURFACE),
             content=ft.Column(
                 [
                     ft.Text(
-                        "Choose any sticker on an available piece. Preferred marks your saved sticker. "
-                        "Pieces follow your priority order; this choice only affects this scramble.",
+                        tr('Choose any sticker on an available piece. Preferred marks your saved sticker. Pieces follow your priority order; this choice only affects this scramble.'),
                         size=12,
                         color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
@@ -284,7 +292,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
 
     def _memo_control(self, category, letters, pairs, orientation, cycle_ids, orientation_flags, cycle_breaks):
         if not letters and not orientation:
-            return ft.Text("(solved)", size=18, selectable=True, color=ft.Colors.ON_SURFACE)
+            return ft.Text(tr('(solved)'), size=18, selectable=True, color=ft.Colors.ON_SURFACE)
 
         scheme = self.state.active_scheme
         if scheme is None:
@@ -324,7 +332,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
                     kwargs = {}
                     if break_info is not None:
                         kwargs["on_click"] = lambda e, c=category, b=break_info: self._open_cycle_break_picker(c, b)
-                    spans.append(ft.TextSpan(text=char, style=style, **kwargs))
+                    spans.append(ft.TextSpan(text=present(char), style=style, **kwargs))
             else:
                 chosen_color = None
                 if scheme.highlight_orientation_targets and any(target_flags):
@@ -341,22 +349,20 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
                 kwargs = {}
                 if pair_breaks:
                     kwargs["on_click"] = lambda e, c=category, b=pair_breaks[0]: self._open_cycle_break_picker(c, b)
-                spans.append(ft.TextSpan(text=display, style=style, **kwargs))
+                spans.append(ft.TextSpan(text=present(display), style=style, **kwargs))
 
             spans.append(ft.TextSpan(text=" "))
             index += target_count
 
         for annotation in orientation:
-            spans.append(ft.TextSpan(text=f"{annotation} "))
+            spans.append(ft.TextSpan(text=present(compose('{0} ', annotation))))
 
         return ft.Text(spans=spans, size=18, selectable=True, color=ft.Colors.ON_SURFACE)
 
     def _render_result(self):
         scheme = self.state.active_scheme
-        colors = {'W':'White','Y':'Yellow','G':'Green','B':'Blue','R':'Red','O':'Orange'}
-        self.scheme_context.value = (f'{scheme.name} · {colors.get(scheme.memo_up, scheme.memo_up)} up / '
-            f'{colors.get(scheme.memo_front, scheme.memo_front)} front' + (' · own orientation' if scheme.scramble_from_own_orientation else '')
-            if scheme else 'Choose a letter scheme to generate memo.')
+        colors = {'W':message('White'),'Y':message('Yellow'),'G':message('Green'),'B':message('Blue'),'R':message('Red'),'O':message('Orange')}
+        self.scheme_context.value = (present(message('{0} · {1} up / {2} front', scheme.name, colors.get(scheme.memo_up, scheme.memo_up), colors.get(scheme.memo_front, scheme.memo_front)) + (message(' · own orientation') if scheme.scramble_from_own_orientation else '') if scheme else message('Choose a letter scheme to generate memo.')))
         self.setup_scheme_button.visible = scheme is None
         self.error.visible = bool(self.error.value)
         self.trace_diagnostics.visible = bool(self.details.value)
@@ -368,18 +374,18 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
 
         if self.last_result is None:
             sections = {
-                "C": ("Corners", ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)),
-                "E": ("Edges", ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)),
+                "C": (message('Corners'), ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)),
+                "E": (message('Edges'), ft.Text("—", size=18, selectable=True, color=ft.Colors.ON_SURFACE)),
             }
         else:
             r = self.last_result
             sections = {
-                "C": ("Corners", self._memo_control(
-                    "corners", r.corner_letters, r.corner_pairs, r.corner_orientation,
+                "C": (message('Corners'), self._memo_control(
+                    message('corners'), r.corner_letters, r.corner_pairs, r.corner_orientation,
                     r.corner_cycle_ids, r.corner_orientation_target_flags, r.corner_cycle_breaks,
                 )),
-                "E": ("Edges", self._memo_control(
-                    "edges", r.edge_letters, r.edge_pairs, r.edge_orientation,
+                "E": (message('Edges'), self._memo_control(
+                    message('edges'), r.edge_letters, r.edge_pairs, r.edge_orientation,
                     r.edge_cycle_ids, r.edge_orientation_target_flags, r.edge_cycle_breaks,
                 )),
             }
@@ -388,7 +394,7 @@ class ScrambleMemoPage(ThemeAwarePage, ft.Column):
         for key in order:
             title, memo_control = sections[key]
             controls.extend([
-                ft.Text(title, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                ft.Text(present(title), weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 memo_control,
             ])
         self.result_area.controls = controls

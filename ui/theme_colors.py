@@ -9,6 +9,8 @@ from enum import Enum
 from functools import lru_cache
 
 import flet as ft
+from core.messages import Message, in_language
+from ui.language import current_language
 from ui.design import build_theme
 from data.color_themes import DEFAULT_LIGHT_THEME, normalize_light_theme
 
@@ -66,6 +68,7 @@ def apply_palette(root, dark, light_theme=None):
     light_theme = normalize_light_theme(light_theme if light_theme is not None else
                                        getattr(root, '_bld_light_theme', DEFAULT_LIGHT_THEME))
     palette = _resolved_palette(dark, light_theme)
+    language = current_language()
     seen = set()
 
     def resolve(value):
@@ -99,7 +102,15 @@ def apply_palette(root, dark, light_theme=None):
             if name == 'shapes' and getattr(obj, '_cube_fixed_paints', False):
                 continue  # Cube stickers and outlines are physical colors in every theme.
             value = getattr(obj, name)
-            if name == 'color' or name.endswith('color'):
+            if isinstance(value, Message):
+                # Only presentation fields: never translate editable values, option
+                # keys, routing data, algorithm text, or selections.
+                if value.language != language and (name in {
+                    "text", "label", "title", "content", "tooltip", "hint_text", "helper_text",
+                    "error_text", "error", "semantics_label", "semantic_label", "message"
+                } or (name == "value" and isinstance(obj, ft.Text))):
+                    setattr(obj, name, in_language(value, language))
+            elif name == 'color' or name.endswith('color'):
                 previous = roles.get(name)
                 source = previous[0] if previous is not None and value == previous[1] else value
                 resolved = resolve(source)

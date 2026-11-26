@@ -1,4 +1,6 @@
 """Two linked editable fields: commutator notation and final moves."""
+from core.messages import message, error_message
+from ui.language import present, tr
 import asyncio
 
 import flet as ft
@@ -26,23 +28,23 @@ class AlgorithmConverter(ft.Column):
         self.incomplete = False
         self._brackets = CommutatorEditor()
         self.last_input = 'final'
-        self.commutator = self._field('Commutator', '[A, B] or [setup: [A, B]]',
+        self.commutator = self._field(message('Commutator'), message('[A, B] or [setup: [A, B]]'),
             lambda e: self._input('commutator', self.commutator.value or ''))
         self.commutator.value = '[]'
         self.commutator.on_focus = self._commutator_focus
         self.commutator.on_selection_change = self._commutator_selection
-        self.commutator.helper = 'Auto brackets · : opens a pair · keep typing after ,'
+        self.commutator.helper = message('Auto brackets · : opens a pair · keep typing after ,')
         self.commutator.helper_style = ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.commutator.helper_max_lines = 2
-        self.final_alg = self._field('Final alg', "R U R' U' · wide/slice moves also work",
+        self.final_alg = self._field(message('Final alg'), message("R U R' U' · wide/slice moves also work"),
             lambda e: self._input('final', self.final_alg.value or ''))
-        self.status = ft.Text('Paste in either field; the other updates automatically.', size=11,
+        self.status = ft.Text(tr('Paste in either field; the other updates automatically.'), size=11,
                               color=ft.Colors.ON_SURFACE_VARIANT)
         self.controls = [self.commutator, self.final_alg, self.status]
         self._snapshots()
 
     def _field(self, label, hint, callback):
-        return ft.TextField(label=label, hint_text=hint, multiline=True, min_lines=2, max_lines=5,
+        return ft.TextField(label=present(label), hint_text=present(hint), multiline=True, min_lines=2, max_lines=5,
             text_size=13, color=ft.Colors.ON_SURFACE,
             label_style=ft.TextStyle(size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             hint_style=ft.TextStyle(size=11, color=ft.Colors.ON_SURFACE_VARIANT),
@@ -170,7 +172,7 @@ class AlgorithmConverter(ft.Column):
         self._set_commutator('')
         self.final_alg.value = ''
         if not self._source.strip():
-            self.status.value = 'Paste in either field; the other updates automatically.'
+            self.status.value = tr('Paste in either field; the other updates automatically.')
         else:
             try:
                 self.algorithm = parse_algorithm(self._source)
@@ -185,14 +187,14 @@ class AlgorithmConverter(ft.Column):
                     self._set_status(result is not None)
             except ValueError as ex:
                 self.final_alg.value = self._source
-                self.final_alg.error_text = str(ex)
-                self.status.value = 'Edit the algorithm to preview it.'
+                self.final_alg.error_text = present(error_message(ex))
+                self.status.value = tr('Edit the algorithm to preview it.')
         self._snapshots()
         self._publish(notify)
 
     def _set_status(self, found):
         count = len(simplified_algorithm(self.algorithm).moves)
-        self.status.value = f'{count} moves' + (' · fields linked' if found else ' · no short commutator found; final alg is usable.')
+        self.status.value = present(message('{0} moves', count) + (message(' · fields linked') if found else message(' · no short commutator found; final alg is usable.')))
 
     def _input(self, direction, source, *, debounce=True, notify=True):
         pending_caret = self._caret_request
@@ -213,11 +215,11 @@ class AlgorithmConverter(ft.Column):
         try:
             if not source.strip():
                 self.incomplete = direction == 'commutator'
-                self.status.value = 'Paste in either field; the other updates automatically.'
+                self.status.value = tr('Paste in either field; the other updates automatically.')
             else:
                 algorithm = parse_algorithm(source)
                 if direction == 'commutator' and not contains_square_bracket(source) and not has_commutator_structure(source):
-                    raise ValueError('Use [A, B] or [setup: [A, B]], or put plain moves in Final alg.')
+                    raise ValueError(message('Use [A, B] or [setup: [A, B]], or put plain moves in Final alg.'))
                 self.algorithm = algorithm
                 if direction == 'commutator':
                     output.value = simplified_algorithm(algorithm).expanded
@@ -225,19 +227,18 @@ class AlgorithmConverter(ft.Column):
                 elif debounce and self._page() is not None:
                     self.pending = True
                     self._needs_reverse = True
-                    self.status.value = 'Finding commutator…'
+                    self.status.value = tr('Finding commutator…')
                 else:
                     result = find_commutator(source)
                     self._set_commutator(result.expression if result is not None else '')
                     self._set_status(result is not None)
         except ValueError as ex:
-            self.incomplete = direction == 'commutator' and str(ex) in (
-                'Both parts of a commutator/setup must contain moves.',
-                'Both parts of a setup must contain moves.',
-                'Use [A, B] or [setup: algorithm].', 'Close every algorithm group.')
-            target.error_text = None if self.incomplete else str(ex)
-            self.status.value = ('Finish both parts using , or : inside the brackets.'
-                                 if self.incomplete else 'Finish the notation to preview it.')
+            self.incomplete = direction == 'commutator' and error_message(ex) in (
+                message('Both parts of a commutator/setup must contain moves.'),
+                message('Both parts of a setup must contain moves.'),
+                message('Use [A, B] or [setup: algorithm].'), message('Close every algorithm group.'))
+            target.error_text = present(None if self.incomplete else error_message(ex))
+            self.status.value = (present(message('Finish both parts using , or : inside the brackets.') if self.incomplete else message('Finish the notation to preview it.')))
         self._snapshots()
         self._publish(notify)
         if self.pending:

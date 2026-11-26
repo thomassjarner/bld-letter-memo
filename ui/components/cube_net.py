@@ -1,4 +1,6 @@
 """Editable 3×3 cube net backed by the existing canonical sticker IDs."""
+from core.messages import message, compose
+from ui.language import present, tr
 import flet as ft
 
 from core.cube_definitions import face_groups
@@ -8,7 +10,7 @@ from ui.components.sticker_tiles import STICKER_BORDER, StickerTiles, buffer_sti
 # Both canonical face lists run clockwise: corners TL/TR/BR/BL and
 # edges top/right/bottom/left. Reuse them rather than renaming any sticker.
 def face_stickers():
-    corners, edges = dict(face_groups("corners")), dict(face_groups("edges"))
+    corners, edges = dict(face_groups(message('corners'))), dict(face_groups(message('edges')))
     return {face: (corners[face][0], edges[face][0], corners[face][1],
                    edges[face][3], face, edges[face][1],
                    corners[face][3], edges[face][2], corners[face][2]) for face in corners}
@@ -19,7 +21,7 @@ NET_ROWS = ((None, "U", None, None), ("L", "F", "R", "B"), (None, "D", None, Non
 # Faces retain the canonical U/L/F/R/B/D order; centers are never included.
 CUBE_STICKER_ORDER = tuple(positions[index] for positions in face_stickers().values()
                            for index in (0, 1, 2, 5, 8, 7, 6, 3))
-COLOR_NAMES = {"W": "White", "Y": "Yellow", "G": "Green", "B": "Blue", "R": "Red", "O": "Orange"}
+COLOR_NAMES = {"W": message('White'), "Y": message('Yellow'), "G": message('Green'), "B": message('Blue'), "R": message('Red'), "O": message('Orange')}
 OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 COLOR_VECTORS = {"W": (0, 1, 0), "Y": (0, -1, 0), "G": (0, 0, 1),
                  "B": (0, 0, -1), "R": (1, 0, 0), "O": (-1, 0, 0)}
@@ -54,7 +56,7 @@ class CubeNetEditor(ft.Column):
         self.spacing = 6
         self.extra_height = 16 + 32 + 2 * self.spacing
         self.tiles = StickerTiles(
-            {category: getattr(scheme, category) for category in ("edges", "corners")},
+            {category: getattr(scheme, category) for category in (message('edges'), message('corners'))},
             config["on_letter_change"], config.get("on_field_focus"), config.get("field_registry"),
         )
         self.cell_controls, self.field_controls = self.tiles.cells, self.tiles.fields
@@ -63,7 +65,7 @@ class CubeNetEditor(ft.Column):
         colors = orientation_colors(scheme.memo_up, scheme.memo_front)
         for face, positions in face_stickers().items():
             bg, fg = FACE_COLORS[colors[face]]
-            cells = [self.tiles.add(sticker, bg, fg, f"{face} · {COLOR_NAMES[colors[face]]}")
+            cells = [self.tiles.add(sticker, bg, fg, compose('{0} · {1}', face, COLOR_NAMES[colors[face]]))
                      for sticker in positions]
             self.face_controls[face] = ft.Container(ft.Column([
                 ft.Row(cells[i:i + 3], spacing=STICKER_GAP, tight=True) for i in (0, 3, 6)
@@ -84,15 +86,14 @@ class CubeNetEditor(ft.Column):
         self.net_scroll = ft.Row([self.net], scroll=ft.ScrollMode.AUTO)
         warning = self.tiles.warning()
         self.controls = [
-            ft.Text("Type clockwise · Auto-saved · Advance automatically", size=11, height=16,
+            ft.Text(tr('Type clockwise · Auto-saved · Advance automatically'), size=11, height=16,
                     max_lines=1, overflow=ft.TextOverflow.ELLIPSIS,
-                    tooltip="Type clockwise around each face, alternating corners and edges. "
-                            "Face order: U → L → F → R → B → D. Centers and buffer pieces are skipped.",
+                    tooltip=tr('Type clockwise around each face, alternating corners and edges. Face order: U → L → F → R → B → D. Centers and buffer pieces are skipped.'),
                     color=ft.Colors.ON_SURFACE_VARIANT),
             self.net_scroll,
-            ft.Text("Editing edges + corners · ★ Buffer · ● Same piece", size=10,
+            ft.Text(tr('Editing edges + corners · ★ Buffer · ● Same piece'), size=10,
                     height=32, max_lines=2, color=ft.Colors.ON_SURFACE_VARIANT),
-            *([ft.Text(warning, size=12, color=ft.Colors.ERROR)] if warning else []),
+            *([ft.Text(present(warning), size=12, color=ft.Colors.ERROR)] if warning else []),
         ]
         self.set_viewport(config.get("width", 760), config.get("height"))
 

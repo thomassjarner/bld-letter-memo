@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.59.0
+
+- Add English and Simplified Chinese under Settings → General. Apply the interface, Material locale and training terminology in place; remember the language on this browser independently of WCA or backups.
+- Localize training, editors, statistics, validation, navigation and the Pages sign-in handoff. Include a small local Simplified Chinese interface font. Preserve user content, execution notation and stored case/route identifiers.
+
 ## 2.58.0
 
 - The Blind Timer overview now shows success rate, mean of successful solves

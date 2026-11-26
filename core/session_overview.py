@@ -1,4 +1,5 @@
 """Recorded statistics. No tracing, forecasting, or changes to saved attempts."""
+from core.messages import message
 from bisect import bisect_left
 from dataclasses import dataclass
 from math import isqrt
@@ -70,12 +71,12 @@ def timer_elapsed(rows):
 
 def duration_label(cs):
     if cs < 100:
-        return f"{cs/100:.2f}s"
+        return message("{0:.2f}s", cs/100)
     minutes,seconds=divmod(cs//100,60)
     hours,minutes=divmod(minutes,60)
     if hours:
-        return f"{hours}h {minutes:02}m {seconds:02}s"
-    return f"{minutes}m {seconds:02}s" if minutes else f"{seconds}s"
+        return message('{0}h {1:02}m {2:02}s', hours, minutes, seconds)
+    return message('{0}m {1:02}s', minutes, seconds) if minutes else message("{0}s", seconds)
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +119,7 @@ class MemoSplit:
 def memo_split(rounds):
     edges_ok=edges_n=corners_ok=corners_n=detailed=0
     for r in rounds:
-        if not r.recall or any(i.category not in ("edges","corners") for i in r.recall):
+        if not r.recall or any(i.category not in (message('edges'),message('corners')) for i in r.recall):
             continue
         e,en=score_recall([i for i in r.recall if i.category=="edges"])
         c,cn=score_recall([i for i in r.recall if i.category=="corners"])

@@ -22,7 +22,7 @@ def stage(target, value, root=ROOT):
     # .dev.vars, tests or local databases alongside the browser application.
     target = Path(target)
     target.mkdir(parents=True, exist_ok=False)
-    for name in ("ui", "core", "data"):
+    for name in ("ui", "core", "data", "assets"):
         shutil.copytree(root/name, target/name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".*"))
     for name in ("main.py", "requirements.txt"):
         shutil.copyfile(root/name, target/name)

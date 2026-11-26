@@ -1,4 +1,5 @@
 """Read-only UFR recall sessions and verified physical-cube setups."""
+from core.messages import message
 from copy import deepcopy
 from dataclasses import dataclass
 import random
@@ -11,7 +12,7 @@ from core.corner_walkthrough import _normalized_execution, apply_moves
 from core.focused_scrambles import MOVES, solve_facelets, state_facelets
 from core.tracer import _solved
 
-STATUSES = ('new', 'learning', 'learned')
+STATUSES = (message('new'), message('learning'), message('learned'))
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,7 @@ def matching_cases(filters, records):
     matches = []
     for case in corner_cases().values():
         record = records.get(case.id)
-        status = record.status if record else 'new'
+        status = record.status if record else message('new')
         if (case.subset in filters.subsets and status in filters.statuses
                 and filters.first in ('all', case.first) and filters.second in ('all', case.second)
                 and (not filters.favorites or record and record.favorite)):
@@ -81,12 +82,12 @@ def make_card(case_id, scheme, records, rng=None):
         try:
             moves, effect, reset = _normalized_execution(candidate.alg)
             if identify_case_state(effect) != case.id:
-                raise ValueError('Wrong case')
+                raise ValueError(message('Wrong case'))
             break
         except (ValueError, StopIteration):
-            warning = 'Your preferred algorithm could not be verified. Showing the built-in recommendation; your saved alg is unchanged.'
+            warning = message('Your preferred algorithm could not be verified. Showing the built-in recommendation; your saved alg is unchanged.')
     else:
-        raise ValueError('Could not verify an algorithm for this case.')
+        raise ValueError(message('Could not verify an algorithm for this case.'))
     initial = inverse_state(effect)
     # A short random detour plus the bundled two-phase solver avoids simply
     # displaying the inverse of the algorithm being tested.
@@ -105,10 +106,10 @@ def make_card(case_id, scheme, records, rng=None):
         # the generated starter rather than a user's preferred algorithm.
         starter_moves, starter_effect, _ = _normalized_execution(case.starter)
         if starter_effect != effect:
-            raise ValueError('The portable setup does not match this case.')
+            raise ValueError(message('The portable setup does not match this case.'))
         setup = simplify_moves(inverse_moves(starter_moves))
     if apply_moves(_solved(), setup) != initial or apply_moves(initial, moves) != _solved():
-        raise ValueError('The setup and solution could not be verified.')
+        raise ValueError(message('The setup and solution could not be verified.'))
     def letter(sticker):
         value = scheme.corners.stickers.get(sticker, '') if scheme else ''
         return value if value and value != 'BUFFER' else '?'
@@ -130,9 +131,9 @@ class CornerRecallSession:
         self.rng = rng or random.SystemRandom()
         self.deck = list(dict.fromkeys(c.id if hasattr(c, 'id') else c for c in cases))
         if not self.deck:
-            raise ValueError('No cases match these filters.')
+            raise ValueError(message('No cases match these filters.'))
         if any(key not in corner_cases() for key in self.deck):
-            raise ValueError('Unknown corner case.')
+            raise ValueError(message('Unknown corner case.'))
         self.rng.shuffle(self.deck)
         self.scheme = deepcopy(scheme)
         self.records = deepcopy(records)

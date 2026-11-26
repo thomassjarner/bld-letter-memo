@@ -1,18 +1,20 @@
 """Local activity navigation. The training keyboard only wraps the training body."""
+from core.messages import message
+from ui.language import present, tr
 import flet as ft
 
 
 class ActivityHeader:
     def __init__(self, title, back, actions, train_label, callback):
-        self.title = ft.Text(title, size=23, weight=ft.FontWeight.W_600, expand=True,
+        self.title = ft.Text(present(title), size=23, weight=ft.FontWeight.W_600, expand=True,
                              max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
-        self.back = ft.IconButton(ft.Icons.ARROW_BACK, tooltip="Back to Practice", icon_size=19, width=34, on_click=back)
+        self.back = ft.IconButton(ft.Icons.ARROW_BACK, tooltip=tr('Back to Practice'), icon_size=19, width=34, on_click=back)
         self.actions = ft.Container(actions)
         heading = ft.Row([self.back,
                           self.title, self.actions], height=44, spacing=6)
         self.picker = ft.SegmentedButton(
-            segments=[ft.Segment(value="train", label=train_label),
-                      ft.Segment(value="stats", label="Statistics", icon=ft.Icons.SHOW_CHART)],
+            segments=[ft.Segment(value="train", label=present(train_label)),
+                      ft.Segment(value="stats", label=tr('Statistics'), icon=ft.Icons.SHOW_CHART)],
             selected=["train"], show_selected_icon=False, height=36,
             style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=10),
                                  text_style=ft.TextStyle(size=13)),
@@ -30,4 +32,4 @@ class ActivityHeader:
     def select(self, tab):
         self.picker.selected = [tab]
         self.actions.visible = tab == "train"
-        self.back.tooltip = "Back to Practice" if tab == "train" else f"Back to {self.title.value}"
+        self.back.tooltip = present(message('Back to Practice') if tab == 'train' else message('Back to {0}', self.title.value))

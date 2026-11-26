@@ -1,5 +1,6 @@
 """Three-way merge of version-18 trainer workspaces. No network, UI or credentials."""
 from __future__ import annotations
+from core.messages import message, join_text
 import hashlib
 import json
 from collections import Counter
@@ -39,16 +40,16 @@ def validate(value):
     # Never silently 'upgrade' an unknown remote format by dropping fields
     # via the intentionally forgiving local backup importer.
     if not isinstance(value, dict) or value.get("version") != CURRENT_VERSION or set(value) != set(AppData().to_dict()):
-        raise ValueError("This cloud workspace needs a different app version. Nothing was replaced.")
+        raise ValueError(message('This cloud workspace needs a different app version. Nothing was replaced.'))
     if AppData.from_dict(value).to_dict() != value:
-        raise ValueError("The cloud workspace could not be read without changing data. Nothing was replaced.")
+        raise ValueError(message('The cloud workspace could not be read without changing data. Nothing was replaced.'))
     result = identify(value)
     lists = [*result["practice_sessions"].values(), result["progressive_memo_history"], result["playground_algorithms"]]
     lists.extend(row["algorithms"] for row in result["corner_case_library"].values())
     for rows in lists:
         ids = [row.get("id") for row in rows]
         if any(not isinstance(i,str) or not i for i in ids) or len(ids)!=len(set(ids)):
-            raise ValueError("Ambiguous record IDs. Nothing was replaced.")
+            raise ValueError(message('Ambiguous record IDs. Nothing was replaced.'))
     return result
 
 
@@ -63,20 +64,27 @@ class Difference:
 
     @property
     def label(self):
-        group = {"global_words":"Letter pair","pair_aliases":"Pair alias","pair_ratings":"Pair rating",
-                 "practice_sessions":"Timer","schemes":"Letter scheme","playground_algorithms":"Playground",
-                 "corner_case_library":"Corner case","progressive_memo_history":"Progressive Memo"}
-        return " · ".join([group.get(self.path[0], self.path[0].replace("_"," ").capitalize()),
-                           *[str(v).replace("_"," ") for v in self.path[1:]]])
+        group = {"global_words":message('Letter pair'),"pair_aliases":message('Pair alias'),"pair_ratings":message('Pair rating'),
+                 "practice_sessions":message('Timer'),"schemes":message('Letter scheme'),"playground_algorithms":message('Playground'),
+                 "corner_case_library":message('Corner case'),"progressive_memo_history":message('Progressive Memo')}
+        root, *rest = self.path
+        head = group.get(root, message(root.replace("_", " ").capitalize()))
+        fields = {"corners","edges","buffer","stickers","memo_orientation","three_style_enabled",
+                  "edge_parity_partner","cycle_break_priority","cycle_break_stickers","memo_order",
+                  "execution_order","tracing_mode","orientation_memo","algorithms","status","favorite",
+                  "notes","preferred_algorithm"}
+        path = [message(key.replace("_"," ")) if i > 0 and key in fields else str(key)
+                for i, key in enumerate(rest)]
+        return join_text(" · ", [head, *path])
 
     @staticmethod
     def describe(value):
-        if value is MISSING: return "Deleted"
-        if isinstance(value,str): return value or "(empty)"
+        if value is MISSING: return message('Deleted')
+        if isinstance(value,str): return value or message('(empty)')
         if isinstance(value,dict) and ("word" in value or "grade_version" in value):
-            return str(value.get("word") or "(no word)") + (f" · rating {value['rating']:g}/5" if "rating" in value else "")
+            return (value.get("word") or message('(no word)')) + (message(' · rating {0:g}/5', value['rating']) if "rating" in value else "")
         if isinstance(value,dict) and "scramble" in value and "centiseconds" in value:
-            return f"{value['scramble']} · {value['centiseconds']/100:.2f}s"+(" · DNF" if value.get("dnf") else " · +2" if value.get("plus2") else "")
+            return message('{0} · {1:.2f}s', value['scramble'], value['centiseconds'] / 100)+(" · DNF" if value.get("dnf") else " · +2" if value.get("plus2") else "")
         return json.dumps(value,ensure_ascii=False,sort_keys=True)
 
 
@@ -130,7 +138,7 @@ def merge(base, device, cloud, choices=None):
             maps = []
             for items in source:
                 m = {v["id"]:v for v in items}
-                if len(m)!=len(items) or "" in m: raise ValueError("Ambiguous record IDs. No data was replaced.")
+                if len(m)!=len(items) or "" in m: raise ValueError(message('Ambiguous record IDs. No data was replaced.'))
                 maps.append(m)
             bm,lm,rm = maps
             keys = dict.fromkeys([*rm,*lm])

@@ -3,6 +3,7 @@
 The scramble tracer retains its original parser and behavior. This engine
 adds slices, rotations, lowercase/wide turns and structured alg notation.
 """
+from core.messages import message
 from dataclasses import dataclass
 import re
 
@@ -66,7 +67,7 @@ def _expand(node):
         for child in parts:
             result += _expand(child)
             if len(result) > MAX_MOVES:
-                raise ValueError(f'Use at most {MAX_MOVES} expanded moves.')
+                raise ValueError(message('Use at most {0} expanded moves.', MAX_MOVES))
         return result
     if kind == 'inverse':
         return inverse_moves(_expand(parts))
@@ -74,14 +75,14 @@ def _expand(node):
         child, count = parts
         moves = _expand(child)
         if len(moves) * count > MAX_MOVES:
-            raise ValueError(f'Use at most {MAX_MOVES} expanded moves.')
+            raise ValueError(message('Use at most {0} expanded moves.', MAX_MOVES))
         return moves * count
     a, b = (_expand(child) for child in parts)
     result = a + b + inverse_moves(a)
     if kind == 'comm':
         result += inverse_moves(b)
     if len(result) > MAX_MOVES:
-        raise ValueError(f'Use at most {MAX_MOVES} expanded moves.')
+        raise ValueError(message('Use at most {0} expanded moves.', MAX_MOVES))
     return result
 
 
@@ -96,7 +97,7 @@ class _Parser:
 
     def sequence(self, stops='', depth=0):
         if depth > 16:
-            raise ValueError('Algorithm groups are nested too deeply.')
+            raise ValueError(message('Algorithm groups are nested too deeply.'))
         children = []
         while True:
             self.space()
@@ -107,20 +108,20 @@ class _Parser:
             if char in '([':
                 left = self.sequence(')' if char == '(' else ',:]', depth + 1)
                 if self.index >= len(self.text):
-                    raise ValueError('Close every algorithm group.')
+                    raise ValueError(message('Close every algorithm group.'))
                 separator = self.text[self.index]
                 self.index += 1
                 if char == '(':
                     node = left
                 else:
                     if separator not in ',:':
-                        raise ValueError('Use [A, B] or [setup: algorithm].')
+                        raise ValueError(message('Use [A, B] or [setup: algorithm].'))
                     right = self.sequence(']', depth + 1)
                     if self.index >= len(self.text) or self.text[self.index] != ']':
-                        raise ValueError('Close every algorithm group.')
+                        raise ValueError(message('Close every algorithm group.'))
                     self.index += 1
                     if not _expand(left) or not _expand(right):
-                        raise ValueError('Both parts of a commutator/setup must contain moves.')
+                        raise ValueError(message('Both parts of a commutator/setup must contain moves.'))
                     node = ('comm' if separator == ',' else 'conj', (left, right))
                 # Group repetition and inverse suffixes, without expanding a
                 # large repetition before checking its size.
@@ -130,7 +131,7 @@ class _Parser:
                         end += 1
                     digits = self.text[self.index:end]
                     if len(digits) > 4:
-                        raise ValueError(f'Use at most {MAX_MOVES} expanded moves.')
+                        raise ValueError(message('Use at most {0} expanded moves.', MAX_MOVES))
                     node = ('repeat', (node, int(digits)))
                     self.index = end
                 if self.index < len(self.text) and self.text[self.index] == "'":
@@ -143,13 +144,13 @@ class _Parser:
                 left = children[0] if len(children) == 1 else ('seq', tuple(children))
                 right = self.sequence(stops, depth + 1)
                 if not _expand(left) or not _expand(right):
-                    raise ValueError('Both parts of a setup must contain moves.')
+                    raise ValueError(message('Both parts of a setup must contain moves.'))
                 return ('conj', (left, right))
             elif char in 'URFDLBurfdlbMESxyz':
                 move = char.upper() + 'w' if char in 'urfdlb' else char
                 if self.index < len(self.text) and self.text[self.index] == 'w':
                     if char not in 'URFDLB':
-                        raise ValueError('Use w only after a face turn, such as Rw.')
+                        raise ValueError(message('Use w only after a face turn, such as Rw.'))
                     move += 'w'
                     self.index += 1
                 if self.index < len(self.text) and self.text[self.index] in "2'":
@@ -160,37 +161,37 @@ class _Parser:
                         self.index += 1
                 node = ('move', move)
             else:
-                raise ValueError(f'Unexpected notation: {char}. Use face/slice/rotation moves, (groups), or [A, B].')
+                raise ValueError(message('Unexpected notation: {0}. Use face/slice/rotation moves, (groups), or [A, B].', char))
             children.append(node)
             if len(children) > MAX_MOVES:
-                raise ValueError(f'Use at most {MAX_MOVES} expanded moves.')
+                raise ValueError(message('Use at most {0} expanded moves.', MAX_MOVES))
         return children[0] if len(children) == 1 else ('seq', tuple(children))
 
 
 def parse_algorithm(source):
     if not isinstance(source, str) or len(source) > MAX_INPUT:
-        raise ValueError(f'Use at most {MAX_INPUT} characters.')
+        raise ValueError(message('Use at most {0} characters.', MAX_INPUT))
     parser = _Parser(source)
     node = parser.sequence()
     parser.space()
     if parser.index != len(parser.text):
-        raise ValueError('Unexpected closing group.')
+        raise ValueError(message('Unexpected closing group.'))
     moves = _expand(node)
     if not moves:
-        raise ValueError('Enter an algorithm first.')
+        raise ValueError(message('Enter an algorithm first.'))
     if len(moves) > MAX_MOVES:
-        raise ValueError(f'Use at most {MAX_MOVES} expanded moves.')
+        raise ValueError(message('Use at most {0} expanded moves.', MAX_MOVES))
     setup, core = (), node
     if node[0] == 'conj':
         setup, core = _expand(node[1][0]), node[1][1]
-    sections = [('Setup', setup)] if setup else []
+    sections = [(message('Setup'), setup)] if setup else []
     if core[0] == 'comm':
         a, b = (_expand(child) for child in core[1])
-        sections += [('A', a), ('B', b), ('Undo A', inverse_moves(a)), ('Undo B', inverse_moves(b))]
+        sections += [('A', a), ('B', b), (message('Undo A'), inverse_moves(a)), (message('Undo B'), inverse_moves(b))]
     else:
-        sections += [('Algorithm', _expand(core))]
+        sections += [(message('Algorithm'), _expand(core))]
     if setup:
-        sections.append(('Undo setup', inverse_moves(setup)))
+        sections.append((message('Undo setup'), inverse_moves(setup)))
     stages, index = [], 0
     for label, section in sections:
         if section:
@@ -245,7 +246,7 @@ def simplified_algorithm(algorithm):
     moves = simplify_moves(algorithm.moves)
     if moves == algorithm.moves:
         return algorithm
-    stages = (Stage('Execution', 0, len(moves)),) if moves else ()
+    stages = (Stage(message('Execution'), 0, len(moves)),) if moves else ()
     return Algorithm(algorithm.source, moves, stages)
 
 

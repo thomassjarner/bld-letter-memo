@@ -1,3 +1,11 @@
+# 2.59.0 · English / 简体中文
+
+**Settings → General → Language** changes the interface without leaving Settings.
+Both choices use their own names, so you can switch back even if you do not
+read the current language. Each browser remembers its own choice. App labels,
+chart captions, error messages and study instructions follow the language;
+your letter scheme, mnemonics and move notation do not.
+
 # 2.58.0 · Success rate, mean and median
 
 The Blind Timer overview pairs completion rate with two measures of successful

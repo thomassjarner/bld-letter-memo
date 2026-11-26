@@ -1,3 +1,5 @@
+from core.messages import message, compose
+from ui.language import present, tr
 import json
 from datetime import date
 
@@ -20,6 +22,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         return self.data
 
     theme_callback = None
+    language_callback = None
     light_theme_callback = None
     navigation_callback = None
 
@@ -34,15 +37,15 @@ class SettingsPage(ThemeAwarePage, ft.Column):
 
 
         self.dark_mode_switch = ft.Switch(
-            label="Dark mode",
+            label=tr('Dark mode'),
             label_text_style=ft.TextStyle(size=13),
             value=bool(self.state.data.dark_mode),
             on_change=self._dark_mode_changed,
         )
         self.light_theme_dropdown = ft.Dropdown(
-            label="Light color theme", height=42, dense=True, text_size=13,
+            label=tr('Light color theme'), height=42, dense=True, text_size=13,
             value=self.state.data.light_theme,
-            options=[ft.DropdownOption(key, theme.name) for key, theme in LIGHT_THEMES.items()],
+            options=[ft.DropdownOption(key, present(theme.name)) for key, theme in LIGHT_THEMES.items()],
             color=ft.Colors.ON_SURFACE,
             label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             on_select=self._light_theme_changed, col={"xs":12, "sm":6},
@@ -52,85 +55,97 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         self.light_theme_hint = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.refresh_appearance()
         self.simultaneous_moves_switch = ft.Switch(
-            label="Simultaneous moves", value=self.state.data.simultaneous_moves,
+            label=tr('Simultaneous moves'), value=self.state.data.simultaneous_moves,
             label_text_style=ft.TextStyle(size=13),
             on_change=lambda e: self.state.set_simultaneous_moves(e.control.value),
         )
         self.navigation_style_dropdown = ft.Dropdown(
-            label="Navigation style",
+            label=tr('Navigation style'),
             width=220, height=42, dense=True, text_size=13,
             value=self.state.data.navigation_style,
             options=[
-                ft.DropdownOption("top_tabs", "Top tabs"),
-                ft.DropdownOption("compact_sidebar", "Compact sidebar"),
-                ft.DropdownOption("popout", "Pop-out menu"),
+                ft.DropdownOption("top_tabs", tr('Top tabs')),
+                ft.DropdownOption("compact_sidebar", tr('Compact sidebar')),
+                ft.DropdownOption("popout", tr('Pop-out menu')),
             ],
             on_select=self._navigation_style_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
         self.rating_mode_dropdown = ft.Dropdown(
-            label="Rating system",
+            label=tr('Rating system'),
             width=190, height=42, dense=True, text_size=13,
             value=self.state.data.letter_pair_rating_mode,
             options=[
-                ft.DropdownOption("numeric", "Numerical (1–5)"),
-                ft.DropdownOption("colors", "Colors"),
-                ft.DropdownOption("qualitative", "Bad / Mid / Good"),
+                ft.DropdownOption("numeric", tr('Numerical (1–5)')),
+                ft.DropdownOption("colors", tr('Colors')),
+                ft.DropdownOption("qualitative", tr('Bad / Mid / Good')),
             ],
             on_select=self._rating_mode_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.rating_levels_dropdown = ft.Dropdown(
-            label="Color levels", width=125, height=42, dense=True, text_size=13, value=str(self.state.data.rating_color_levels),
-            options=[ft.DropdownOption(str(x), str(x)) for x in (3, 4, 5)],
+            label=tr('Color levels'), width=125, height=42, dense=True, text_size=13, value=str(self.state.data.rating_color_levels),
+            options=[ft.DropdownOption(str(x), present(str(x))) for x in (3, 4, 5)],
             on_select=self._rating_levels_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.rating_palette_area = ft.ResponsiveRow(spacing=10, run_spacing=10)
         self._rebuild_rating_palette()
 
+        self.language_picker = ft.Dropdown(
+            label=tr('Language / 语言'), key="interface_language", width=230, dense=True,
+            value=self.state.language, options=[ft.DropdownOption("en", "English"),
+                                               ft.DropdownOption("zh-CN", "简体中文")],
+            on_select=self._change_language,
+        )
+        self.language_hint = ft.Text(tr('Applies to this browser. Your letters, words and algorithms stay as entered.'),
+                                     size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+        general = panel(ft.Column([section_title(message('General'), ft.Icons.SETTINGS_OUTLINED),
+                                  self.language_picker, self.language_hint], spacing=8, tight=True))
         appearance = panel(ft.Column([
-                section_title("Appearance", ft.Icons.PALETTE_OUTLINED),
+                section_title(message('Appearance'), ft.Icons.PALETTE_OUTLINED),
                 ft.Row([self.dark_mode_switch, self.navigation_style_dropdown], spacing=18, wrap=True),
                 ft.ResponsiveRow([self.light_theme_dropdown, self.light_theme_preview],
                                  spacing=10, run_spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 self.light_theme_hint,
             ], spacing=10, tight=True))
         playback = panel(ft.Column([
-                section_title("Algorithm playback", ft.Icons.SLOW_MOTION_VIDEO),
+                section_title(message('Algorithm playback'), ft.Icons.SLOW_MOTION_VIDEO),
                 self.simultaneous_moves_switch,
-                ft.Text("Play consecutive opposite-face turns together, shown as (U D'). "
-                        "Applies to U/D, R/L and F/B, including primes and doubles. "
-                        "Saved algorithms and move counts stay the same.",
+                ft.Text(tr("Play consecutive opposite-face turns together, shown as (U D'). Applies to U/D, R/L and F/B, including primes and doubles. Saved algorithms and move counts stay the same."),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=8, tight=True))
         ratings = panel(ft.Column([
-                section_title("Letter pair ratings", ft.Icons.STAR_OUTLINE),
+                section_title(message('Letter pair ratings'), ft.Icons.STAR_OUTLINE),
                 ft.Row([self.rating_mode_dropdown, self.rating_levels_dropdown], wrap=True, spacing=10),
-                ft.Text("Ratings stay on a common 1–5 scale. Changing the color scale never rewrites old grades; review those pairs with the Update grades filter.",
+                ft.Text(tr('Ratings stay on a common 1–5 scale. Changing the color scale never rewrites old grades; review those pairs with the Update grades filter.'),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.rating_palette_area,
             ], spacing=10, tight=True))
         backup = panel(ft.Column([
-                section_title("Backup & data", ft.Icons.SAVE_OUTLINED),
-                ft.Text("Saved in this browser", size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Your schemes, dictionary, algorithms, training history, and preferences save automatically. Export a backup to keep a copy or move devices.",
+                section_title(message('Backup & data'), ft.Icons.SAVE_OUTLINED),
+                ft.Text(tr('Saved in this browser'), size=13, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                ft.Text(tr('Your schemes, dictionary, algorithms, training history, and preferences save automatically. Export a backup to keep a copy or move devices.'),
                         size=13, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Row([
-                    action_button("Export backup", primary=True, icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
-                    action_button("Import backup", icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
+                    action_button(message('Export backup'), primary=True, icon=ft.Icons.DOWNLOAD, on_click=self._export_backup),
+                    action_button(message('Import backup'), icon=ft.Icons.UPLOAD_FILE, on_click=self._choose_import),
                 ], wrap=True, spacing=8),
-                ft.Text("Import replaces the current schemes, letter-pair data, timer sessions, Progressive Memo history, case library, saved playground algorithms, and settings.",
+                ft.Text(tr('Import replaces the current schemes, letter-pair data, timer sessions, Progressive Memo history, case library, saved playground algorithms, and settings.'),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.status_text,
             ], spacing=10, tight=True), col={"xs":12,"lg":6})
         self.account=AccountPanel(self)
         self.controls = [
-            page_heading("Settings", "Appearance, account sync, playback, and backups."),
+            page_heading(message('Settings'), message('Appearance, account sync, playback, and backups.')),
             ft.ResponsiveRow([
-                ft.Column([appearance, playback], spacing=12, tight=True, col={"xs":12,"lg":6}),
+                ft.Column([general, appearance, playback], spacing=12, tight=True, col={"xs":12,"lg":6}),
                 ft.Column([self.account.control, backup],spacing=12,tight=True,col={"xs":12,"lg":6}),
             ], spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.START),
             ratings,
         ]
+
+    async def _change_language(self, e):
+        if self.language_callback:
+            await self.language_callback(e.control.value)
 
     def _dark_mode_changed(self, e):
         enabled = bool(e.control.value)
@@ -143,11 +158,10 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         theme = light_theme(self.state.data.light_theme)
         colors = theme.colors
         self.light_theme_dropdown.value = self.state.data.light_theme
-        self.light_theme_hint.value = theme.description + (" Saved for light mode; turn off Dark mode to apply it."
-            if self.state.data.dark_mode else " Applies immediately and saves in this browser.")
+        self.light_theme_hint.value = present(theme.description + (message(' Saved for light mode; turn off Dark mode to apply it.') if self.state.data.dark_mode else message(' Applies immediately and saves in this browser.')))
         self.light_theme_preview.bgcolor = colors['surface_container_low']
         self.light_theme_preview.border = ft.Border.all(1, colors['outline_variant'])
-        self.light_theme_preview.tooltip = theme.name + " light theme preview"
+        self.light_theme_preview.tooltip = present(theme.name + message(' light theme preview'))
         self.light_theme_preview.content = ft.Row([
             ft.Column([ft.Container(width=24, height=6, border_radius=3, bgcolor=colors['primary']),
                        ft.Container(width=20, height=4, border_radius=2, bgcolor=colors['on_surface_variant']),
@@ -195,12 +209,12 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         grades = list(self.state.data.rating_color_grades)
         for i, (color, grade) in enumerate(zip(colors, grades)):
             color_field = ft.TextField(
-                label=f"Level {i+1} color", value=color, expand=True, height=40, text_size=13, dense=True,
+                label=tr('Level {0} color', i + 1), value=color, expand=True, height=40, text_size=13, dense=True,
                 on_blur=lambda e, idx=i: self._save_rating_color(idx, e.control),
                 on_submit=lambda e, idx=i: self._save_rating_color(idx, e.control),
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             grade_field = ft.TextField(
-                label="Rating", value=(f"{grade:.2f}".rstrip("0").rstrip(".")), width=72, height=40, text_size=13, dense=True,
+                label=tr('Rating'), value=(compose('{0:.2f}', grade).rstrip("0").rstrip(".")), width=72, height=40, text_size=13, dense=True,
                 on_blur=lambda e, idx=i: self._save_rating_grade(idx, e.control),
                 on_submit=lambda e, idx=i: self._save_rating_grade(idx, e.control),
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
@@ -214,7 +228,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
     def _save_rating_color(self, index, control):
         if not self.state.set_rating_color(index, control.value):
             control.value = self.state.data.rating_color_hexes[index]
-            control.error_text = "Use a hex color like #F9A825"
+            control.error_text = tr('Use a hex color like #F9A825')
         else:
             control.value = self.state.data.rating_color_hexes[index]
             control.error_text = None
@@ -223,9 +237,9 @@ class SettingsPage(ThemeAwarePage, ft.Column):
     def _save_rating_grade(self, index, control):
         if not self.state.set_rating_color_grade(index, control.value):
             control.value = str(self.state.data.rating_color_grades[index])
-            control.error_text = "Grade must be between 1 and 5"
+            control.error_text = tr('Grade must be between 1 and 5')
         else:
-            control.value = f"{self.state.data.rating_color_grades[index]:.2f}".rstrip("0").rstrip(".")
+            control.value = compose('{0:.2f}', self.state.data.rating_color_grades[index]).rstrip('0').rstrip('.')
             control.error_text = None
         control.update()
 
@@ -242,23 +256,23 @@ class SettingsPage(ThemeAwarePage, ft.Column):
                 allowed_extensions=["json"],
             )
             self.status_text.value = (
-                f"Backup exported: {filename}" if saved is not None else "Backup export cancelled."
+                present(message('Backup exported: {0}', filename) if saved is not None else message('Backup export cancelled.'))
             )
         except Exception as exc:
-            self.status_text.value = f"Could not export backup: {exc}"
+            self.status_text.value = tr('Could not export backup: {0}', exc)
         self.update()
 
     async def _choose_import(self, e):
         try:
             files = await ft.FilePicker().pick_files(
-                dialog_title="Import BLD Letter Memo backup",
+                dialog_title=tr('Import BLD Letter Memo backup'),
                 allow_multiple=False,
                 with_data=True,
                 file_type=ft.FilePickerFileType.CUSTOM,
                 allowed_extensions=["json"],
             )
         except Exception as exc:
-            self.status_text.value = f"Could not open backup picker: {exc}"
+            self.status_text.value = tr('Could not open backup picker: {0}', exc)
             self.update()
             return
 
@@ -266,21 +280,20 @@ class SettingsPage(ThemeAwarePage, ft.Column):
             return
         selected = files[0]
         if selected.bytes is None:
-            self.status_text.value = "Could not read that backup file."
+            self.status_text.value = tr('Could not read that backup file.')
             self.update()
             return
 
         self._pending_import = (selected.name, selected.bytes)
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Import backup?", color=ft.Colors.ON_SURFACE),
+            title=ft.Text(tr('Import backup?'), color=ft.Colors.ON_SURFACE),
             content=ft.Text(
-                "This will replace your current schemes, letter-pair data, timer sessions, practice histories, case library, saved playground algorithms, and settings with the selected backup."
-                + (" Sync is on: these changes will also be compared with your cloud copy." if self.account.cloud and self.account.cloud.consent else "")
+                present(message('This will replace your current schemes, letter-pair data, timer sessions, practice histories, case library, saved playground algorithms, and settings with the selected backup.') + (message(' Sync is on: these changes will also be compared with your cloud copy.') if self.account.cloud and self.account.cloud.consent else ''))
             , color=ft.Colors.ON_SURFACE),
             actions=[
-                ft.TextButton("Cancel", on_click=self._close_dialog),
-                ft.ElevatedButton("Import", on_click=self._confirm_import),
+                ft.TextButton(tr('Cancel'), on_click=self._close_dialog),
+                ft.ElevatedButton(tr('Import'), on_click=self._confirm_import),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -305,7 +318,7 @@ class SettingsPage(ThemeAwarePage, ft.Column):
         try:
             raw = json.loads(raw_bytes.decode("utf-8"))
             if not isinstance(raw, dict):
-                raise ValueError("Backup root must be an object")
+                raise ValueError(message('Backup root must be an object'))
             imported = AppData.from_dict(raw)
             self.state.replace_data(imported)
             self.dark_mode_switch.value = bool(imported.dark_mode)
@@ -318,8 +331,8 @@ class SettingsPage(ThemeAwarePage, ft.Column):
                 self.light_theme_callback()
             if self.navigation_callback:
                 self.navigation_callback(imported.navigation_style)
-            self.status_text.value = f"Imported backup: {name}"
+            self.status_text.value = tr('Imported backup: {0}', name)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
-            self.status_text.value = f"Could not import that backup: {exc}"
+            self.status_text.value = tr('Could not import that backup: {0}', exc)
         self._pending_import = None
         self.page.update()

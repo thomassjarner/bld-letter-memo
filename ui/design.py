@@ -1,4 +1,6 @@
 """Shared presentation tokens. No training or persistence logic lives here."""
+from core.messages import message
+from ui.language import current_language, present
 import flet as ft
 from data.color_themes import DEFAULT_LIGHT_THEME, light_theme as get_light_theme
 from ui.feature_icons import feature_icon
@@ -40,6 +42,7 @@ def build_theme(dark=False, light_theme=DEFAULT_LIGHT_THEME):
         text_style=ft.TextStyle(size=13, weight=ft.FontWeight.W_600),
     )
     return ft.Theme(
+        font_family="BLDMemoHans" if current_language() == "zh-CN" else None,
         color_scheme_seed=colors["primary"], color_scheme=ft.ColorScheme(**colors),
         visual_density=ft.VisualDensity.COMPACT,
         # Explicit foregrounds prevent Flet defaults from leaving dark text on
@@ -59,7 +62,7 @@ def build_theme(dark=False, light_theme=DEFAULT_LIGHT_THEME):
 
 
 def eyebrow(text):
-    return ft.Text(text.upper(), size=11, weight=ft.FontWeight.W_600,
+    return ft.Text(present(text.upper()), size=11, weight=ft.FontWeight.W_600,
                    color=ft.Colors.PRIMARY, style=ft.TextStyle(letter_spacing=.7))
 
 
@@ -67,8 +70,8 @@ def page_heading(title, description, label=None):
     return ft.Container(
         ft.Column([
             *([eyebrow(label)] if label else []),
-            ft.Text(title, size=PAGE_TITLE, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-            ft.Text(description, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(present(title), size=PAGE_TITLE, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+            ft.Text(present(description), size=13, color=ft.Colors.ON_SURFACE_VARIANT),
         ], spacing=4),
         padding=ft.Padding.only(bottom=8),
     )
@@ -76,7 +79,7 @@ def page_heading(title, description, label=None):
 
 def panel(content, padding=16, **kwargs):
     return ft.Container(
-        content=content, padding=padding, border_radius=10,
+        content=present(content), padding=padding, border_radius=10,
         bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
         border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT), **kwargs,
     )
@@ -92,15 +95,15 @@ def activity_card(title, description, icon, action, on_click=None, number=None, 
                          ft.Colors.PRIMARY_CONTAINER if enabled else ft.Colors.SURFACE_CONTAINER_HIGH,
                          border_radius=8),
             ft.Column([
-                ft.Text(title, size=17, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE,
+                ft.Text(present(title), size=17, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE,
                         max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
-                ft.Text(number or ("Ready" if enabled else "Planned"), size=11,
+                ft.Text(present(number or (message('Ready') if enabled else message('Planned'))), size=11,
                         color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=2, expand=True),
         ], spacing=10, height=52),
-        ft.Text(description, size=BODY_TEXT, color=ft.Colors.ON_SURFACE_VARIANT,
-                height=52, max_lines=3, overflow=ft.TextOverflow.ELLIPSIS, tooltip=description),
-        ft.TextButton(action, icon=ft.Icons.ARROW_FORWARD,
+        ft.Text(present(description), size=BODY_TEXT, color=ft.Colors.ON_SURFACE_VARIANT,
+                height=52, max_lines=3, overflow=ft.TextOverflow.ELLIPSIS, tooltip=present(description)),
+        ft.TextButton(present(action), icon=ft.Icons.ARROW_FORWARD,
                       height=ACTION_HEIGHT, disabled=not enabled, on_click=on_click),
     ], spacing=8, tight=True), col={"xs": 12, "md": 6}, padding=14)
 
@@ -108,15 +111,15 @@ def activity_card(title, description, icon, action, on_click=None, number=None, 
 def section_title(title, icon=None):
     return ft.Row([
         *([ft.Icon(icon, size=ICON_SIZE, color=ft.Colors.PRIMARY)] if icon else []),
-        ft.Text(title, size=SECTION_TITLE, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+        ft.Text(present(title), size=SECTION_TITLE, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
     ], spacing=8, height=24)
 
 
 def action_button(label, *, primary=False, icon=None, on_click=None, **kwargs):
     cls = ft.FilledButton if primary else ft.OutlinedButton
-    return cls(label, icon=icon, height=ACTION_HEIGHT, on_click=on_click, **kwargs)
+    return cls(present(label), icon=icon, height=ACTION_HEIGHT, on_click=on_click, **kwargs)
 
 
 def icon_action(icon, tooltip, on_click, *, size=36, **kwargs):
-    return ft.IconButton(icon, tooltip=tooltip, on_click=on_click, icon_size=ICON_SIZE,
+    return ft.IconButton(icon, tooltip=present(tooltip), on_click=on_click, icon_size=ICON_SIZE,
                          width=size, height=size, padding=6, **kwargs)

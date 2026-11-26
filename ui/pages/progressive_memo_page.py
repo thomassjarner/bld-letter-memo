@@ -1,5 +1,7 @@
 """Space-driven real-scramble memo, recall, feedback and persistent history."""
 from __future__ import annotations
+from core.messages import message, compose, join_text, error_message
+from ui.language import present, tr
 
 import asyncio
 from datetime import datetime, timezone
@@ -20,7 +22,7 @@ from ui.theme_colors import ThemeAwarePage, apply_palette
 
 
 def order_label(order):
-    return " → ".join("Corners" if letter == "C" else "Edges" for letter in order)
+    return join_text(' → ', (message('Corners') if letter == 'C' else message('Edges') for letter in order))
 
 
 @ft.control
@@ -29,8 +31,8 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
     open_scheme_callback = None
     INTRO_SECONDS = 1.0
     SPACE_KEYS = {" ", "Space", "Spacebar"}
-    LEFT_KEYS = {"ArrowLeft", "Arrow Left", "Left"}
-    RIGHT_KEYS = {"ArrowRight", "Arrow Right", "Right"}
+    LEFT_KEYS = {"ArrowLeft", "Arrow Left", message('Left')}
+    RIGHT_KEYS = {"ArrowRight", "Arrow Right", message('Right')}
 
     @property
     def state(self):
@@ -67,21 +69,21 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self._layout_wide = None
 
         self.clock = ft.Text("0.00", size=14, font_family="monospace", color=ft.Colors.ON_SURFACE)
-        self.cancel_button = ft.TextButton("Cancel", on_click=self._cancel)
-        self.activity_header = ActivityHeader("Progressive Memo", self._back,
-            ft.Row([self.clock, self.cancel_button], tight=True, spacing=6), "Train", self._select_activity_tab)
+        self.cancel_button = ft.TextButton(tr('Cancel'), on_click=self._cancel)
+        self.activity_header = ActivityHeader(message('Progressive Memo'), self._back,
+            ft.Row([self.clock, self.cancel_button], tight=True, spacing=6), message('Train'), self._select_activity_tab)
         self.header, self.title_text = self.activity_header.view, self.activity_header.title
-        self.scheme_dropdown = ft.Dropdown(label="Letter scheme", width=280, dense=True,
+        self.scheme_dropdown = ft.Dropdown(label=tr('Letter scheme'), width=280, dense=True,
                                           on_select=self._choose_scheme)
         self.display_letters = ft.Text("", size=84, weight=ft.FontWeight.W_600,
                                        font_family="monospace", text_align=ft.TextAlign.CENTER)
         self.recall_field = self._make_recall_field()
-        self.recall_forward = ft.TextButton("Skip", icon=ft.Icons.ARROW_FORWARD, height=36,
+        self.recall_forward = ft.TextButton(tr('Skip'), icon=ft.Icons.ARROW_FORWARD, height=36,
                                            on_click=self._skip_recall)
-        self.allow_memo_navigation = ft.Switch(label="Allow memo navigation",
+        self.allow_memo_navigation = ft.Switch(label=tr('Allow memo navigation'),
             value=self.state.data.progressive_memo_allow_navigation, label_text_style=ft.TextStyle(size=13),
             on_change=lambda e:self._constraint_changed('allow_navigation',e.control.value))
-        self.show_category_overview = ft.Switch(label="Show category overview",
+        self.show_category_overview = ft.Switch(label=tr('Show category overview'),
             value=self.state.data.progressive_memo_show_overview, label_text_style=ft.TextStyle(size=13),
             on_change=lambda e:self._constraint_changed('show_overview',e.control.value))
         self.stage_scroll = ft.ListView(spacing=12, scroll=ft.ScrollMode.AUTO,
@@ -89,19 +91,19 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self.stage_panel = panel(self.stage_scroll, padding=20)
         self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         self.history = ft.ListView(spacing=4, scroll=ft.ScrollMode.ALWAYS)
-        self.older_button = ft.TextButton("Older attempts", height=32, on_click=self._older_attempts)
+        self.older_button = ft.TextButton(tr('Older attempts'), height=32, on_click=self._older_attempts)
         self.history_panel = panel(ft.Column([
-            ft.Row([ft.Text("Saved attempts", size=14, weight=ft.FontWeight.W_600, expand=True),
+            ft.Row([ft.Text(tr('Saved attempts'), size=14, weight=ft.FontWeight.W_600, expand=True),
                     self.history_meta], height=30),
             self.history, self.older_button,
         ], spacing=8), padding=14)
         self.main_region = ft.Column(spacing=12)
         self.keyboard_listener = ft.KeyboardListener(
-            content=self.main_region, on_key_down=self._key_down,
+            content=present(self.main_region), on_key_down=self._key_down,
             on_key_up=self._key_up,
             on_key_repeat=lambda e: None, autofocus=True,
         )
-        self.body_host = ft.Container(content=self.keyboard_listener, expand=True)
+        self.body_host = ft.Container(content=present(self.keyboard_listener), expand=True)
         self.controls = [self.header, self.body_host]
         self.set_viewport(*self._viewport)
         self.refresh(update=False)
@@ -123,7 +125,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             page.run_task(function, *args)
 
     def _make_recall_field(self, run=None, index=None):
-        field = ft.TextField(hint_text="Type letters", width=240, height=58, dense=True,
+        field = ft.TextField(hint_text=tr('Type letters'), width=240, height=58, dense=True,
             text_size=28, text_align=ft.TextAlign.CENTER,
             capitalization=ft.TextCapitalization.CHARACTERS,
             autocorrect=False, enable_suggestions=False)
@@ -141,11 +143,10 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         self._update()
 
     def _sync_recall_forward(self):
-        label = 'Next' if self.run and self.phase == 'recall' and self.run.current_input else 'Skip'
+        label = message('Next') if self.run and self.phase == 'recall' and self.run.current_input else message('Skip')
         changed = self.recall_forward.content != label
-        self.recall_forward.content = label
-        self.recall_forward.tooltip = ('Keep this answer and go forward (→)' if label == 'Next'
-                                       else 'Leave this unanswered and go forward (→)')
+        self.recall_forward.content = present(label)
+        self.recall_forward.tooltip = (present(message('Keep this answer and go forward (→)') if label == 'Next' else message('Leave this unanswered and go forward (→)')))
         return changed
 
     def set_viewport(self, width, height):
@@ -203,9 +204,9 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
                 self.statistics = StatisticsPage(source="memo", data=self.state)
             self.statistics.set_viewport(self.body_host.width,self.body_host.height)
             self.statistics.open_for(self.state.data.active_scheme)
-            self.body_host.content = self.statistics
+            self.body_host.content = present(self.statistics)
         else:
-            self.body_host.content = self.keyboard_listener
+            self.body_host.content = present(self.keyboard_listener)
             self.refresh(update=False)
         self._update()
 
@@ -215,7 +216,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             if update:
                 self._update()
             return
-        self.scheme_dropdown.options = [ft.DropdownOption(name, name) for name in self.state.scheme_names]
+        self.scheme_dropdown.options = [ft.DropdownOption(name, present(name)) for name in self.state.scheme_names]
         self.scheme_dropdown.value = self.state.data.active_scheme
         if self.result and not any(item.id == self.result.id for item in self.state.data.progressive_memo_history):
             self.run, self.result = None, None
@@ -242,87 +243,85 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             scheme = self.state.active_scheme
             info = []
             if scheme:
-                info = [ft.Text(f"Memo: {order_label(scheme.memo_order or 'CE')}", size=12),
-                        ft.Text(f"Recall: {order_label(scheme.execution_order or 'EC')}", size=12),
-                        ft.Text(f"3-style edges: on · parity helper {scheme.edge_parity_partner or 'UR'} · complete pairs"
-                                if scheme.three_style_enabled else "3-style edges: off · a single final letter is possible",
+                info = [ft.Text(tr('Memo: {0}', order_label(scheme.memo_order or 'CE')), size=12),
+                        ft.Text(tr('Recall: {0}', order_label(scheme.execution_order or 'EC')), size=12),
+                        ft.Text(present(message('3-style edges: on · parity helper {0} · complete pairs', scheme.edge_parity_partner or 'UR') if scheme.three_style_enabled else message('3-style edges: off · a single final letter is possible')),
                                 size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                        ft.Text(" · ".join(f"{label}: {'letters, grouped' if cat.orientation_memo == 'trace' else 'visual, omitted'}"
-                                           for label, cat in (("Twists", scheme.corners), ("Flips", scheme.edges))),
+                        ft.Text(present(join_text(' · ', (compose('{0}: {1}', label, message('letters, grouped') if cat.orientation_memo == 'trace' else message('visual, omitted')) for label, cat in ((message('Twists'), scheme.corners), (message('Flips'), scheme.edges))))),
                                 size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
             self.stage_scroll.controls = [
-                ft.Text("Memo, then recall", size=24, weight=ft.FontWeight.W_600),
-                ft.Text("Memo each pair, then type the letters from memory. Choose your memo constraints below.", size=13),
+                ft.Text(tr('Memo, then recall'), size=24, weight=ft.FontWeight.W_600),
+                ft.Text(tr('Memo each pair, then type the letters from memory. Choose your memo constraints below.'), size=13),
                 self.scheme_dropdown, *info,
                 panel(ft.Column([
-                    ft.Text('Constraints', size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+                    ft.Text(tr('Constraints'), size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                     self.allow_memo_navigation, self.show_category_overview,
-                    ft.Text('Navigation off = one pass. Overview on = all letters after each category.',
+                    ft.Text(tr('Navigation off = one pass. Overview on = all letters after each category.'),
                             size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 ], spacing=4, tight=True), padding=12),
-                ft.Text("Real scramble", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Text(self.current_scramble, size=13, font_family="monospace", selectable=True),
-                ft.Text(self.error or ("Choose or create a letter scheme first." if not scheme else ""), color=ft.Colors.ERROR),
-                ft.Row([ft.FilledButton("Start", icon=ft.Icons.PLAY_ARROW, disabled=scheme is None, on_click=self._start),
-                        ft.OutlinedButton("New scramble", on_click=self._new_scramble),
-                        ft.TextButton("Letter Schemes", on_click=self._open_scheme)], wrap=True, spacing=8),
-                ft.Text("Category titles last 1 second. Timing starts at the first letters and ends when you confirm the last answer. Leaving the activity cancels an unfinished attempt.",
+                ft.Text(tr('Real scramble'), size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(present(self.current_scramble), size=13, font_family="monospace", selectable=True),
+                ft.Text(present(self.error or (message('Choose or create a letter scheme first.') if not scheme else '')), color=ft.Colors.ERROR),
+                ft.Row([ft.FilledButton(tr('Start'), icon=ft.Icons.PLAY_ARROW, disabled=scheme is None, on_click=self._start),
+                        ft.OutlinedButton(tr('New scramble'), on_click=self._new_scramble),
+                        ft.TextButton(tr('Letter Schemes'), on_click=self._open_scheme)], wrap=True, spacing=8),
+                ft.Text(tr('Category titles last 1 second. Timing starts at the first letters and ends when you confirm the last answer. Leaving the activity cancels an unfinished attempt.'),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
             ]
         elif self.phase == "intro":
-            controls = [ft.Text(self.run.category.category.title(), size=44, weight=ft.FontWeight.W_600)]
+            controls = [ft.Text(tr(self.run.category.category.title()), size=44, weight=ft.FontWeight.W_600)]
             if self.run.can_memo_previous:
-                controls.append(ft.OutlinedButton('Previous', icon=ft.Icons.ARROW_BACK, on_click=self._previous_memo))
+                controls.append(ft.OutlinedButton(tr('Previous'), icon=ft.Icons.ARROW_BACK, on_click=self._previous_memo))
             self._center(controls, 120 if len(controls)>1 else 70)
         elif self.phase == "memo":
             prompt = self.run.prompt
-            self.display_letters.value = " ".join(pairs(prompt.letters))
+            self.display_letters.value = present(join_text(' ', pairs(prompt.letters)))
             self._center([
-                ft.Text(f"{prompt.category.title()} · {prompt.label}", size=14, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(present(compose('{0} · {1}', message(prompt.category.title()), prompt.label)), size=14, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.display_letters,
-                ft.Text("← Previous · Space / → Next" if self.run.allow_memo_navigation else "Space → next",
+                ft.Text(present(message('← Previous · Space / → Next') if self.run.allow_memo_navigation else message('Space → next')),
                         size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 ft.Row([
-                    *([ft.OutlinedButton('Previous', icon=ft.Icons.ARROW_BACK,
+                    *([ft.OutlinedButton(tr('Previous'), icon=ft.Icons.ARROW_BACK,
                         disabled=not self.run.can_memo_previous, on_click=self._previous_memo)]
                       if self.run.allow_memo_navigation else []),
-                    ft.FilledButton("Next", on_click=self._next),
+                    ft.FilledButton(tr('Next'), on_click=self._next),
                 ], spacing=8, wrap=True, alignment=ft.MainAxisAlignment.CENTER),
             ])
         elif self.phase == "overview":
             category = self.run.category
-            controls = [ft.Text(f"{category.category.title()} · Review all pairs", size=21, weight=ft.FontWeight.W_600),
-                        ft.Text(" ".join(category.ordinary_pairs) or "No ordinary letter targets", size=32,
+            controls = [ft.Text(tr('{0} · Review all pairs', message(category.category.title())), size=21, weight=ft.FontWeight.W_600),
+                        ft.Text(present(join_text(' ', category.ordinary_pairs) or message('No ordinary letter targets')), size=32,
                                 font_family="monospace", text_align=ft.TextAlign.CENTER)]
             if category.orientation_pairs:
-                controls += [ft.Text("All twists" if category.category == "corners" else "All flips", size=12),
-                             ft.Text(" ".join(category.orientation_pairs), size=28, font_family="monospace")]
+                controls += [ft.Text(present(message('All twists') if category.category == 'corners' else message('All flips')), size=12),
+                             ft.Text(present(join_text(' ', category.orientation_pairs)), size=28, font_family="monospace")]
             last = self.run.category_index == len(self.run.plan.categories) - 1
-            controls += [ft.Text("Space → type your recall" if last else "Space → next category", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            controls += [ft.Text(present(message('Space → type your recall') if last else message('Space → next category')), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                          ft.Row([
-                             *([ft.OutlinedButton('Previous',icon=ft.Icons.ARROW_BACK,
+                             *([ft.OutlinedButton(tr('Previous'),icon=ft.Icons.ARROW_BACK,
                                  disabled=not self.run.can_memo_previous,on_click=self._previous_memo)]
                                if self.run.allow_memo_navigation else []),
-                             ft.FilledButton("Recall" if last else "Next category", on_click=self._next),
+                             ft.FilledButton(present(message('Recall') if last else message('Next category')), on_click=self._next),
                          ], spacing=8,wrap=True,alignment=ft.MainAxisAlignment.CENTER)]
             self._center(controls, 260)
         elif self.phase == "recall":
             prompt = self.run.prompt
             self._sync_recall_forward()
-            instruction = ("Type this flip's letter pair." if prompt.category == "edges"
-                           else "Type all twist letters together.") if prompt.kind == "orientation" else (
-                               "Type the single final letter." if len(prompt.letters) == 1 else "Type the letter pair.")
-            self.recall_field.hint_text = "Type one letter" if len(prompt.letters) == 1 else "Type letters"
+            instruction = (message("Type this flip's letter pair.") if prompt.category == "edges"
+                           else message('Type all twist letters together.')) if prompt.kind == "orientation" else (
+                               message('Type the single final letter.') if len(prompt.letters) == 1 else message('Type the letter pair.'))
+            self.recall_field.hint_text = present(message('Type one letter') if len(prompt.letters) == 1 else message('Type letters'))
             self._center([
-                ft.Text(f"Recall {prompt.category.title()} · {prompt.label}", size=20, weight=ft.FontWeight.W_600),
-                ft.Text(f"Answer {self.run.recall_index + 1} / {len(self.run.plan.recall_prompts)}", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(tr('Recall {0} · {1}', message(prompt.category.title()), prompt.label), size=20, weight=ft.FontWeight.W_600),
+                ft.Text(tr('Answer {0} / {1}', self.run.recall_index + 1, len(self.run.plan.recall_prompts)), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 self.recall_field,
-                ft.Text(instruction, size=12),
-                ft.Text("← Previous · → Next / skip empty · Space / Enter confirm", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Text("Saved answers stay unless you type replacement letters.", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                ft.Row([ft.OutlinedButton("Previous", icon=ft.Icons.ARROW_BACK, height=36,
+                ft.Text(present(instruction), size=12),
+                ft.Text(tr('← Previous · → Next / skip empty · Space / Enter confirm'), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(tr('Saved answers stay unless you type replacement letters.'), size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Row([ft.OutlinedButton(tr('Previous'), icon=ft.Icons.ARROW_BACK, height=36,
                                          disabled=self.run.recall_index == 0, on_click=self._previous),
-                        ft.FilledButton("Confirm", height=36, on_click=self._next),
+                        ft.FilledButton(tr('Confirm'), height=36, on_click=self._next),
                         self.recall_forward],
                        alignment=ft.MainAxisAlignment.CENTER, spacing=8, run_spacing=6, wrap=True),
             ], 330)
@@ -356,7 +355,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         try:
             plan = build_plan(self.current_scramble, self.state.active_scheme)
         except ScrambleError as error:
-            self.error = str(error)
+            self.error = present(error_message(error))
             self._render_stage()
             self._update()
             return
@@ -402,7 +401,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
     async def _tick(self, token):
         while self.active and token == self._generation and self.in_attempt:
             if self.run.started_at is not None:
-                self.clock.value = _format_centiseconds(round((time.monotonic() - self.run.started_at) * 100))
+                self.clock.value = present(_format_centiseconds(round((time.monotonic() - self.run.started_at) * 100)))
                 self._update()
             await asyncio.sleep(0.2)
 
@@ -440,7 +439,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             # events from a discarded field cannot change a different answer.
             self.recall_field = self._make_recall_field(self.run, self.run.recall_index)
         value = self.run.current_input if self.run and self.phase == "recall" else ""
-        self.recall_field.value = value[:len(self.run.prompt.letters)] if value else ""
+        self.recall_field.value = value[:len(self.run.prompt.letters)] if value else ''
         self.recall_field.selection = None
 
     def _previous_memo(self, e=None):
@@ -540,7 +539,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             show_category_overview=self.run.show_category_overview,
         )
         self.state.add_progressive_memo_attempt(self.result)
-        self.clock.value = _format_centiseconds(self.result.centiseconds)
+        self.clock.value = present(_format_centiseconds(self.result.centiseconds))
         self._refresh_history()
 
     def _cancel(self, e=None, update=True):
@@ -589,49 +588,49 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
         dark = self.state.data.dark_mode
         foreground = ("#83E0AF" if dark else "#12643D") if correct else ("#FFB4AB" if dark else "#BA1A1A")
         background = ("#173F2C" if dark else "#E1F3E7") if correct else ("#482A29" if dark else "#FCEAE8")
-        description = f"Correct: {expected}" if correct else (f"Missing: {expected}" if not entered else (f"Extra: {entered}" if not expected else f"{entered} should be {expected}"))
+        description = message('Correct: {0}', expected) if correct else (message('Missing: {0}', expected) if not entered else (message('Extra: {0}', entered) if not expected else message('{0} should be {1}', entered, expected)))
         return ft.Container(ft.Column([
-            ft.Text(entered or "—", size=19, weight=ft.FontWeight.BOLD, color=foreground),
-            ft.Text(expected, size=11, color=foreground),
+            ft.Text(present(entered or '—'), size=19, weight=ft.FontWeight.BOLD, color=foreground),
+            ft.Text(present(expected), size=11, color=foreground),
         ], spacing=4, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            width=40, padding=6, border_radius=6, bgcolor=background, tooltip=description)
+            width=40, padding=6, border_radius=6, bgcolor=background, tooltip=present(description))
 
     def _render_result(self):
         result = self.result
         controls = [
-            ft.Text("Recall result", size=24, weight=ft.FontWeight.W_600),
-            ft.Row([ft.Text(f"{result.accuracy:.1f}% accuracy", size=23, weight=ft.FontWeight.W_600),
-                    ft.Text(f"Total {_format_centiseconds(result.centiseconds)}", size=20, font_family="monospace")], wrap=True, spacing=24),
-            ft.Text(f"Memo {_format_centiseconds(result.memo_centiseconds)} · Recall {_format_centiseconds(result.recall_centiseconds)} · {result.correct_letters}/{result.scored_letters} scored letters correct", size=12),
-            ft.Text(self._constraints_label(result), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Text("Green = correct · Red = incorrect or missing. Each tile shows your answer above the correct letter. Additional typed letters are listed separately and still reduce the score.",
+            ft.Text(tr('Recall result'), size=24, weight=ft.FontWeight.W_600),
+            ft.Row([ft.Text(tr('{0:.1f}% accuracy', result.accuracy), size=23, weight=ft.FontWeight.W_600),
+                    ft.Text(tr('Total {0}', _format_centiseconds(result.centiseconds)), size=20, font_family="monospace")], wrap=True, spacing=24),
+            ft.Text(tr('Memo {0} · Recall {1} · {2}/{3} scored letters correct', _format_centiseconds(result.memo_centiseconds), _format_centiseconds(result.recall_centiseconds), result.correct_letters, result.scored_letters), size=12),
+            ft.Text(present(self._constraints_label(result)), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(tr('Green = correct · Red = incorrect or missing. Each tile shows your answer above the correct letter. Additional typed letters are listed separately and still reduce the score.'),
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
-        for category in ("corners" if letter == "C" else "edges" for letter in result.execution_order):
+        for category in (message('corners') if letter == "C" else message('edges') for letter in result.execution_order):
             items = [item for item in result.recall if item.category == category]
-            controls.append(ft.Text(category.title(), size=17, weight=ft.FontWeight.W_600))
+            controls.append(ft.Text(tr(category.title()), size=17, weight=ft.FontWeight.W_600))
             if not items:
-                controls.append(ft.Text("No letter targets", size=12))
+                controls.append(ft.Text(tr('No letter targets'), size=12))
             pair_index, flip_index = 0, 0
             for item in items:
                 pair_index += item.kind == "pair"
-                label = ("All twists" if category == "corners" else "All flips") if item.kind == "orientation" else f"Pair {pair_index}"
+                label = (message('All twists') if category == "corners" else message('All flips')) if item.kind == "orientation" else message('Pair {0}', pair_index)
                 if category == "edges" and item.kind == "orientation" and len(normalize_letters(item.expected)) <= 2:
                     flip_index += 1
-                    label = f"Flip {flip_index}"
+                    label = message('Flip {0}', flip_index)
                 aligned = align_letters(item.expected, item.entered)
                 controls.append(ft.Row([
-                    ft.Text(label, size=12, width=72),
+                    ft.Text(present(label), size=12, width=72),
                     ft.Row([self._result_letter(*letter) for letter in aligned if letter[0]],
                            spacing=4, wrap=True, expand=True),
                 ], spacing=10))
                 additional = ''.join(entered for expected, entered, _ in aligned if not expected)
                 if additional:
-                    controls.append(ft.Text(f"{label} · Additional input: {additional}", size=12, color=ft.Colors.ERROR))
+                    controls.append(ft.Text(tr('{0} · Additional input: {1}', label, additional), size=12, color=ft.Colors.ERROR))
         controls += [ft.Divider(),
-                     ft.Text(f"Saved · {result.scheme_name} · Memo {result.memo_order} / Exec {result.execution_order}", size=12),
-                     ft.Text(result.scramble, size=12, font_family="monospace", selectable=True),
-                     ft.FilledButton("Start next attempt", on_click=self._start_next)]
+                     ft.Text(tr('Saved · {0} · Memo {1} / Exec {2}', result.scheme_name, result.memo_order, result.execution_order), size=12),
+                     ft.Text(present(result.scramble), size=12, font_family="monospace", selectable=True),
+                     ft.FilledButton(tr('Start next attempt'), on_click=self._start_next)]
         self.stage_scroll.controls = controls
 
     def _start_next(self, e=None):
@@ -640,22 +639,22 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
 
     @staticmethod
     def _constraints_label(attempt):
-        return ('Memo navigation: ' + ('allowed' if attempt.allow_memo_navigation else 'one pass') +
-                ' · Category overview: ' + ('shown' if attempt.show_category_overview else 'hidden'))
+        return (message('Memo navigation: ') + (message('allowed') if attempt.allow_memo_navigation else message('one pass')) +
+                message(' · Category overview: ') + (message('shown') if attempt.show_category_overview else message('hidden')))
 
     def _refresh_history(self):
         history = self.state.data.progressive_memo_history
-        self.history_meta.value = str(len(history))
+        self.history_meta.value = present(str(len(history)))
         self.older_button.visible = len(history) > self.history_limit
         self.older_button.disabled = self.in_attempt
-        self.history.controls = [ft.Text("Finished attempts save here automatically.", size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
+        self.history.controls = [ft.Text(tr('Finished attempts save here automatically.'), size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
         if history:
             self.history.controls = [ft.TextButton(content=ft.Column([
-                ft.Row([ft.Text(_format_centiseconds(item.centiseconds), size=16, weight=ft.FontWeight.W_600, expand=True),
-                        ft.Text(f"{item.accuracy:.1f}%", size=13)], spacing=8),
-                ft.Text(f"{item.scheme_name} · {item.created_at[:16].replace('T', ' ')} UTC", size=10,
+                ft.Row([ft.Text(present(_format_centiseconds(item.centiseconds)), size=16, weight=ft.FontWeight.W_600, expand=True),
+                        ft.Text(present(compose('{0:.1f}%', item.accuracy)), size=13)], spacing=8),
+                ft.Text(tr('{0} · {1} UTC', item.scheme_name, item.created_at[:16].replace('T', ' ')), size=10,
                         color=ft.Colors.ON_SURFACE_VARIANT, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-            ], spacing=3), tooltip=item.scramble + '\n' + self._constraints_label(item), disabled=self.in_attempt,
+            ], spacing=3), tooltip=present(item.scramble + '\n' + self._constraints_label(item)), disabled=self.in_attempt,
                 on_click=lambda e, saved=item: self._show_saved(saved)) for item in reversed(history[-self.history_limit:])]
 
     def _show_saved(self, saved):
@@ -663,7 +662,7 @@ class ProgressiveMemoPage(ThemeAwarePage, ft.Column):
             return
         self._generation += 1
         self.run, self.result = None, saved
-        self.clock.value = _format_centiseconds(saved.centiseconds)
+        self.clock.value = present(_format_centiseconds(saved.centiseconds))
         self._render_stage()
         self._update()
 

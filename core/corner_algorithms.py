@@ -4,6 +4,7 @@ Code-owned choices never enter the user's saved records. Legacy builtin IDs
 remain round-trippable in backups, but are not offered or executed as defaults.
 Personal algorithms and their explicit preferences still take precedence.
 """
+from core.messages import message
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from hashlib import sha256
@@ -14,8 +15,7 @@ from core.algorithms import parse_algorithm
 from core.corner_cases import corner_cases
 
 
-QUALITY_NOTICE = ('BLDDB manmade algorithms · ranked by source count. '
-                  'Popularity does not guarantee an optimal alg; you can save your own.')
+QUALITY_NOTICE = (message('BLDDB manmade algorithms · ranked by source count. Popularity does not guarantee an optimal alg; you can save your own.'))
 CATALOG_PATH = Path(__file__).with_name('blddb_corner_catalog.json')
 
 
@@ -27,7 +27,6 @@ def case_source_url(key):
 @dataclass(frozen=True)
 class BuiltinAlgorithm:
     id: str
-    name: str
     alg: str
     origin: str
     position: str
@@ -38,6 +37,11 @@ class BuiltinAlgorithm:
     raw_alg: str
     commutator: str
     sources: tuple[str, ...]
+
+    @cached_property
+    def name(self):
+        label = "{0} · {1} source" if self.source_count == 1 else "{0} · {1} sources"
+        return message(label, self.raw_alg, self.source_count)
 
     @cached_property
     def moves(self):
@@ -53,7 +57,7 @@ def _snapshot():
     data = json.loads(CATALOG_PATH.read_text(encoding='utf-8'))
     if (data.get('schema') != 1 or data['metadata'].get('buffer') != 'UFR'
             or set(data['cases']) != set(corner_cases())):
-        raise ValueError('The bundled BLDDB UFR catalog is incomplete or incompatible.')
+        raise ValueError(message('The bundled BLDDB UFR catalog is incomplete or incompatible.'))
     return data
 
 
@@ -70,19 +74,18 @@ def blddb_case_algorithms():
         for rank, group in enumerate(entry['groups'], 1):
             sources = tuple(group['sources'])
             if not sources or len(sources) > previous_count:
-                raise ValueError(f'Invalid BLDDB popularity order: {key}')
+                raise ValueError(message('Invalid BLDDB popularity order: {0}', key))
             previous_count = len(sources)
             count = len(group['variants'])
             for index, item in enumerate(group['variants'], 1):
                 # Rank/source count are deliberately absent from the ID: a
                 # saved choice survives later popularity changes.
                 identifier = 'builtin:blddb:' + sha256((key + '\n' + item['moves']).encode()).hexdigest()[:24]
-                name = item['moves'] + f' · {len(sources)} ' + ('source' if len(sources) == 1 else 'sources')
                 variants.append(BuiltinAlgorithm(
-                    identifier, name, item['source'], 'blddb', 'UFR-' + key.replace(':', '-'),
+                    identifier, item['source'], 'blddb', 'UFR-' + key.replace(':', '-'),
                     len(sources), rank, index, count, item['moves'], item['commutator'], sources))
         if not variants:
-            raise ValueError(f'No BLDDB alternatives for {key}')
+            raise ValueError(message('No BLDDB alternatives for {0}', key))
         result[key] = tuple(variants)
     return result
 

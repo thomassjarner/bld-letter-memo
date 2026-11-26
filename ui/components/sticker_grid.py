@@ -1,4 +1,6 @@
 """Compact face cards using the cube editor's fixed colored letter tiles."""
+from core.messages import message, compose
+from ui.language import present, tr
 import math
 import flet as ft
 
@@ -8,7 +10,7 @@ from ui.components.cube_net import FACE_COLORS, orientation_colors
 from ui.components.sticker_tiles import StickerTiles
 
 
-FACE_NAMES = {"U": "Up", "L": "Left", "F": "Front", "R": "Right", "B": "Back", "D": "Down"}
+FACE_NAMES = {"U": message('Up'), "L": message('Left'), "F": message('Front'), "R": message('Right'), "B": message('Back'), "D": message('Down')}
 MIN_CARD_STICKER_SIZE = 32
 CARD_PADDING = 10
 CARD_BORDER = 1
@@ -37,7 +39,7 @@ class FaceCardsEditor(ft.Column):
             for sticker in stickers:
                 cell = self.tiles.add(sticker, bg, fg)
                 column = ft.Column([
-                    ft.Text(sticker, size=9, height=12, text_align=ft.TextAlign.CENTER,
+                    ft.Text(present(sticker), size=9, height=12, text_align=ft.TextAlign.CENTER,
                             color=ft.Colors.ON_SURFACE_VARIANT),
                     cell,
                 ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER, tight=True)
@@ -45,7 +47,7 @@ class FaceCardsEditor(ft.Column):
                 self.tile_columns.append(column)
             self.face_controls[face] = ft.Container(
                 ft.Column([
-                    ft.Text(f"{face} · {FACE_NAMES[face]}", size=12, height=18,
+                    ft.Text(present(compose('{0} · {1}', face, FACE_NAMES[face])), size=12, height=18,
                             weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
                     ft.Row(columns, spacing=CELL_GAP, alignment=ft.MainAxisAlignment.CENTER),
                 ], spacing=6, tight=True),
@@ -58,13 +60,13 @@ class FaceCardsEditor(ft.Column):
                                 vertical_alignment=ft.CrossAxisAlignment.START)
         warning = self.tiles.warning()
         self.controls = [
-            ft.Text("Type letters · Auto-saved · Advance automatically", size=11, height=16,
+            ft.Text(tr('Type letters · Auto-saved · Advance automatically'), size=11, height=16,
                     max_lines=1, overflow=ft.TextOverflow.ELLIPSIS,
-                    tooltip="Letters save immediately; typing advances to the next sticker.",
+                    tooltip=tr('Letters save immediately; typing advances to the next sticker.'),
                     color=ft.Colors.ON_SURFACE_VARIANT),
             self.card_grid,
-            ft.Text("★ Buffer · ● Same piece", size=10, height=32, color=ft.Colors.ON_SURFACE_VARIANT),
-            *([ft.Text(warning, size=12, color=ft.Colors.ERROR)] if warning else []),
+            ft.Text(tr('★ Buffer · ● Same piece'), size=10, height=32, color=ft.Colors.ON_SURFACE_VARIANT),
+            *([ft.Text(present(warning), size=12, color=ft.Colors.ERROR)] if warning else []),
         ]
         self.set_viewport(config.get("width", 760), config.get("height"))
 

@@ -1,4 +1,5 @@
 """Timer records and estimates for five new attempts. All durations are centiseconds."""
+from core.messages import message
 from bisect import bisect_left, insort
 from functools import cached_property, lru_cache
 from itertools import product
@@ -198,11 +199,11 @@ def parse_goal(text):
     raw = (text or "").strip()
     m = re.fullmatch(r"(?:(\d{1,5}):([0-5]\d)|(\d{1,7}))(?:[.,](\d{1,2}))?",raw,flags=re.ASCII)
     if not m:
-        raise ValueError("Enter seconds or m:ss, for example 90 or 1:30.00.")
+        raise ValueError(message('Enter seconds or m:ss, for example 90 or 1:30.00.'))
     seconds = int(m[1])*60+int(m[2]) if m[1] is not None else int(m[3])
     cs = seconds*100+int((m[4] or "").ljust(2,"0"))
     if cs <= 0:
-        raise ValueError("Enter a time greater than zero.")
+        raise ValueError(message('Enter a time greater than zero.'))
     return cs
 
 

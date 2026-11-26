@@ -1,3 +1,5 @@
+from core.messages import message, compose
+from ui.language import present, tr
 import flet as ft
 from ui.theme_colors import ThemeAwarePage, show_themed_dialog
 
@@ -11,12 +13,12 @@ from ui.design import icon_action, page_heading, eyebrow
 
 
 COLOR_LABELS = {
-    "W": "White",
-    "Y": "Yellow",
-    "G": "Green",
-    "B": "Blue",
-    "R": "Red",
-    "O": "Orange",
+    "W": message('White'),
+    "Y": message('Yellow'),
+    "G": message('Green'),
+    "B": message('Blue'),
+    "R": message('Red'),
+    "O": message('Orange'),
 }
 OPPOSITE = {"W": "Y", "Y": "W", "G": "B", "B": "G", "R": "O", "O": "R"}
 
@@ -35,29 +37,29 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self.spacing = 0
         # Edges first is only a UI/data-entry preference. It does not affect
         # memo/execution order.
-        self.selected_category = "edges"
-        self._last_letter_category = "edges"
+        self.selected_category = message('edges')
+        self._last_letter_category = message('edges')
         self._viewport = (1400.0, 760.0)
         self._layout_wide = True
         self._layout_key = None
         self._cube_editor = None
         self._cards_editor = None
         self.editor_dropdown = ft.Dropdown(
-            label="Editor", width=170, height=44, dense=True,
+            label=tr('Editor'), width=170, height=44, dense=True,
             value=self.state.data.letter_scheme_editor,
-            options=[ft.DropdownOption("cards", "Face cards"), ft.DropdownOption("cube", "2D cube")],
+            options=[ft.DropdownOption("cards", tr('Face cards')), ft.DropdownOption("cube", tr('2D cube'))],
             on_select=self._on_editor_change,
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
         )
-        self.new_scheme_field = ft.TextField(hint_text="New scheme name", width=144, dense=True, on_submit=self._create_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
+        self.new_scheme_field = ft.TextField(hint_text=tr('New scheme name'), width=144, dense=True, on_submit=self._create_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.new_scheme_field.height = 36
         self.first_scheme_field = ft.TextField(
-            label="Scheme name", hint_text="e.g. My BLD scheme", width=260, height=44, dense=True,
+            label=tr('Scheme name'), hint_text=tr('e.g. My BLD scheme'), width=260, height=44, dense=True,
             on_submit=self._create_first_scheme, color=ft.Colors.ON_SURFACE,
             label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
             hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT),
         )
-        self.rename_field = ft.TextField(hint_text="Rename active scheme", width=170, dense=True, on_submit=self._rename_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
+        self.rename_field = ft.TextField(hint_text=tr('Rename active scheme'), width=170, dense=True, on_submit=self._rename_scheme, color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         self.scheme_list_view = ft.ListView(expand=True, spacing=2, scroll=ft.ScrollMode.AUTO)
         # Keep one scrollable body control mounted for the lifetime of the
         # page. Replacing the whole Column on every setting change reset its
@@ -78,9 +80,9 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         self._focused_sticker = None
         self._rename_dialog = None
         self.rename_field.on_submit = self._confirm_rename
-        self._standard_heading = page_heading("Letter Schemes", "Map stickers to letters and tune the way you trace a cube.", "01 / Foundation")
+        self._standard_heading = page_heading(message('Letter Schemes'), message('Map stickers to letters and tune the way you trace a cube.'), message('01 / Foundation'))
         self._editor_heading = ft.Container(
-            ft.Text("Letter Schemes", size=24, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
+            ft.Text(tr('Letter Schemes'), size=24, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
             height=38, padding=ft.Padding.only(bottom=6),
         )
         self._buffer_pickers = {}
@@ -100,10 +102,10 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
             content=ft.Column(
                 [
-                    eyebrow("Your schemes"),
+                    eyebrow(message('Your schemes')),
                     ft.Row([self.new_scheme_field, ft.IconButton(ft.Icons.ADD, width=36, height=36,
                                                                icon_size=18, on_click=self._create_scheme,
-                                                               tooltip="Create scheme")], spacing=6),
+                                                               tooltip=tr('Create scheme'))], spacing=6),
                     ft.Divider(),
                     self.scheme_list_view,
                 ],
@@ -185,9 +187,9 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                 ft.Container(
                     content=ft.Row(
                         [
-                            ft.Text(name, weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL, expand=True, color=ft.Colors.ON_SURFACE),
-                            icon_action(ft.Icons.CONTENT_COPY, "Duplicate scheme", lambda e, n=name: self._duplicate_scheme(n), size=32),
-                            icon_action(ft.Icons.DELETE_OUTLINE, "Delete scheme", lambda e, n=name: self._delete_scheme(n), size=32),
+                            ft.Text(present(name), weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL, expand=True, color=ft.Colors.ON_SURFACE),
+                            icon_action(ft.Icons.CONTENT_COPY, message('Duplicate scheme'), lambda e, n=name: self._duplicate_scheme(n), size=32),
+                            icon_action(ft.Icons.DELETE_OUTLINE, message('Delete scheme'), lambda e, n=name: self._delete_scheme(n), size=32),
                         ],
                         spacing=0,
                     ),
@@ -211,12 +213,12 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             self._focused_sticker = None
             self.body_scroll.controls = [ft.Container(
                 ft.Column([
-                    ft.Text("Create your first letter scheme" if not self.state.scheme_names else "Choose or create a letter scheme",
+                    ft.Text(present(message('Create your first letter scheme') if not self.state.scheme_names else message('Choose or create a letter scheme')),
                             size=19, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                    ft.Text("Name your scheme, then choose your buffers and assign letters.", size=12,
+                    ft.Text(tr('Name your scheme, then choose your buffers and assign letters.'), size=12,
                             color=ft.Colors.ON_SURFACE_VARIANT),
                     ft.Row([self.first_scheme_field,
-                            ft.FilledButton("Create scheme", height=44, tooltip="Create letter scheme",
+                            ft.FilledButton(tr('Create scheme'), height=44, tooltip=tr('Create letter scheme'),
                                             on_click=self._create_first_scheme)], wrap=True, spacing=8, run_spacing=8),
                 ], spacing=12, tight=True), padding=16, border_radius=10,
                 bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
@@ -232,10 +234,10 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             selected_index=tab_index,
             on_change=self._on_tab_change,
             content=ft.TabBar(
-                tabs=[ft.Tab(label="All stickers"), ft.Tab(label="Preferences")] if cube_mode else [
-                    ft.Tab(label="Edges"),
-                    ft.Tab(label="Corners"),
-                    ft.Tab(label="Preferences"),
+                tabs=[ft.Tab(label=tr('All stickers')), ft.Tab(label=tr('Preferences'))] if cube_mode else [
+                    ft.Tab(label=tr('Edges')),
+                    ft.Tab(label=tr('Corners')),
+                    ft.Tab(label=tr('Preferences')),
                 ]
             ),
         )
@@ -244,10 +246,10 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         common = [
             ft.Row(
                 [
-                    ft.Text(scheme.name, size=16, weight=ft.FontWeight.BOLD,
+                    ft.Text(present(scheme.name), size=16, weight=ft.FontWeight.BOLD,
                             color=ft.Colors.ON_SURFACE, expand=True,
-                            max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, tooltip=scheme.name),
-                    ft.TextButton("Rename", icon=ft.Icons.EDIT_OUTLINED, height=32,
+                            max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, tooltip=present(scheme.name)),
+                    ft.TextButton(tr('Rename'), icon=ft.Icons.EDIT_OUTLINED, height=32,
                                   on_click=self._open_rename),
                 ], height=36
             ),
@@ -264,12 +266,12 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             self.set_viewport(*self._viewport)
             return
 
-        categories = ("edges", "corners") if cube_mode else (self.selected_category,)
+        categories = (message('edges'), message('corners')) if cube_mode else (self.selected_category,)
         for category in categories:
             picker = build_buffer_picker(category, getattr(scheme, category).buffer_sticker,
                                          lambda sticker, c=category: self._set_buffer(sticker, c))
-            picker.label = "Edge buffer" if category == "edges" else "Corner buffer"
-            picker.tooltip = f"Choose the exact {category[:-1]} tracing buffer sticker"
+            picker.label = present(message('Edge buffer') if category == 'edges' else message('Corner buffer'))
+            picker.tooltip = tr('Choose the exact {0} tracing buffer sticker', message(category[:-1]))
             self._buffer_pickers[category] = picker
         self._buffer_toolbar = ft.Row([*self._buffer_pickers.values(), self.editor_dropdown], spacing=12, run_spacing=4)
 
@@ -295,7 +297,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
 
         self.body_scroll.controls = common + [
             self._buffer_toolbar,
-            ft.Container(content=grid),
+            ft.Container(content=present(grid)),
             self.settings_message,
         ]
         self.set_viewport(*self._viewport)
@@ -307,21 +309,21 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             front_options = [c for c in COLOR_LABELS if c not in {scheme.memo_up, OPPOSITE[scheme.memo_up]}]
 
         up = ft.Dropdown(
-            label="Top color",
+            label=tr('Top color'),
             width=150,
             value=scheme.memo_up,
-            options=[ft.DropdownOption(c, COLOR_LABELS[c]) for c in COLOR_LABELS],
+            options=[ft.DropdownOption(c, present(COLOR_LABELS[c])) for c in COLOR_LABELS],
             on_select=self._orientation_up_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         front = ft.Dropdown(
-            label="Front color",
+            label=tr('Front color'),
             width=150,
             value=scheme.memo_front if scheme.memo_front in front_options else front_options[0],
-            options=[ft.DropdownOption(c, COLOR_LABELS[c]) for c in front_options],
+            options=[ft.DropdownOption(c, present(COLOR_LABELS[c])) for c in front_options],
             on_select=self._orientation_front_changed,
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
         return ft.Row([
-            ft.Text("Memo orientation", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+            ft.Text(tr('Memo orientation'), weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
             up,
             front,
         ], wrap=True)
@@ -330,19 +332,19 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         nav = ft.Row(
             [
                 ft.OutlinedButton(
-                    "General",
+                    tr('General'),
                     icon=ft.Icons.TUNE,
                     on_click=lambda e: self._set_preference_section("general"),
                     disabled=self.preference_section == "general",
                 ),
                 ft.OutlinedButton(
-                    "Corners tracing",
-                    on_click=lambda e: self._set_preference_section("corners"),
+                    tr('Corners tracing'),
+                    on_click=lambda e: self._set_preference_section(message('corners')),
                     disabled=self.preference_section == "corners",
                 ),
                 ft.OutlinedButton(
-                    "Edges tracing",
-                    on_click=lambda e: self._set_preference_section("edges"),
+                    tr('Edges tracing'),
+                    on_click=lambda e: self._set_preference_section(message('edges')),
                     disabled=self.preference_section == "edges",
                 ),
             ],
@@ -351,13 +353,13 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
 
         if self.preference_section == "general":
             memo_field = ft.TextField(
-                label="Memo", hint_text="CE", value=scheme.memo_order, width=90, max_length=2,
+                label=tr('Memo'), hint_text="CE", value=scheme.memo_order, width=90, max_length=2,
                 capitalization=ft.TextCapitalization.CHARACTERS,
                 on_submit=lambda e: self._save_order("memo", e.control),
                 on_blur=lambda e: self._save_order("memo", e.control),
             color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
             exec_field = ft.TextField(
-                label="Exec", hint_text="EC", value=scheme.execution_order, width=90, max_length=2,
+                label=tr('Exec'), hint_text="EC", value=scheme.execution_order, width=90, max_length=2,
                 capitalization=ft.TextCapitalization.CHARACTERS,
                 on_submit=lambda e: self._save_order("execution", e.control),
                 on_blur=lambda e: self._save_order("execution", e.control),
@@ -366,32 +368,32 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                 [
                     self._build_orientation_settings(scheme),
                     ft.Switch(
-                        label="Scramble from own orientation",
+                        label=tr('Scramble from own orientation'),
                         value=scheme.scramble_from_own_orientation,
                         on_change=lambda e: self._scramble_from_own_orientation_changed(e.control.value),
                     ),
                     ft.Text(
-                        "Off: scramble notation is read as White-top / Green-front. On: scramble notation is read from this scheme's own orientation.",
+                        tr("Off: scramble notation is read as White-top / Green-front. On: scramble notation is read from this scheme's own orientation."),
                         size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.Row([
-                        ft.Text("Order", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                        ft.Text(tr('Order'), weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                         memo_field, ft.Text("/", color=ft.Colors.ON_SURFACE), exec_field,
-                        ft.Text("Blank = standard CE / EC", size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                        ft.Text(tr('Blank = standard CE / EC'), size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                     ], wrap=True),
                     self._build_three_style_settings(scheme),
                     ft.Switch(
-                        label="Show cycles with colors",
+                        label=tr('Show cycles with colors'),
                         value=scheme.show_cycle_colors,
                         on_change=lambda e: self._show_cycle_colors_changed(e.control.value),
                     ),
                     ft.Switch(
-                        label="Highlight twist/flip targets",
+                        label=tr('Highlight twist/flip targets'),
                         value=scheme.highlight_orientation_targets,
                         on_change=lambda e: self._highlight_orientation_targets_changed(e.control.value),
                     ),
                     ft.Text(
-                        "Cycle colors affect generated memo display only. Twist/flip highlighting applies when those are memoed as target letters.",
+                        tr('Cycle colors affect generated memo display only. Twist/flip highlighting applies when those are memoed as target letters.'),
                         size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                 ],
@@ -402,9 +404,9 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
 
         return ft.Column(
             [
-                ft.Text("Preferences", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                ft.Text(tr('Preferences'), size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                 ft.Text(
-                    "Scheme-specific settings used automatically by Scramble Memo and future practice tools.",
+                    tr('Scheme-specific settings used automatically by Scramble Memo and future practice tools.'),
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
                 nav,
@@ -431,14 +433,14 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         if scheme.three_style_enabled:
             controls.extend([
                 ft.Dropdown(
-                    label="Edge parity partner",
+                    label=tr('Edge parity partner'),
                     width=190,
                     value=preferred,
-                    options=[ft.DropdownOption(p, p) for p in pieces],
+                    options=[ft.DropdownOption(p, present(p)) for p in pieces],
                     on_select=lambda e: self._edge_parity_partner_changed(e.control.value),
                 color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT)),
                 ft.Text(
-                    "Default: UR. When the corner trace is odd, the edge buffer and parity partner are memo-swapped before the edge trace.",
+                    tr('Default: UR. When the corner trace is odd, the edge buffer and parity partner are memo-swapped before the edge trace.'),
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
             ])
@@ -446,19 +448,19 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
 
     def _build_category_preferences(self, scheme, category: str):
         cat = scheme.corners if category == "corners" else scheme.edges
-        title = "Corners" if category == "corners" else "Edges"
-        noun = "twists" if category == "corners" else "flips"
+        title = message('Corners') if category == "corners" else message('Edges')
+        noun = message('twists') if category == "corners" else message('flips')
         mode = ft.Dropdown(
-            label=f"{noun.capitalize()} handling",
+            label=tr('{0} handling', noun.capitalize()),
             width=235,
             value=cat.orientation_memo,
             options=[
-                ft.DropdownOption("visual", f"Visualize {noun}"),
-                ft.DropdownOption("trace", f"Trace / shoot {noun}"),
+                ft.DropdownOption("visual", tr('Visualize {0}', noun)),
+                ft.DropdownOption("trace", tr('Trace / shoot {0}', noun)),
             ],
             on_select=lambda e, c=category: self._orientation_mode_changed(c, e.control.value),
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
-        mode_label = "Standard" if cat.tracing_mode == "standard" else "Custom"
+        mode_label = message('Standard') if cat.tracing_mode == "standard" else message('Custom')
         rows = self._build_cycle_break_rows(scheme, category)
         split = (len(rows) + 1) // 2
         row_grid = ft.Row(
@@ -472,15 +474,15 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         return ft.Column(
             [
                 ft.Row([
-                    ft.Text(f"{title} tracing — {mode_label}", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
+                    ft.Text(tr('{0} tracing — {1}', title, mode_label), size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE),
                     mode,
                     ft.OutlinedButton(
-                        "Reset to Standard", icon=ft.Icons.RESTART_ALT,
+                        tr('Reset to Standard'), icon=ft.Icons.RESTART_ALT,
                         on_click=lambda e, c=category: self._reset_tracing(c),
                     ),
                 ], wrap=True),
                 ft.Text(
-                    "Choose the preferred sticker for each physical piece and rank which pieces you prefer for cycle breaks.",
+                    tr('Choose the preferred sticker for each physical piece and rank which pieces you prefer for cycle breaks.'),
                     size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                 ),
                 row_grid,
@@ -514,13 +516,13 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
             options = []
             for sticker in stickers:
                 letter = cat.stickers.get(sticker, "")
-                label = f"{sticker} ({letter})" if letter and letter != "BUFFER" else sticker
-                options.append(ft.DropdownOption(sticker, label))
+                label = compose('{0} ({1})', sticker, letter) if letter and letter != "BUFFER" else sticker
+                options.append(ft.DropdownOption(sticker, present(label)))
             rows.append(
                 ft.Row([
-                    ft.Container(ft.Text(f"{i + 1}. {piece}", weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE), width=85),
+                    ft.Container(ft.Text(present(compose('{0}. {1}', i + 1, piece)), weight=ft.FontWeight.BOLD, color=ft.Colors.ON_SURFACE), width=85),
                     ft.Dropdown(
-                        label="Preferred sticker",
+                        label=tr('Preferred sticker'),
                         width=170,
                         value=preferred,
                         options=options,
@@ -528,13 +530,13 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
                     color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT)),
                     ft.IconButton(
                         ft.Icons.ARROW_UPWARD,
-                        tooltip="Higher priority",
+                        tooltip=tr('Higher priority'),
                         disabled=i == 0,
                         on_click=lambda e, c=category, idx=i: self._move_priority(c, idx, -1),
                     ),
                     ft.IconButton(
                         ft.Icons.ARROW_DOWNWARD,
-                        tooltip="Lower priority",
+                        tooltip=tr('Lower priority'),
                         disabled=i == len(priority) - 1,
                         on_click=lambda e, c=category, idx=i: self._move_priority(c, idx, 1),
                     ),
@@ -543,7 +545,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         return rows
 
     def _set_preference_section(self, section: str):
-        if section not in {"general", "corners", "edges"}:
+        if section not in {"general", message('corners'), message('edges')}:
             return
         self.preference_section = section
         self.selected_category = "preferences"
@@ -565,8 +567,8 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         scheme = self.state.create_scheme(name)
         if self.state.data.active_scheme != scheme.name:
             self.state.switch_scheme(scheme.name)
-        self.selected_category = "edges"
-        self._last_letter_category = "edges"
+        self.selected_category = message('edges')
+        self._last_letter_category = message('edges')
         self._focused_sticker = None
         field.value = ""
         self.refresh()
@@ -575,14 +577,14 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         scheme = self.state.active_scheme
         if scheme is None: return
         self._focused_sticker = None
-        self.rename_field.label = "Scheme name"
+        self.rename_field.label = tr('Scheme name')
         self.rename_field.value = scheme.name
         self.rename_field.error_text = None
         self.rename_field.width, self.rename_field.height = 280, 42
-        self._rename_dialog = ft.AlertDialog(modal=True, title=ft.Text("Rename scheme"),
-            content=self.rename_field, actions=[
-                ft.TextButton("Cancel", on_click=self._close_rename),
-                ft.FilledButton("Save name", on_click=self._confirm_rename),
+        self._rename_dialog = ft.AlertDialog(modal=True, title=ft.Text(tr('Rename scheme')),
+            content=present(self.rename_field), actions=[
+                ft.TextButton(tr('Cancel'), on_click=self._close_rename),
+                ft.FilledButton(tr('Save name'), on_click=self._confirm_rename),
             ])
         show_themed_dialog(self.page, self._rename_dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
@@ -597,10 +599,10 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         if self._rename_dialog is None: return self._rename_scheme(e)
         name = (self.rename_field.value or "").strip()
         active = self.state.active_scheme
-        error = "Enter a scheme name." if not name else (
-            "That scheme name already exists." if name in self.state.scheme_names and active and name != active.name else None)
+        error = message('Enter a scheme name.') if not name else (
+            message('That scheme name already exists.') if name in self.state.scheme_names and active and name != active.name else None)
         if error:
-            self.rename_field.error_text = error
+            self.rename_field.error_text = present(error)
             self.rename_field.update()
             return
         self.page.pop_dialog()
@@ -633,7 +635,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         if self.state.data.letter_scheme_editor == "cube":
             self.selected_category = "preferences" if e.control.selected_index == 1 else self._last_letter_category
         else:
-            self.selected_category = {0: "edges", 1: "corners", 2: "preferences"}.get(e.control.selected_index, "edges")
+            self.selected_category = {0: message('edges'), 1: message('corners'), 2: "preferences"}.get(e.control.selected_index, "edges")
             if self.selected_category != "preferences":
                 self._last_letter_category = self.selected_category
         self._focused_sticker = None
@@ -753,7 +755,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         if scheme is None:
             return
         if not self.state.set_memo_orientation(scheme, scheme.memo_up, e.control.value):
-            self.settings_message.value = "Top and front colors must be adjacent."
+            self.settings_message.value = tr('Top and front colors must be adjacent.')
         else:
             self.settings_message.value = ""
         self._refresh_body()
@@ -766,8 +768,8 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         value = (control.value or "").strip().upper()
         control.value = value
         if not self.state.set_order(scheme, kind, value):
-            self.settings_message.value = "Order must be CE, EC, or left blank for the standard."
-            control.error_text = "Use CE or EC"
+            self.settings_message.value = tr('Order must be CE, EC, or left blank for the standard.')
+            control.error_text = tr('Use CE or EC')
         else:
             self.settings_message.value = ""
             control.error_text = None
@@ -809,7 +811,7 @@ class LetterSchemesPage(ThemeAwarePage, ft.Column):
         if scheme is None:
             return
         if not self.state.set_edge_parity_partner(scheme, piece):
-            self.settings_message.value = "Parity partner must be a different edge piece from the buffer."
+            self.settings_message.value = tr('Parity partner must be a different edge piece from the buffer.')
         else:
             self.settings_message.value = ""
         self.selected_category = "preferences"

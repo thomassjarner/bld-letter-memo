@@ -1,4 +1,6 @@
 """Practice navigation; the approved Blind Timer remains a separate control."""
+from core.messages import message
+from ui.language import present, tr
 import flet as ft
 
 from ui.design import activity_card, page_heading
@@ -46,33 +48,33 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.scroll = None
         self.spacing = 0
         activities = [
-            activity_card("Blind Timer", "Time a blind solve and compare it with your session history.",
-                          ft.Icons.TIMER, "Open Blind Timer", lambda e: self.open_timer_callback(),
-                          "Timed solves", feature="timer"),
-            activity_card("Progressive Memo", "Memo a scramble one pair at a time, then type what you remember.",
-                          ft.Icons.PSYCHOLOGY, "Open Progressive Memo", self.open_progressive,
-                          "Letter recall", feature="progressive"),
-            activity_card("3-style corner trainer", "Choose corner cases, recall their algorithms, then retry the ones you missed.",
-                          ft.Icons.SCHOOL_OUTLINED, "Open corner trainer", lambda e: self.open_trainer_callback(),
-                          "Algorithm recall", feature="trainer"),
+            activity_card(message('Blind Timer'), message('Time a blind solve and compare it with your session history.'),
+                          ft.Icons.TIMER, message('Open Blind Timer'), lambda e: self.open_timer_callback(),
+                          message('Timed solves'), feature="timer"),
+            activity_card(message('Progressive Memo'), message('Memo a scramble one pair at a time, then type what you remember.'),
+                          ft.Icons.PSYCHOLOGY, message('Open Progressive Memo'), self.open_progressive,
+                          message('Letter recall'), feature="progressive"),
+            activity_card(message('3-style corner trainer'), message('Choose corner cases, recall their algorithms, then retry the ones you missed.'),
+                          ft.Icons.SCHOOL_OUTLINED, message('Open corner trainer'), lambda e: self.open_trainer_callback(),
+                          message('Algorithm recall'), feature="trainer"),
         ]
         for card in activities:
             card.col = {"xs": 12, "md": 6, "lg": 4}
         self.menu.controls = [
-            page_heading("Practice", "Choose what to train: complete solves, memo, or corner algorithms."),
+            page_heading(message('Practice'), message('Choose what to train: complete solves, memo, or corner algorithms.')),
             ft.ResponsiveRow(activities, spacing=12, run_spacing=12),
-            ft.ExpansionTile(title=ft.Text("More practice modes", size=14, color=ft.Colors.ON_SURFACE),
-                subtitle=ft.Text("Planned activities", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.ExpansionTile(title=ft.Text(tr('More practice modes'), size=14, color=ft.Colors.ON_SURFACE),
+                subtitle=ft.Text(tr('Planned activities'), size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                 expanded=False, maintain_state=True, dense=True, tile_padding=0, controls_padding=8,
                 expanded_cross_axis_alignment=ft.CrossAxisAlignment.STRETCH,
                 controls=[ft.ResponsiveRow([
-                activity_card("Delayed Recall", "Memo, wait for a countdown, then type what you remember.",
-                              ft.Icons.HOURGLASS_BOTTOM, "Coming soon", enabled=False, feature="delayed"),
-                activity_card("Letter Pair Drill", "Build fast, reliable pair-to-word recall from your dictionary.",
-                              ft.Icons.BOLT, "Coming soon", enabled=False, feature="drill"),
+                activity_card(message('Delayed Recall'), message('Memo, wait for a countdown, then type what you remember.'),
+                              ft.Icons.HOURGLASS_BOTTOM, message('Coming soon'), enabled=False, feature="delayed"),
+                activity_card(message('Letter Pair Drill'), message('Build fast, reliable pair-to-word recall from your dictionary.'),
+                              ft.Icons.BOLT, message('Coming soon'), enabled=False, feature="drill"),
             ], spacing=12, run_spacing=12)]),
         ]
-        self.switcher.content = self.menu
+        self.switcher.content = present(self.menu)
         if update and self._mounted():
             self.update()
 
@@ -81,7 +83,7 @@ class PracticeHubPage(ThemeAwarePage, ft.Column):
         self.scroll = None
         self.spacing = 0
         self.progressive.open_scheme_callback = self.open_scheme_callback
-        self.switcher.content = self.progressive
+        self.switcher.content = present(self.progressive)
         self.progressive.refresh(update=False)
         if self._mounted():
             self.update()

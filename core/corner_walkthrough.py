@@ -1,4 +1,5 @@
 """Verified, read-only corner execution plans using the existing tracer/library."""
+from core.messages import message
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
@@ -50,7 +51,7 @@ def rotations():
 @lru_cache(maxsize=576)
 def _shot_positions(buffer, target):
     if set(buffer) == set(target):
-        raise ValueError('A target must be outside the physical buffer piece.')
+        raise ValueError(message('A target must be outside the physical buffer piece.'))
     rotation = next(r for r in rotations() if r.stickers[buffer] == target)
     reverse = {destination: source for source, destination in rotation.positions.items()}
     bp, tp = _key(buffer)[0], _key(target)[0]
@@ -124,10 +125,10 @@ def target_letter(scheme, sticker):
 
 def build_corner_plan(scramble, scheme, records=None, corner_cycle_break_overrides=None):
     if scheme is None:
-        raise ValueError('Choose a letter scheme first.')
+        raise ValueError(message('Choose a letter scheme first.'))
     buffer = scheme.corners.buffer_sticker or scheme.corners.buffer_piece
     if buffer not in CORNER_STICKER_ORDER:
-        raise ValueError('Set a valid corner buffer in Letter Schemes first.')
+        raise ValueError(message('Set a valid corner buffer in Letter Schemes first.'))
     snapshot = deepcopy(scheme.to_dict())
     initial = simulate(scramble, scheme.memo_up, scheme.memo_front, scheme.scramble_from_own_orientation)
     # Reuse the exact corner tracer, without requiring any edge buffer or
@@ -156,25 +157,25 @@ def build_corner_plan(scramble, scheme, records=None, corner_cycle_break_overrid
             try:
                 moves, effect, reset = _normalized_execution(candidate.alg)
                 if effect != _pair_effect('UFR', a, b):
-                    raise ValueError('Wrong corner effect')
+                    raise ValueError(message('Wrong corner effect'))
                 result = simplify_moves(frame.moves + moves + inverse_moves(frame.moves))
                 if apply_moves(SOLVED, result) != _pair_effect(buffer, first, second):
-                    raise ValueError('Wrong buffer setup')
+                    raise ValueError(message('Wrong buffer setup'))
                 part = AlgorithmPart(key, candidate.name, candidate.alg, candidate.id, frame.moves, reset)
                 return result, (part,)
             except (ValueError, StopIteration):
-                warnings.append(f'{key.replace(":", " / ")}: saved choice could not be verified; using the built-in recommendation.')
-        raise ValueError('Could not verify an algorithm for ' + first + ' / ' + second)
+                warnings.append(message('{0}: saved choice could not be verified; using the built-in recommendation.', key.replace(':', ' / ')))
+        raise ValueError(message('Could not verify an algorithm for ') + first + ' / ' + second)
 
     current = initial
     def add_pair(first, second):
         nonlocal current
         if first == second: return
         if set(first) == set(second):
-            raise ValueError('Twist targets cannot be used as a permutation pair.')
+            raise ValueError(message('Twist targets cannot be used as a permutation pair.'))
         moves, parts = resolve_distinct(first, second)
         if len(all_moves) + len(moves) > MAX_WALKTHROUGH_MOVES:
-            raise ValueError('This walkthrough exceeds 2400 moves. Choose shorter case algorithms first.')
+            raise ValueError(message('This walkthrough exceeds 2400 moves. Choose shorter case algorithms first.'))
         letters = target_letter(scheme, first) + target_letter(scheme, second)
         start = len(all_moves)
         all_moves.extend(moves)
@@ -201,11 +202,11 @@ def build_corner_plan(scramble, scheme, records=None, corner_cycle_break_overrid
         position = _key(sticker)
         delta[position] = reverse[_key(current[position])]
     if not all(_physical_correct(delta, piece, CORNER_STICKER_ORDER) for piece in CORNER_PIECES):
-        raise ValueError('The corner target sequence could not be verified.')
+        raise ValueError(message('The corner target sequence could not be verified.'))
     twists = tuple(piece for piece, stickers in CORNER_PIECES.items()
                    if any(_at(delta, sticker) != sticker for sticker in stickers))
     if any(_at(current, s) != _at(initial, s) for s in EDGE_STICKER_ORDER + list('ULFRBD')):
-        raise ValueError('The corner algorithms unexpectedly changed edges or centers.')
+        raise ValueError(message('The corner algorithms unexpectedly changed edges or centers.'))
     moves = tuple(all_moves)
     algorithm = Algorithm(' '.join(moves), moves, tuple(stages))
     return CornerPlan(scramble.strip(), scheme.name, snapshot, buffer, trace, initial, current,

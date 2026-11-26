@@ -1,21 +1,19 @@
-# Update to 2.58.0: successful solve times in the timer overview
+# Update to 2.59.0: Simplified Chinese
 
-Use the existing Git repository on your Desktop. Merge the updated **core**,
-**ui** and **tests** folders and the four Markdown files from the extracted
-release into `~/Desktop/letterpairscheme-helper-web`. Keep your local
-configuration, including `cloud/wrangler.toml`. If the updated files are
-already there, run this directly:
+Merge the contents of the extracted release into your existing Desktop repository
+(using Finder’s **Merge** for folders). Keep your existing .git directory, Pages
+workflow and local Worker configuration. The new **assets/fonts** folder contains
+the interface font and its license. From the updated Desktop repository:
 
 ```bash
 cd ~/Desktop/letterpairscheme-helper-web &&
-git add -- core ui tests README.md CHANGELOG.md UI_CHANGES.md PATCHING.md &&
-{ git diff --cached --quiet || git commit -m "Show mean and median successful solve times in the timer overview"; } &&
+git add -- assets core data ui web_cloud scripts/cloud_build.py tools/subset_hans_font.py tests docs/LOCALIZATION.md README.md THIRD_PARTY_NOTICES.md CHANGELOG.md UI_CHANGES.md PATCHING.md &&
+git commit -m "Add Simplified Chinese to the training workspace" &&
 git push origin main
 ```
 
-After GitHub Pages deploys, open **Blind Timer → Statistics** or **Progressive
-Memo → Statistics**. Existing solves and synced data work immediately. This
-update does not change the Pages workflow, Worker or database.
+After Pages deploys, choose **Settings → General → Language / 语言 → 简体中文**.
+No Worker deployment or database migration is needed for this release.
 
 ## Previous update: 2.52.1 WCA return repair (only if still on the old Worker)
 

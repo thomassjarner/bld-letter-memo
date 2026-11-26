@@ -1,5 +1,6 @@
 """Progressive Memo sequencing and scoring, using the existing BLD tracer."""
 from __future__ import annotations
+from core.messages import message
 
 from dataclasses import dataclass
 import unicodedata
@@ -29,9 +30,9 @@ class MemoPrompt:
     def label(self) -> str:
         if self.kind == "orientation":
             if self.category == "edges" and self.count:
-                return f"Flip {self.index + 1} / {self.count}"
-            return "All twists" if self.category == "corners" else "All flips"
-        return f"Pair {self.index + 1} / {self.count}"
+                return message('Flip {0} / {1}', self.index + 1, self.count)
+            return message('All twists') if self.category == "corners" else message('All flips')
+        return message('Pair {0} / {1}', self.index + 1, self.count)
 
 
 @dataclass(frozen=True)
@@ -72,22 +73,22 @@ def build_plan(scramble: str, scheme: LetterScheme,
                corner_cycle_break_overrides=None, edge_cycle_break_overrides=None) -> ProgressivePlan:
     # Freeze the scheme for this attempt. Later edits cannot change its answer.
     snapshot = scheme.duplicate(scheme.name)
-    for category in ("corners", "edges"):
+    for category in (message('corners'), message('edges')):
         cat = getattr(snapshot, category)
         buffer = cat.buffer_sticker or cat.buffer_piece
         if not buffer or not find_piece_for_sticker(buffer, CATEGORY_PIECES[category]):
-            raise ScrambleError(f"Choose a {category[:-1]} buffer in Letter Schemes first.")
+            raise ScrambleError(message('Choose a {0} buffer in Letter Schemes first.', message(category[:-1])))
     result = ScrambleTracer().trace(scramble, snapshot,
                                    corner_cycle_break_overrides=corner_cycle_break_overrides,
                                    edge_cycle_break_overrides=edge_cycle_break_overrides)
     categories = {}
-    for category, prefix in (("corners", "corner"), ("edges", "edge")):
+    for category, prefix in ((message('corners'), message('corner')), (message('edges'), message('edge'))):
         letters = getattr(result, prefix + "_letters")
         targets = getattr(result, prefix + "_targets")
         flags = getattr(result, prefix + "_orientation_target_flags")
         missing = [target for target, letter in zip(targets, letters) if letter == "?"]
         if missing:
-            raise ScrambleError(f"Add {category} letters for {', '.join(dict.fromkeys(missing))} in Letter Schemes first.")
+            raise ScrambleError(message('Add {0} letters for {1} in Letter Schemes first.', category, ', '.join(dict.fromkeys(missing))))
         ordinary, orientation = [], []
         for index, letter in enumerate(letters):
             orientation_target = index < len(flags) and flags[index]
@@ -95,15 +96,15 @@ def build_plan(scramble: str, scheme: LetterScheme,
         if category == "edges" and snapshot.three_style_enabled and len("".join(ordinary)) % 2:
             # The tracer already applies the configured parity swap. Never
             # conceal an inconsistent plan by dropping or padding a target.
-            raise ScrambleError("3-style edge memo must contain complete pairs. Check the scheme's edge letters and parity settings.")
+            raise ScrambleError(message("3-style edge memo must contain complete pairs. Check the scheme's edge letters and parity settings."))
         categories[category[0].upper()] = CategoryMemo(category, pairs("".join(ordinary)), pairs("".join(orientation)))
     memo_order = snapshot.memo_order or "CE"
     execution_order = snapshot.execution_order or "EC"
     if memo_order not in {"CE", "EC"} or execution_order not in {"CE", "EC"}:
-        raise ScrambleError("Set valid CE / EC memo and execution orders in Letter Schemes.")
+        raise ScrambleError(message('Set valid CE / EC memo and execution orders in Letter Schemes.'))
     recall = tuple(prompt for letter in execution_order for prompt in categories[letter].recall_prompts)
     if not recall:
-        raise ScrambleError("This scramble has no letter targets to recall. Try a new scramble.")
+        raise ScrambleError(message('This scramble has no letter targets to recall. Try a new scramble.'))
     return ProgressivePlan(scramble, snapshot.name, snapshot.to_dict(), memo_order, execution_order,
                            tuple(categories[letter] for letter in memo_order), recall)
 
@@ -270,7 +271,7 @@ class ProgressiveRun:
 
     def timings(self) -> tuple[int, int]:
         if self.phase != "result" or self.started_at is None or self.memo_finished_at is None or self.finished_at is None:
-            raise ValueError("An unfinished attempt has no saved timing.")
+            raise ValueError(message('An unfinished attempt has no saved timing.'))
         total = max(0, round((self.finished_at - self.started_at) * 100))
         memo = max(0, min(total, round((self.memo_finished_at - self.started_at) * 100)))
         return memo, total - memo

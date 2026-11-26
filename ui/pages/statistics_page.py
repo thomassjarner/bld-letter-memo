@@ -1,4 +1,6 @@
 """Read-only statistics, scoped to the activity which owns the saved history."""
+from core.messages import message, compose, error_message
+from ui.language import present, tr
 from dataclasses import field
 
 import flet as ft
@@ -14,7 +16,7 @@ from ui.theme_colors import ThemeAwarePage
 
 
 def pct(value):
-    return "—" if value is None else f"{value:.1f}%"
+    return "—" if value is None else compose('{0:.1f}%', value)
 
 
 def odds_label(probability):
@@ -27,15 +29,16 @@ def odds_label(probability):
         return "<0.01%"
     if v > 99.95:
         return ">99.9%"
-    return f"{v:.2f}%" if v < 10 else f"{v:.1f}%"
+    return compose('{0:.2f}%', v) if v < 10 else compose('{0:.1f}%', v)
 
 
 def clock(value):
-    return "—" if value is None else "DNF" if value == "DNF" else format_time(value)
+    return "—" if value is None else message('DNF') if value == "DNF" else format_time(value)
 
 
 def count(n, noun, plural=None):
-    return f"{n} {noun if n == 1 else plural or noun+'s'}"
+    # The English plural is explicit; Chinese uses the same counter at every count.
+    return message("{0} {1}", n, message(str(noun if n == 1 else plural or str(noun)+"s")))
 
 
 def choice(value):
@@ -48,26 +51,26 @@ def selected_limit(value):
 
 class Metric:
     def __init__(self, title, col):
-        self.title = ft.Text(title, size=14, color=ft.Colors.ON_SURFACE_VARIANT)
+        self.title = ft.Text(present(title), size=14, color=ft.Colors.ON_SURFACE_VARIANT)
         self.value = ft.Text("—", size=22, weight=ft.FontWeight.W_600)
         self.detail = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
         self.view = ft.Column([self.title, self.value, self.detail], spacing=2, tight=True, col=col)
 
     def show(self, value, detail):
-        self.value.value, self.detail.value = value, detail
+        self.value.value, self.detail.value = present(value), present(detail)
 
 
 class NumberList:
     def __init__(self, title, labels):
         self.values = [ft.Text("—", size=14, weight=ft.FontWeight.W_600, font_family="monospace")
                        for _ in labels]
-        self.view = ft.Column([ft.Text(title, size=15, weight=ft.FontWeight.W_600)] + [
-            ft.Row([ft.Text(label, size=13, expand=True), value], spacing=8)
+        self.view = ft.Column([ft.Text(present(title), size=15, weight=ft.FontWeight.W_600)] + [
+            ft.Row([ft.Text(present(label), size=13, expand=True), value], spacing=8)
             for label,value in zip(labels,self.values)], spacing=4, tight=True, col={"xs":12,"md":6})
 
     def show(self, *values):
         for label, value in zip(self.values,values):
-            label.value = value
+            label.value = present(value)
 
 
 @ft.control
@@ -81,53 +84,52 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         timer = self.source == "timer"
         self.session = self.scheme = self._last_context = None
         self.scope = self.window = None  # Full dataset; cumulative line from its first attempt.
-        self.phase = "total"
+        self.phase = message('total')
         self._history, self._records, self._filter_options = [], None, None
         self._forecast = self._goal = self._profile = self._ao5 = None
         self._summary = self._summary_window = self._ao5_points = None
         self._memo_rounds = []
         self._memo_splits = {}
-        self.metric = "time" if timer else "accuracy"
+        self.metric = message('time') if timer else "accuracy"
         self._views = {"time":"all","accuracy":"all"}
-        self.filter_picker = ft.Dropdown(width=179, height=48, dense=True, label="Timer session" if timer else "Letter scheme",
+        self.filter_picker = ft.Dropdown(width=179, height=48, dense=True, label=present(message('Timer session') if timer else message('Letter scheme')),
                                          on_select=self._change_filter)
-        self.scope_picker = ft.Dropdown(width=166, height=48, dense=True, label="Data range", value="all",
-            options=[ft.DropdownOption("all", "Entire session" if timer else "All rounds")] +
-                    [ft.DropdownOption(str(w), f"Last {w} "+("solves" if timer else "rounds")) for w in WINDOWS],
+        self.scope_picker = ft.Dropdown(width=166, height=48, dense=True, label=tr('Data range'), value="all",
+            options=[ft.DropdownOption("all", present(message('Entire session') if timer else message('All rounds')))] +
+                    [ft.DropdownOption(str(w), present(message('Last {0} ', w) + (message('solves') if timer else message('rounds')))) for w in WINDOWS],
             on_select=self._change_scope)
         self.metric_picker = ft.SegmentedButton(
-            segments=[ft.Segment(value="time",label="Time"),ft.Segment(value="accuracy",label="Accuracy")],
+            segments=[ft.Segment(value="time",label=tr('Time')),ft.Segment(value="accuracy",label=tr('Accuracy'))],
             selected=[self.metric],show_selected_icon=False,height=38,
             style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=12),text_style=ft.TextStyle(size=14)),
             on_change=self._change_metric)
         self._view_options = {
-            "time":[ft.DropdownOption("all","Cumulative median"),
-                    *([ft.DropdownOption("ao5","Recorded Ao5")] if timer else []),
-                    ft.DropdownOption("distribution","Distribution"),
-                    *[ft.DropdownOption(str(w),f"Rolling {w} median") for w in WINDOWS]],
-            "accuracy":[ft.DropdownOption("all","Cumulative accuracy"),
-                        *[ft.DropdownOption(str(w),f"Rolling {w} accuracy") for w in WINDOWS]],
+            "time":[ft.DropdownOption("all",tr('Cumulative median')),
+                    *([ft.DropdownOption("ao5",tr('Recorded Ao5'))] if timer else []),
+                    ft.DropdownOption("distribution",tr('Distribution')),
+                    *[ft.DropdownOption(str(w),tr('Rolling {0} median', w)) for w in WINDOWS]],
+            "accuracy":[ft.DropdownOption("all",tr('Cumulative accuracy')),
+                        *[ft.DropdownOption(str(w),tr('Rolling {0} accuracy', w)) for w in WINDOWS]],
         }
         self.window_picker = ft.Dropdown(width=198,height=44,dense=True,
-            label="Chart view",value="all",options=self._view_options[self.metric],on_select=self._change_window)
-        self.phase_picker = ft.Dropdown(width=145, height=44, dense=True, label="Phase", value=self.phase,
-            options=[ft.DropdownOption(k,v) for k,v in (("total","Total time"),("memo","Memo time"),("recall","Recall time"))],
+            label=tr('Chart view'),value="all",options=self._view_options[self.metric],on_select=self._change_window)
+        self.phase_picker = ft.Dropdown(width=145, height=44, dense=True, label=tr('Phase'), value=self.phase,
+            options=[ft.DropdownOption(k,present(v)) for k,v in ((message('total'),message('Total time')),("memo",message('Memo time')),("recall",message('Recall time')))],
             visible=False,on_select=self._change_phase)
         self.filters = ft.Row([self.filter_picker, self.scope_picker], height=52, spacing=10)
         self.empty = panel(ft.Column([
-            ft.Text("No solves in this session yet" if timer else "No saved memo rounds in this selection",
+            ft.Text(present(message('No solves in this session yet') if timer else message('No saved memo rounds in this selection')),
                     size=17,weight=ft.FontWeight.W_600),
-            ft.Text("Record a solve in Timer or choose another session above. Your first Ao5 appears after five attempts."
-                    if timer else "Finish a round in Train or change the letter scheme above.",
+            ft.Text(present(message('Record a solve in Timer or choose another session above. Your first Ao5 appears after five attempts.') if timer else message('Finish a round in Train or change the letter scheme above.')),
                     size=14,color=ft.Colors.ON_SURFACE_VARIANT)],spacing=5,tight=True),padding=16)
         self.coverage = ft.Text(size=13, weight=ft.FontWeight.W_600)
         self.elapsed = ft.Text(size=13,color=ft.Colors.ON_SURFACE_VARIANT)
-        labels = (("Success rate", "Mean of successful solves", "Median successful solve") if timer else
-                  ("Letter accuracy", "Typical memo", "Typical recall", "Perfect rounds"))
+        labels = ((message('Success rate'), message('Mean of successful solves'), message('Median successful solve')) if timer else
+                  (message('Letter accuracy'), message('Typical memo'), message('Typical recall'), message('Perfect rounds')))
         if timer:
             self.metrics = [Metric(k, {"xs":12 if i==2 else 6, "sm":4}) for i,k in enumerate(labels)]
-            self.metrics[1].view.tooltip="Average of every successful time in this range, including +2 penalties. DNFs are excluded."
-            self.metrics[2].view.tooltip="Middle successful time when sorted by speed; for an even count, the mean of the two middle times. Includes +2 penalties."
+            self.metrics[1].view.tooltip=tr('Average of every successful time in this range, including +2 penalties. DNFs are excluded.')
+            self.metrics[2].view.tooltip=tr('Middle successful time when sorted by speed; for an even count, the mean of the two middle times. Includes +2 penalties.')
         else:
             self.metrics = [Metric(k, {"xs":6,"md":3}) for k in labels]
         self.accuracy = TrendChart(True, timer, self.data)
@@ -142,7 +144,7 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
                             ft.Text(width=62,text_align=ft.TextAlign.RIGHT)], spacing=6, visible=False)
                             for _ in range(12)]
         overview_items = [
-            ft.Row([ft.Text("Session overview" if timer else "Memo overview",size=19,weight=ft.FontWeight.W_600),
+            ft.Row([ft.Text(present(message('Session overview') if timer else message('Memo overview')),size=19,weight=ft.FontWeight.W_600),
                     self.coverage,self.elapsed],wrap=True,spacing=14,run_spacing=3),
             ft.ResponsiveRow([m.view for m in self.metrics],spacing=12,run_spacing=8),
         ]
@@ -159,34 +161,34 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         items = [self.overview,self.chart_controls,self.chart_area,self.footnote]
         recent_content = []
         if timer:
-            self.odds = NumberList("Odds for the next five", ["Valid Ao5 · at least 4 of 5",
-                                                              "4 in a row within 5", "All 5 successful"])
-            self.observed = NumberList("Recorded in this range", ["Valid Ao5s / completed windows",
-                                                                  "Latest recorded Ao5", "Current / longest success streak"])
+            self.odds = NumberList(message('Odds for the next five'), [message('Valid Ao5 · at least 4 of 5'),
+                                                              message('4 in a row within 5'), message('All 5 successful')])
+            self.observed = NumberList(message('Recorded in this range'), [message('Valid Ao5s / completed windows'),
+                                                                  message('Latest recorded Ao5'), message('Current / longest success streak')])
             self.odds_note = ft.Text(size=12, color=ft.Colors.ON_SURFACE_VARIANT)
-            self.goal_field = ft.TextField(label="Time goal", hint_text="1:30.00", width=148, dense=True,
+            self.goal_field = ft.TextField(label=tr('Time goal'), hint_text="1:30.00", width=148, dense=True,
                                           on_submit=self._apply_goal, on_change=self._edit_goal)
-            self.goal_button = ft.OutlinedButton("Check goal", on_click=self._apply_goal)
+            self.goal_button = ft.OutlinedButton(tr('Check goal'), on_click=self._apply_goal)
             self.goal_recorded = ft.Text(size=14, selectable=True)
             self.goal_result = ft.Text(size=14, selectable=True)
             self.forecast_caption = ft.Text(size=14,color=ft.Colors.PRIMARY)
-            goals = ft.Column([ft.Text("Beat a time",size=15,weight=ft.FontWeight.W_600),
+            goals = ft.Column([ft.Text(tr('Beat a time'),size=15,weight=ft.FontWeight.W_600),
                 ft.Row([self.goal_field,self.goal_button],wrap=True,spacing=8,run_spacing=6),
                 self.goal_recorded,self.goal_result],tight=True,spacing=5,col={"xs":12,"md":6})
-            self.forecasts = ft.ExpansionTile(title="Forecasts & time goal",subtitle=self.forecast_caption,
+            self.forecasts = ft.ExpansionTile(title=tr('Forecasts & time goal'),subtitle=present(self.forecast_caption),
                 expanded=False,maintain_state=True,dense=True,controls_padding=12,controls=[
                     ft.ResponsiveRow([self.odds.view,goals],spacing=20,run_spacing=12),self.odds_note])
             items.append(panel(self.forecasts,padding=0))
             recent_content.append(self.observed.view)
-        self.recent = ft.ExpansionTile(title="Recent attempts", subtitle="Results and trend accuracy · newest first",
+        self.recent = ft.ExpansionTile(title=tr('Recent attempts'), subtitle=tr('Results and trend accuracy · newest first'),
             expanded=False, maintain_state=True, dense=True, controls=[ft.Column([
                 *recent_content,*self.recent_rows],spacing=6,tight=True)],controls_padding=10)
         items.append(self.recent)
         if timer:
             self.pb_values = [ft.Text(size=12,color=ft.Colors.ON_SURFACE_VARIANT) for _ in range(3)]
-            items.append(ft.Row([ft.Text("Session PBs",size=12,weight=ft.FontWeight.W_600),
+            items.append(ft.Row([ft.Text(tr('Session PBs'),size=12,weight=ft.FontWeight.W_600),
                                  *self.pb_values],wrap=True,spacing=14,run_spacing=3,
-                                tooltip="Personal bests across this entire timer session."))
+                                tooltip=tr('Personal bests across this entire timer session.')))
         self.report = ft.Column(items, spacing=9, tight=True, horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                                 visible=False)
         # One native vertical viewport; content gets its natural height, rather
@@ -210,7 +212,7 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         self._goal = None
         self.goal_field.error = None
         self.goal_recorded.value = ""
-        self.goal_result.value = "Press Enter or Check goal." if (self.goal_field.value or "").strip() else ""
+        self.goal_result.value = present(message('Press Enter or Check goal.') if (self.goal_field.value or '').strip() else '')
         self._update_goal_controls()
 
     def _apply_goal(self,e=None):
@@ -219,7 +221,7 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             self._goal = parse_goal(self.goal_field.value)
         except ValueError as err:
             self._goal = None
-            self.goal_field.error = str(err)
+            self.goal_field.error = present(error_message(err))
         self._show_goal()
         self._update_goal_controls()
 
@@ -238,20 +240,16 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             self.goal_recorded.value = self.goal_result.value = ""
             return
         single,ao5,sampled = self._forecast.goal_odds(self._goal)
-        avg_label = ("Need 3 successful times" if ao5 is None else
+        avg_label = (message('Need 3 successful times') if ao5 is None else
                      ("≈" if sampled else "")+odds_label(ao5))
         def observed(profile,noun):
             hits = profile.under(self._goal)
-            return f"{hits}/{profile.total} {noun} ({pct(100*hits/profile.total)})"
-        actual_ao5 = observed(self._ao5.profile,"Ao5s") if self._ao5.values else "No completed Ao5 yet"
-        self.goal_recorded.value = (f"Recorded under {clock(self._goal)}: "+observed(self._profile,"attempts")
-                                    +" · "+actual_ao5)
-        self.goal_result.value = (f"Next attempts · Single: {odds_label(single)}"
-                                  f" · Valid Ao5: {avg_label}")
-        self.goal_recorded.tooltip = ("Times must be strictly below the goal. Counts include DNFs as misses. "
-                                      "Each recorded Ao5 uses five consecutive attempts inside this range.")
-        self.goal_result.tooltip = ("Estimated chance of beating the same goal. DNFs count as misses. "
-                                    "The Ao5 is for five new attempts; ≈ denotes a sampling estimate.")
+            return compose('{0}/{1} {2} ({3})', hits, profile.total, noun, pct(100 * hits / profile.total))
+        actual_ao5 = observed(self._ao5.profile,message('Ao5s')) if self._ao5.values else message('No completed Ao5 yet')
+        self.goal_recorded.value = (present(message('Recorded under {0}: ', clock(self._goal)) + observed(self._profile, message('attempts')) + ' · ' + actual_ao5))
+        self.goal_result.value = (tr('Next attempts · Single: {0} · Valid Ao5: {1}', odds_label(single), avg_label))
+        self.goal_recorded.tooltip = (tr('Times must be strictly below the goal. Counts include DNFs as misses. Each recorded Ao5 uses five consecutive attempts inside this range.'))
+        self.goal_result.tooltip = (tr('Estimated chance of beating the same goal. DNFs count as misses. The Ao5 is for five new attempts; ≈ denotes a sampling estimate.'))
 
     def open_for(self, context):
         if context != self._last_context:
@@ -309,14 +307,14 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
             names = sorted({a.scheme_name for a in data.progressive_memo_history},key=str.casefold)
             if self.scheme not in names:
                 self.scheme = None
-            options = (("*","All schemes"), *[(":"+k,k or "Unnamed scheme") for k in names])
+            options = (("*",message('All schemes')), *[(":"+k,k or message('Unnamed scheme')) for k in names])
             value = "*" if self.scheme is None else ":"+self.scheme
             self._memo_rounds=[r for r in data.progressive_memo_history
                                if self.scheme is None or r.scheme_name==self.scheme]
             self._history = memo_attempts(self._memo_rounds,phase=self.phase)
             self._memo_splits.clear()
         if options != self._filter_options:
-            self.filter_picker.options = [ft.DropdownOption(k,label) for k,label in options]
+            self.filter_picker.options = [ft.DropdownOption(k,present(label)) for k,label in options]
             self._filter_options = options
         self.filter_picker.value, self.phase_picker.value = value, self.phase
         self._render(update=update)
@@ -363,69 +361,62 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
     def _display_sample(self,rows,offset,s,times):
         timer = self.source == "timer"
         total = s.overall
-        noun = "solve" if timer else "round"
-        self.coverage.value = (("Entire session" if timer else "All rounds") + " · " + count(len(rows),noun)
-                               if self.scope is None else
-                               f"Latest {len(rows)} of {count(len(self._history),noun)} · #{offset+1}–#{offset+len(rows)}")
+        noun = message('solve') if timer else message('round')
+        self.coverage.value = (present((message('Entire session') if timer else message('All rounds')) + ' · ' + count(len(rows), noun) if self.scope is None else message('Latest {0} of {1} · #{2}–#{3}', len(rows), count(len(self._history), noun), offset + 1, offset + len(rows))))
         if timer:
-            self.elapsed.value=duration_label(timer_elapsed(rows))+" on the timer"
-            self.elapsed.tooltip="Actual elapsed time across these attempts, including DNFs. Excludes +2 penalties and breaks."
+            self.elapsed.value=tr('{0} on the timer', duration_label(timer_elapsed(rows)))
+            self.elapsed.tooltip=tr('Actual elapsed time across these attempts, including DNFs. Excludes +2 penalties and breaks.')
             insights = timer_insights(times,recorded=self._ao5.record)
             self._forecast = insights.forecast
             self._show_goal()
             self.metrics[0].show(pct(total.accuracy),
-                f"{count(total.correct,'success','successes')} · {count(total.attempts-total.correct,'DNF')}")
-            self.metrics[1].show(clock(self._profile.mean),f"Across {count(total.timed,'successful solve')}"
-                                 if total.timed else "No successful times yet")
+                compose('{0} · {1}', count(total.correct, message('success'), message('successes')), count(total.attempts - total.correct, message('DNF'))))
+            self.metrics[1].show(clock(self._profile.mean),message('Across {0}', count(total.timed, message('successful solve')))
+                                 if total.timed else message('No successful times yet'))
             spread=self._profile.middle_half
-            detail=(f"Middle 50%: {clock(spread[0])} – {clock(spread[1])}" if spread is not None else
-                    "One successful time" if total.timed else "No successful times yet")
+            detail=(message('Middle 50%: {0} – {1}', clock(spread[0]), clock(spread[1])) if spread is not None else
+                    message('One successful time') if total.timed else message('No successful times yet'))
             self.metrics[2].show(clock(total.median),detail)
             needed = MIN_TIMED_SOLVES-total.timed
-            self.forecast_caption.value=("Estimated valid Ao5 · "+clock(insights.valid_pace) if needed<=0 else
-                f"Estimated valid Ao5 · {count(needed,'more successful solve')} needed")
-            self.forecast_caption.tooltip="Expected time if five new attempts produce a valid average."
+            self.forecast_caption.value=(present(message('Estimated valid Ao5 · ') + clock(insights.valid_pace) if needed <= 0 else message('Estimated valid Ao5 · {0} needed', count(needed, message('more successful solve')))))
+            self.forecast_caption.tooltip=tr('Expected time if five new attempts produce a valid average.')
             odds = insights.odds
             self.odds.show(odds_label(odds.valid),odds_label(odds.run_of_four),odds_label(odds.clean))
             recorded = insights.recorded
             averages=self._ao5.values
-            latest=clock("DNF" if averages[-1] is None else averages[-1]) if averages else "—"
-            self.observed.show(f"{recorded.valid} / {recorded.windows}", latest,
-                               f"{insights.current_streak} / {insights.longest_streak}")
-            self.observed.values[1].tooltip=(f"Attempts #{offset+len(rows)-4}–{offset+len(rows)}" if averages else
-                                             f"{count(5-len(rows),'more attempt')} for the first Ao5")
-            self.odds_note.value = (("Small sample. " if len(rows)<10 else "") +
-                f"Forecast success rate: {pct(100*self._forecast.success_rate)}. "
-                f"Each {HALF_LIFE} attempts back halves a solve’s weight. Next-five odds assume independent attempts.")
-            for target,label,value in zip(self.pb_values,("Single","Ao5","Ao12"),
+            latest=clock(message('DNF') if averages[-1] is None else averages[-1]) if averages else "—"
+            self.observed.show(compose('{0} / {1}', recorded.valid, recorded.windows), latest,
+                               compose('{0} / {1}', insights.current_streak, insights.longest_streak))
+            self.observed.values[1].tooltip=(present(message('Attempts #{0}–{1}', offset + len(rows) - 4, offset + len(rows)) if averages else message('{0} for the first Ao5', count(5 - len(rows), message('more attempt')))))
+            self.odds_note.value = (present((message('Small sample. ') if len(rows) < 10 else '') + message('Forecast success rate: {0}. Each {1} attempts back halves a solve’s weight. Next-five odds assume independent attempts.', pct(100 * self._forecast.success_rate), HALF_LIFE)))
+            for target,label,value in zip(self.pb_values,(message('Single'),"Ao5","Ao12"),
                                           (self._records.single,self._records.ao5.best,self._records.ao12.best)):
-                target.value = f"{label}  {clock(value)}"
+                target.value = present(compose('{0}  {1}', label, clock(value)))
         else:
-            self.elapsed.value=count(total.scored,"scored letter")
+            self.elapsed.value=present(count(total.scored, message('scored letter')))
             for tile,(value,detail) in zip(self.metrics,[
-                (pct(total.accuracy),f"{total.correct} / {total.scored} scored letters"),
-                (clock(s.memo_median),"Median memorization time"),
-                (clock(s.recall_median),"Median recall time"),
-                (str(s.perfect),f"Out of {count(total.attempts,'round')}")]):
+                (pct(total.accuracy),message('{0} / {1} scored letters', total.correct, total.scored)),
+                (clock(s.memo_median),message('Median memorization time')),
+                (clock(s.recall_median),message('Median recall time')),
+                (str(s.perfect),message('Out of {0}', count(total.attempts, message('round'))))]):
                 tile.show(value,detail)
             if offset not in self._memo_splits:
                 self._memo_splits[offset]=memo_split(self._memo_rounds[offset:])
             split=self._memo_splits[offset]
-            for label,name,good,n in ((self.edge_note,"Edges",split.edge_correct,split.edge_scored),
-                                      (self.corner_note,"Corners",split.corner_correct,split.corner_scored)):
+            for label,name,good,n in ((self.edge_note,message('Edges'),split.edge_correct,split.edge_scored),
+                                      (self.corner_note,message('Corners'),split.corner_correct,split.corner_scored)):
                 label.visible=bool(split.detailed)
-                label.value=(f"{name} · {pct(100*good/n)} ({good}/{n})" if n else f"{name} · No scored letters")
+                label.value=(present(compose('{0} · {1} ({2}/{3})', name, pct(100 * good / n), good, n) if n else message('{0} · No scored letters', name)))
             self.split_note.visible=split.detailed!=len(rows)
-            self.split_note.value=(f"Edge and corner detail saved for {split.detailed} of {count(len(rows),'round')}."
-                                  if split.detailed else "Only overall scores are available for these rounds.")
+            self.split_note.value=(present(message('Edge and corner detail saved for {0} of {1}.', split.detailed, count(len(rows), message('round'))) if split.detailed else message('Only overall scores are available for these rounds.')))
 
     def _display_charts(self,rows,offset,s,view):
         timer = self.source == "timer"
         recent = s.recent
-        noun = "solve" if timer else "round"
-        timing = "solve time" if timer else self.phase+" time"
-        scope = ("since the start of this range" if self.window is None else
-                 f"over the latest {count(recent.attempts,noun)}")
+        noun = message('solve') if timer else message('round')
+        timing = message('solve time') if timer else {"total":message('total time'), "memo":message('memo time'), "recall":message('recall time')}[self.phase]
+        scope = (message('since the start of this range') if self.window is None else
+                 message('over the latest {0}', count(recent.attempts, noun)))
         accuracy=self.metric=="accuracy"
         ao5=view=="ao5"
         wait=ao5 and not self._ao5.values
@@ -437,41 +428,40 @@ class StatisticsPage(ThemeAwarePage, ft.Column):
         for chart in (self.accuracy,self.timing):
             chart.clear_inspection()
         if wait:
-            self.ao5_wait.value=f"Recorded Ao5 starts at attempt five. {len(rows)} of 5 attempts in this range."
+            self.ao5_wait.value=tr('Recorded Ao5 starts at attempt five. {0} of 5 attempts in this range.', len(rows))
         elif ao5:
             if self._ao5_points is None:
                 self._ao5_points=self._ao5.points(offset)
-            self.timing.set_series("Recorded Ao5","",
-                "Each average drops the best and worst of five consecutive attempts.",
+            self.timing.set_series(message('Recorded Ao5'),"",
+                message('Each average drops the best and worst of five consecutive attempts.'),
                 self._ao5_points,ao5=True)
         elif accuracy:
-            self.accuracy.set_series("Solve success rate over time" if timer else "Letter accuracy over time",
-                pct(recent.accuracy), "Successes / attempts "+scope+"." if timer else "Correct / scored letters "+scope+".",
+            self.accuracy.set_series(message('Solve success rate over time') if timer else message('Letter accuracy over time'),
+                pct(recent.accuracy), message('Successes / attempts ')+scope+"." if timer else message('Correct / scored letters ')+scope+".",
                 s.points,self.window)
         elif view!="distribution":
-            self.timing.set_series("Median "+timing+" over time",clock(recent.median),
-                ("Successful solves " if timer else "Completed rounds ")+scope+".",s.points,self.window)
+            self.timing.set_series(message('Median {0} over time', timing),clock(recent.median),
+                (message('Successful solves ') if timer else message('Completed rounds '))+scope+".",s.points,self.window)
         if not wait and ao5:
             grouped=len(self._ao5.values)>len(self._ao5_points)
-            self.footnote.value=("Each mark groups consecutive Ao5 results and shows their valid median. × means a DNF in that group."
-                                 if grouped else "Each mark ends a five-attempt window. × means that Ao5 was a DNF.")
+            self.footnote.value=(present(message('Each mark groups consecutive Ao5 results and shows their valid median. × means a DNF in that group.') if grouped else message('Each mark ends a five-attempt window. × means that Ao5 was a DNF.')))
         elif self.footnote.visible:
             if len(s.points)<len(rows):
-                detail=f"All {count(len(rows),noun)} are included in {len(s.points)} marks. Each shows its group’s "+("accuracy." if accuracy else "median.")
+                detail=message('All {0} are included in {1} marks. Each shows its group’s ', count(len(rows), noun), len(s.points))+(message('accuracy.') if accuracy else message('median.'))
             else:
-                detail="Each dot is one "+noun+"."
+                detail=(message('Each dot is one solve.') if timer else message('Each dot is one round.'))
             if timer and not accuracy:
-                detail+=" × marks a DNF. Times include +2 penalties."
+                detail+=message(' × marks a DNF. Times include +2 penalties.')
             elif not timer and accuracy:
-                detail+=" Accuracy counts scored letters."
-            self.footnote.value=detail
+                detail+=message(' Accuracy counts scored letters.')
+            self.footnote.value=present(detail)
         latest = list(reversed(s.latest))
         for i,row in enumerate(self.recent_rows):
             row.visible = i < len(latest)
             if row.visible:
                 point = latest[i]
                 a = point.attempt
-                result = ("DNF" if a.time is None else clock(a.time)+(" (+2)" if a.plus2 else "")) if timer else (
-                    f"{a.correct}/{a.scored} letters · {clock(a.time)}")
+                result = (message('DNF') if a.time is None else clock(a.time)+(" (+2)" if a.plus2 else "")) if timer else (
+                    message('{0}/{1} letters · {2}', a.correct, a.scored, clock(a.time)))
                 row.controls[0].value,row.controls[1].value,row.controls[2].value = (
-                    f"#{point.number}",result,pct(point.rolling.accuracy))
+                    present(compose('#{0}', point.number)),present(result),present(pct(point.rolling.accuracy)))

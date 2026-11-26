@@ -6,6 +6,7 @@ kept so a bad deployment/startup cannot silently replace a populated database
 with an empty one.
 """
 from __future__ import annotations
+from core.messages import message
 
 import asyncio
 import hashlib
@@ -25,6 +26,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
     SHADOW_KEY = "bld-letter-memo.app-data.shadow"
     ROLLBACK_KEY = "bld-letter-memo.app-data.rollback"
     PREFERENCES_KEY = "bld-letter-memo.workspace-preferences"
+    LANGUAGE_KEY = "bld-letter-memo.interface-language"
     CLOUD_CURRENT_KEY = "bld-letter-memo.cloud-local-revision"
     asynchronous_saves = True
 
@@ -40,6 +42,18 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
         self._idle.set()
         self.cloud_anchor = self.cloud_owner = None
         self._cloud_tracking = None
+
+    async def load_language(self):
+        from core.messages import normalize_language
+        try:
+            return normalize_language(await self._prefs.get(self.LANGUAGE_KEY))
+        except Exception:
+            return normalize_language(None)
+
+    async def save_language(self, code):
+        from core.messages import normalize_language
+        # Independent of cloud snapshots and large, asynchronous workspace saves.
+        await self._put(self.LANGUAGE_KEY, normalize_language(code))
 
     def on_save_status(self, callback):
         self._save_status_callback = callback
@@ -160,7 +174,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
     async def wait_saved(self):
         await self._idle.wait()
         if self._pending_payload is not None:
-            raise OSError("Browser save did not finish; cloud sync is paused.")
+            raise OSError(message('Browser save did not finish; cloud sync is paused.'))
 
     def stop_tracking_cloud(self):
         self._cloud_tracking = None
@@ -174,7 +188,7 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
 
     async def _put(self,key,value):
         if await self._prefs.set(key,value) is False:
-            raise OSError("Browser storage rejected the save.")
+            raise OSError(message('Browser storage rejected the save.'))
 
     async def _mark_cloud_copy(self, payload):
         account, revision = self._cloud_tracking
@@ -214,13 +228,13 @@ class SharedPreferencesAppDataRepository(AppDataRepository):
                     if self._cloud_tracking is not None:
                         await self._mark_cloud_copy(payload)
                     if self._pending_payload is None:
-                        self._status('Saved')
+                        self._status(message('Saved'))
                 except Exception:
                     # Keep the payload queued for one later save attempt instead
                     # of pretending a failed browser-storage write succeeded.
                     if self._pending_payload is None:
                         self._pending_payload = payload
-                    self._status('Save failed — retry on next change')
+                    self._status(message('Save failed — retry on next change'))
                     break
         finally:
             self._flush_running = False

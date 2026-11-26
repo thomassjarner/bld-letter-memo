@@ -1,4 +1,5 @@
 """Optional adapter for the static Flet/Pyodide build. No desktop dependencies."""
+from core.messages import message
 import json
 import sys
 from urllib.parse import urljoin, urlsplit
@@ -33,5 +34,5 @@ class BrowserCloud:
     async def call(self, op, **args):
         result=json.loads(str(await self.module.call(op,json.dumps(args,ensure_ascii=False,separators=(",",":")))))
         if not result.get("ok"):
-            raise CloudError(result.get("error") or "Cloud sync is unavailable.",result.get("status",0))
+            raise CloudError(message(result.get("error") or "Cloud sync is unavailable."), result.get("status",0))
         return result.get("value")

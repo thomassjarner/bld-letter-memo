@@ -1,4 +1,5 @@
 """UFR corner cases, independent of letter labels and preferred algorithms."""
+from core.messages import message
 from collections import deque
 from dataclasses import dataclass
 from functools import lru_cache
@@ -20,7 +21,7 @@ def valid_targets(first, second):
 
 def case_id(first, second):
     if not valid_targets(first, second):
-        raise ValueError('Choose stickers on two different non-buffer corners.')
+        raise ValueError(message('Choose stickers on two different non-buffer corners.'))
     return first + ':' + second
 
 
@@ -37,15 +38,15 @@ def identify_case_state(net):
     """Identify a case from an effect already normalized to the original frame."""
     initial = inverse_state(net)
     if any(_at(net, s) != s for s in EDGE_STICKER_ORDER):
-        raise ValueError('This algorithm also changes edges. A UFR corner case must restore all edges.')
+        raise ValueError(message('This algorithm also changes edges. A UFR corner case must restore all edges.'))
     first = _at(initial, BUFFER)
     second = _at(initial, first)
     if not valid_targets(first, second) or _at(initial, second) != BUFFER:
-        raise ValueError('This algorithm is not a pure UFR corner three-cycle.')
+        raise ValueError(message('This algorithm is not a pure UFR corner three-cycle.'))
     involved = {BUFFER, find_piece_for_sticker(first, CORNER_PIECES), find_piece_for_sticker(second, CORNER_PIECES)}
     if any(_at(net, s) != s for piece, stickers in CORNER_PIECES.items()
            if piece not in involved for s in stickers):
-        raise ValueError('This algorithm changes additional corners or twists.')
+        raise ValueError(message('This algorithm changes additional corners or twists.'))
     return case_id(first, second)
 
 
@@ -100,7 +101,7 @@ def corner_cases():
                 seen.add(target)
                 queue.append((target, (move,) + setup, body))
     if len(found) != 378:
-        raise ValueError('Could not build the full UFR corner case catalog.')
+        raise ValueError(message('Could not build the full UFR corner case catalog.'))
     return {case_id(a, b): found[case_id(a, b)] for a in TARGETS for b in TARGETS if valid_targets(a, b)}
 
 

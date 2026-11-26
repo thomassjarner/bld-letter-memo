@@ -1,4 +1,6 @@
 from __future__ import annotations
+from core.messages import message, compose, error_message
+from ui.language import present, tr
 
 
 import asyncio
@@ -73,7 +75,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self.current_scramble = self._generate_scramble()
         except ValueError as ex:
             self.current_scramble = ""
-            self._scramble_error = str(ex)
+            self._scramble_error = error_message(ex)
         self.scramble_stack = [self.current_scramble]
         self.scramble_index = 0
 
@@ -85,9 +87,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.last_solve_index = None
         self.keyboard_listener: ft.KeyboardListener | None = None
 
-        self.scramble_text = ft.Text(self.current_scramble, size=17, selectable=True, font_family="monospace", color=ft.Colors.ON_SURFACE)
+        self.scramble_text = ft.Text(present(self.current_scramble), size=17, selectable=True, font_family="monospace", color=ft.Colors.ON_SURFACE)
         self.timer_text = ft.Text("0.00", size=68, weight=ft.FontWeight.W_500, font_family="monospace", color=ft.Colors.ON_SURFACE)
-        self.status_text = ft.Text(self._scramble_error, size=14, color=ft.Colors.ON_SURFACE)
+        self.status_text = ft.Text(present(self._scramble_error), size=14, color=ft.Colors.ON_SURFACE)
         self.stats_text = ft.Text("", color=ft.Colors.ON_SURFACE)
         self.copy_notice = ft.Text("", opacity=0, animate_opacity=300, size=12, color=ft.Colors.ON_SURFACE)
         self._copy_notice_token = 0
@@ -96,64 +98,63 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.history = ft.ListView(spacing=0, scroll=ft.ScrollMode.ALWAYS,
                                    build_controls_on_demand=True)
         self.history_limit = 50
-        self.history_sort = 'newest'
+        self.history_sort = message('newest')
         self._history_session = self.state.data.active_practice_session
         self.history_meta = ft.Text("", size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                                     expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
         self.older_solves_button = ft.IconButton(ft.Icons.EXPAND_MORE, width=28, height=28, padding=2,
-            tooltip='Show 50 more solves in this order', on_click=self._load_older_solves)
-        self.date_sort_button = ft.TextButton('Newest', height=28, width=68,
+            tooltip=tr('Show 50 more solves in this order'), on_click=self._load_older_solves)
+        self.date_sort_button = ft.TextButton(tr('Newest'), height=28, width=68,
             on_click=lambda e: self._sort_history('date'))
-        self.time_sort_button = ft.TextButton('Fastest', height=28, width=68,
-            on_click=lambda e: self._sort_history('time'))
+        self.time_sort_button = ft.TextButton(tr('Fastest'), height=28, width=68,
+            on_click=lambda e: self._sort_history(message('time')))
         self.metric_values = [ft.Text("—", size=15, weight=ft.FontWeight.W_600,
                                       color=ft.Colors.ON_SURFACE) for _ in range(3)]
         self._viewport = (1400, 760)
         self.session_dropdown = ft.Dropdown(
-            label="Session",
+            label=tr('Session'),
             width=150, height=44, dense=True,
             value=self.state.data.active_practice_session,
-            options=[ft.DropdownOption(name, self.state.practice_session_labels[name])
+            options=[ft.DropdownOption(name, present(self.state.practice_session_labels[name]))
                      for name in self.state.practice_session_names],
             on_select=self._switch_session,
-            tooltip="Session 1: full cube. Edges only: corners solved. Corners only: edges solved; "
-                    "with 3-style, 50% of cases swap your buffer and helper edges for parity.",
+            tooltip=tr('Session 1: full cube. Edges only: corners solved. Corners only: edges solved; with 3-style, 50% of cases swap your buffer and helper edges for parity.'),
         color=ft.Colors.ON_SURFACE, label_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT), hint_style=ft.TextStyle(color=ft.Colors.ON_SURFACE_VARIANT))
 
         self.previous_scramble_button = ft.IconButton(
-            ft.Icons.CHEVRON_LEFT, tooltip="Previous scramble",
+            ft.Icons.CHEVRON_LEFT, tooltip=tr('Previous scramble'),
             on_click=self._previous_scramble, disabled=True,
         )
         self.new_scramble_button = ft.IconButton(
-            ft.Icons.CHEVRON_RIGHT, tooltip="Next scramble", on_click=self._new_scramble,
+            ft.Icons.CHEVRON_RIGHT, tooltip=tr('Next scramble'), on_click=self._new_scramble,
         )
         self.scramble_memo_button = ft.IconButton(feature_icon('memo', 20),
-            tooltip='Scramble Memo · current scramble', width=32, height=32, padding=4,
+            tooltip=tr('Scramble Memo · current scramble'), width=32, height=32, padding=4,
             disabled=not self.current_scramble or bool(self._scramble_error),
             on_click=lambda e: self._open_current_memo())
         self.corner_walkthrough_button = ft.IconButton(feature_icon('walkthrough', 20),
-            tooltip="3-style corner analysis · current scramble", width=32, height=32, padding=4,
+            tooltip=tr('3-style corner analysis · current scramble'), width=32, height=32, padding=4,
             disabled=not self.current_scramble or bool(self._scramble_error),
             on_click=lambda e: self._open_corner_walkthrough(self.current_scramble))
         for button in (self.previous_scramble_button, self.new_scramble_button):
             button.width = button.height = 32
             button.padding = 4
         self.success_button = ft.OutlinedButton(
-            "Success", icon=ft.Icons.CHECK_CIRCLE, on_click=lambda e: self._mark_last("ok"), disabled=True
+            tr('Success'), icon=ft.Icons.CHECK_CIRCLE, on_click=lambda e: self._mark_last("ok"), disabled=True
         )
         self.plus2_button = ft.OutlinedButton(
             "+2", icon=ft.Icons.ADD, on_click=lambda e: self._mark_last("plus2"), disabled=True
         )
         self.dnf_button = ft.OutlinedButton(
-            "DNF", icon=ft.Icons.CANCEL, on_click=lambda e: self._mark_last("dnf"), disabled=True
+            tr('DNF'), icon=ft.Icons.CANCEL, on_click=lambda e: self._mark_last("dnf"), disabled=True
         )
         self.memo_button = ft.OutlinedButton(
-            "Scramble Memo", icon=feature_icon('memo', 18), tooltip="Scramble Memo · last solve",
+            tr('Scramble Memo'), icon=feature_icon('memo', 18), tooltip=tr('Scramble Memo · last solve'),
             on_click=self._take_last_to_memo, disabled=True,
         )
         self.corner_analysis_button = ft.OutlinedButton(
-            '3-style corner analysis', icon=feature_icon('walkthrough', 18),
-            tooltip='3-style corner analysis · last solve',
+            tr('3-style corner analysis'), icon=feature_icon('walkthrough', 18),
+            tooltip=tr('3-style corner analysis · last solve'),
             on_click=self._take_last_to_corner_analysis, disabled=True)
         for button in (self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button):
             button.style = ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=10, vertical=9))
@@ -165,7 +166,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _practice_card(self, title: str, subtitle: str, icon, enabled: bool, on_click=None):
         return activity_card(title, subtitle, icon,
-            "Open Blind Timer" if enabled else "Coming soon",
+            message('Open Blind Timer') if enabled else message('Coming soon'),
             on_click=on_click, enabled=enabled)
 
     def show_menu(self, update: bool = True):
@@ -199,18 +200,18 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._reset_hold_state()
         self.spacing = 12
         self.controls = [
-            page_heading("Practice", "Choose a focused session. Build confidence one attempt at a time.", "03 / Repetition"),
+            page_heading(message('Practice'), message('Choose a focused session. Build confidence one attempt at a time.'), message('03 / Repetition')),
             ft.ResponsiveRow([
-                self._practice_card("Blind Timer", "Generate scrambles, time full blind attempts, and review your session history.",
+                self._practice_card(message('Blind Timer'), message('Generate scrambles, time full blind attempts, and review your session history.'),
                                     ft.Icons.TIMER, True, self._open_timer_from_practice),
-                self._practice_card("Progressive Memo", "Memo a real cube one pair at a time, then recall it.",
+                self._practice_card(message('Progressive Memo'), message('Memo a real cube one pair at a time, then recall it.'),
                                     ft.Icons.PSYCHOLOGY, False),
-                self._practice_card("Delayed Recall", "Memo, wait for a countdown, then type what you remember.",
+                self._practice_card(message('Delayed Recall'), message('Memo, wait for a countdown, then type what you remember.'),
                                     ft.Icons.HOURGLASS_BOTTOM, False),
-                self._practice_card("Letter Pair Drill", "Build fast, reliable pair-to-word recall from your dictionary.",
+                self._practice_card(message('Letter Pair Drill'), message('Build fast, reliable pair-to-word recall from your dictionary.'),
                                     ft.Icons.BOLT, False),
             ], spacing=12, run_spacing=12),
-            ft.Text("Blind Timer is ready to use. The other three activities are planned.",
+            ft.Text(tr('Blind Timer is ready to use. The other three activities are planned.'),
                     size=12, color=ft.Colors.ON_SURFACE_VARIANT),
         ]
         if update:
@@ -228,7 +229,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             ft.Row([self.previous_scramble_button, self.new_scramble_button,
                     self.scramble_memo_button, self.corner_walkthrough_button], spacing=0, tight=True),
         ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=12)
-        self._timer_hint = ft.Text("Hold Space to arm · Release to start · Any key to stop",
+        self._timer_hint = ft.Text(tr('Hold Space to arm · Release to start · Any key to stop'),
                                   size=11, color=ft.Colors.ON_SURFACE_VARIANT,
                                   text_align=ft.TextAlign.CENTER)
         self._timer_stage = panel(ft.Column([
@@ -239,21 +240,21 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button,
         ], spacing=8, run_spacing=4, wrap=True, alignment=ft.MainAxisAlignment.CENTER)
         self._stats_panel = panel(ft.Row([
-            ft.Row([ft.Text(label, size=13, color=ft.Colors.ON_SURFACE_VARIANT), value], spacing=8, tight=True)
-            for label, value in zip(("Success / total", "Ao5", "Ao12"), self.metric_values)
+            ft.Row([ft.Text(present(label), size=13, color=ft.Colors.ON_SURFACE_VARIANT), value], spacing=8, tight=True)
+            for label, value in zip((message('Success / total'), "Ao5", "Ao12"), self.metric_values)
         ], spacing=24, vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=ft.Padding.symmetric(horizontal=14, vertical=6))
         self._timer_workspace = ft.Column([
             self._timer_stage, self._result_row, self._stats_panel,
         ], spacing=12)
 
-        self._stats_button = ft.IconButton(ft.Icons.INSIGHTS, tooltip="Session statistics",
+        self._stats_button = ft.IconButton(ft.Icons.INSIGHTS, tooltip=tr('Session statistics'),
                                            on_click=self._show_session_stats, visible=False)
         self.history_panel = panel(ft.Column([
             ft.Container(ft.Row([
-                ft.Text("Session history", size=15, weight=ft.FontWeight.W_600,
+                ft.Text(tr('Session history'), size=15, weight=ft.FontWeight.W_600,
                         color=ft.Colors.ON_SURFACE, expand=True),
                 self._stats_button,
-                ft.IconButton(ft.Icons.DELETE_SWEEP_OUTLINED, tooltip="Reset session",
+                ft.IconButton(ft.Icons.DELETE_SWEEP_OUTLINED, tooltip=tr('Reset session'),
                               icon_size=18, on_click=self._confirm_reset),
             ], spacing=2), height=32),
             self.history,
@@ -262,8 +263,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=4), height=28),
         ], spacing=8), padding=12)
         self._main_region = ft.Column(spacing=0)
-        self.activity_header = ActivityHeader("Blind Timer", self._back_to_practice, self.session_dropdown,
-                                              "Timer", self._select_activity_tab)
+        self.activity_header = ActivityHeader(message('Blind Timer'), self._back_to_practice, self.session_dropdown,
+                                              message('Timer'), self._select_activity_tab)
         self._timer_body = ft.Column([
             self._scramble_panel,
             self._main_region,
@@ -271,11 +272,11 @@ class PracticePage(ThemeAwarePage, ft.Column):
         # Reflow updates the existing body. The KeyboardListener is created
         # once and stays mounted through resizing, theme changes, and history.
         self.keyboard_listener = ft.KeyboardListener(
-            content=self._timer_body, autofocus=True,
+            content=present(self._timer_body), autofocus=True,
             on_key_down=self._on_key_down, on_key_repeat=self._on_key_repeat,
             on_key_up=self._on_key_up, expand=True,
         )
-        self.body_host = ft.Container(content=self.keyboard_listener, expand=True)
+        self.body_host = ft.Container(content=present(self.keyboard_listener), expand=True)
         self.controls = [self.activity_header.view, self.body_host]
         self._timer_layout_wide = None
         self.set_viewport(*self._viewport)
@@ -310,7 +311,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self._timer_body.width = width
         self.scramble_text.size = 17 if wide else 14
         self.session_dropdown.width = 150 if wide else 136
-        self.success_button.content = "Success" if width >= 600 else "OK"
+        self.success_button.content = present(message('Success') if width >= 600 else message('OK'))
         for button in (self.success_button, self.plus2_button, self.dnf_button, self.memo_button, self.corner_analysis_button):
             button.height = 30 if width < 600 else 36
             button.style = ft.ButtonStyle(
@@ -360,7 +361,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self._timer_stage.content.controls.append(self._timer_hint)
         if self._timer_stage.height >= 160:
             self._timer_stage.content.controls.append(self.copy_notice)
-        self._timer_stage.tooltip = "Hold Space to arm · Release to start · Any key to stop"
+        self._timer_stage.tooltip = tr('Hold Space to arm · Release to start · Any key to stop')
         self.history_panel.height = history_height
         self.history.height = max(1, history_height - 100)
         self._main_region.height = main_height
@@ -381,9 +382,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _sort_history(self, kind):
         if kind == 'date':
-            self.history_sort = 'oldest' if self.history_sort == 'newest' else 'newest'
+            self.history_sort = message('oldest') if self.history_sort == 'newest' else message('newest')
         else:
-            self.history_sort = 'slowest' if self.history_sort == 'fastest' else 'fastest'
+            self.history_sort = message('slowest') if self.history_sort == 'fastest' else message('fastest')
         self.history_limit = 50
         self._refresh_stats_and_history()
         if self.page is not None:
@@ -400,10 +401,10 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _show_session_stats(self, e=None):
         dialog = ft.AlertDialog(
-            title=ft.Text("Session statistics", color=ft.Colors.ON_SURFACE),
-            content=ft.Text(self.stats_text.value.replace("    ", "\n"),
+            title=ft.Text(tr('Session statistics'), color=ft.Colors.ON_SURFACE),
+            content=ft.Text(present(self.stats_text.value.replace('    ', '\n')),
                             color=ft.Colors.ON_SURFACE),
-            actions=[ft.TextButton("Close", on_click=lambda e: self._close_session_stats())],
+            actions=[ft.TextButton(tr('Close'), on_click=lambda e: self._close_session_stats())],
         )
         show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)
 
@@ -421,9 +422,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 self.statistics = StatisticsPage(source="timer", data=self.state)
             self.statistics.set_viewport(self.body_host.width,self.body_host.height)
             self.statistics.open_for(self.state.data.active_practice_session)
-            self.body_host.content = self.statistics
+            self.body_host.content = present(self.statistics)
         else:
-            self.body_host.content = self.keyboard_listener
+            self.body_host.content = present(self.keyboard_listener)
             self.refresh(update=False)
         self._safe_update()
         if tab == "train":
@@ -464,7 +465,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             scramble = self._generate_scramble(name)
         except ValueError as ex:
             e.control.value = self.state.data.active_practice_session
-            self.status_text.value = str(ex)
+            self.status_text.value = present(error_message(ex))
             self._safe_update()
             return
         self.state.switch_practice_session(name)
@@ -504,7 +505,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.current_scramble = scramble
         self.scramble_stack = [scramble]
         self.scramble_index = 0
-        self.scramble_text.value = scramble
+        self.scramble_text.value = present(scramble)
         self.previous_scramble_button.disabled = True
 
     def _sync_scramble_context(self):
@@ -520,8 +521,8 @@ class PracticePage(ThemeAwarePage, ft.Column):
         try:
             scramble = self._generate_scramble()
         except ValueError as ex:
-            self._scramble_error = str(ex)
-            self.status_text.value = self._scramble_error
+            self._scramble_error = error_message(ex)
+            self.status_text.value = present(self._scramble_error)
             return False
         self._replace_scrambles(scramble)
         self.status_text.value = ""
@@ -627,9 +628,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 self.last_display_second = whole
                 if whole >= 60:
                     m, s = divmod(whole, 60)
-                    self.timer_text.value = f"{m}:{s:02d}"
+                    self.timer_text.value = present(compose('{0}:{1:02d}', m, s))
                 else:
-                    self.timer_text.value = str(whole)
+                    self.timer_text.value = present(str(whole))
                 self._safe_update()
 
     def _start_timer(self, now: float):
@@ -639,7 +640,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.started_at = now
         self.last_display_second = -1
         self.timer_text.color = ft.Colors.ON_SURFACE
-        self.status_text.value = "RUNNING — press any key to stop"
+        self.status_text.value = tr('RUNNING — press any key to stop')
         self.previous_scramble_button.disabled = True
         self.new_scramble_button.disabled = True
         self.success_button.disabled = True
@@ -654,9 +655,9 @@ class PracticePage(ThemeAwarePage, ft.Column):
         self.running = False
         centiseconds = max(0, int(round(elapsed * 100)))
         solved_scramble = self.current_scramble
-        self.timer_text.value = _format_centiseconds(centiseconds)
+        self.timer_text.value = present(_format_centiseconds(centiseconds))
         self.timer_text.color = ft.Colors.ON_SURFACE
-        self.status_text.value = "Stopped — mark Success, +2, or DNF"
+        self.status_text.value = tr('Stopped — mark Success, +2, or DNF')
         self.last_solve_index = self.state.add_practice_solve(
             centiseconds, solved_scramble, dnf=False, plus2=False
         )
@@ -685,7 +686,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             self.scramble_stack.append(self._generate_scramble())
             self.scramble_index += 1
         self.current_scramble = self.scramble_stack[self.scramble_index]
-        self.scramble_text.value = self.current_scramble
+        self.scramble_text.value = present(self.current_scramble)
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
     def _update_analysis_availability(self):
@@ -714,7 +715,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
     def _show_scramble_at_index(self):
         self.current_scramble = self.scramble_stack[self.scramble_index]
-        self.scramble_text.value = self.current_scramble
+        self.scramble_text.value = present(self.current_scramble)
         self.previous_scramble_button.disabled = self.scramble_index <= 0
 
         # If this scramble already has a solve, restore its latest saved result
@@ -727,12 +728,12 @@ class PracticePage(ThemeAwarePage, ft.Column):
             idx, solve = matching[-1]
             self.last_solve_index = idx
             if solve.dnf:
-                self.timer_text.value = f"DNF ({_format_centiseconds(solve.centiseconds)})"
-                self.status_text.value = "Previous scramble — saved result: DNF"
+                self.timer_text.value = present(f'DNF ({_format_centiseconds(solve.centiseconds)})')
+                self.status_text.value = tr('Previous scramble — saved result: DNF')
             else:
                 effective = _effective_centiseconds(solve)
-                self.timer_text.value = _format_centiseconds(effective) + ("+" if getattr(solve, "plus2", False) else "")
-                self.status_text.value = "Previous scramble — saved result"
+                self.timer_text.value = present(_format_centiseconds(effective) + ('+' if getattr(solve, 'plus2', False) else ''))
+                self.status_text.value = tr('Previous scramble — saved result')
             self.memo_button.disabled = False
             self.success_button.disabled = False
             self.plus2_button.disabled = False
@@ -786,19 +787,19 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
         if result == "dnf":
             self.state.set_practice_solve_result(self.last_solve_index, dnf=True, plus2=False)
-            self.timer_text.value = f"DNF ({raw_time})"
-            self.status_text.value = "DNF"
+            self.timer_text.value = present(f'DNF ({raw_time})')
+            self.status_text.value = tr('DNF')
         elif result == "plus2":
             self.state.set_practice_solve_result(self.last_solve_index, dnf=False, plus2=True)
             # Show the penalized time immediately. Internally the solve keeps
             # its measured time plus a +2 flag, so stats still use 37.26 for
             # a measured 35.26 without losing the original measurement.
-            self.timer_text.value = _format_centiseconds(solve.centiseconds + 200) + "+"
+            self.timer_text.value = present(_format_centiseconds(solve.centiseconds + 200) + '+')
             self.status_text.value = "+2"
         else:
             self.state.set_practice_solve_result(self.last_solve_index, dnf=False, plus2=False)
-            self.timer_text.value = raw_time
-            self.status_text.value = "Success"
+            self.timer_text.value = present(raw_time)
+            self.status_text.value = tr('Success')
         self._refresh_stats_and_history(update=False)
         self._safe_update()
         self._focus_keyboard_listener()
@@ -848,35 +849,32 @@ class PracticePage(ThemeAwarePage, ft.Column):
             if value is None:
                 return "—"
             if value == "DNF":
-                return "DNF"
+                return message('DNF')
             return _format_centiseconds(value)
 
-        metric_texts = (f"{successes}/{len(solves)}", fmt_avg(ao5), fmt_avg(ao12))
-        self.stats_text.value = (f"Successful / total: {metric_texts[0]}    "
-                                 f"Ao5: {metric_texts[1]}    Ao12: {metric_texts[2]}")
+        metric_texts = (compose('{0}/{1}', successes, len(solves)), fmt_avg(ao5), fmt_avg(ao12))
+        self.stats_text.value = (tr('Successful / total: {0}    Ao5: {1}    Ao12: {2}', metric_texts[0], metric_texts[1], metric_texts[2]))
         for control, value in zip(self.metric_values, metric_texts):
-            control.value = value
+            control.value = present(value)
         shown = min(len(solves), self.history_limit)
-        self.history_meta.value = f"{shown}/{len(solves)} solves"
-        self.history_meta.tooltip = f"{shown} of {len(solves)} solves · {self.history_sort} first"
-        date_active = self.history_sort in ('newest', 'oldest')
+        self.history_meta.value = tr('{0}/{1} solves', shown, len(solves))
+        self.history_meta.tooltip = tr('{0} of {1} solves · {2} first', shown, len(solves), message(self.history_sort))
+        date_active = self.history_sort in (message('newest'), message('oldest'))
         for button, active, label in ((self.date_sort_button, date_active,
-                'Oldest' if self.history_sort == 'oldest' else 'Newest'),
-                (self.time_sort_button, not date_active, 'Slowest' if self.history_sort == 'slowest' else 'Fastest')):
-            button.content = label
+                message('Oldest') if self.history_sort == 'oldest' else message('Newest')),
+                (self.time_sort_button, not date_active, message('Slowest') if self.history_sort == 'slowest' else message('Fastest'))):
+            button.content = present(label)
             button.style = ft.ButtonStyle(padding=4, text_style=ft.TextStyle(size=11,
                 weight=ft.FontWeight.W_600 if active else ft.FontWeight.NORMAL),
                 color=ft.Colors.ON_PRIMARY_CONTAINER if active else ft.Colors.PRIMARY,
                 bgcolor=ft.Colors.PRIMARY_CONTAINER if active else ft.Colors.TRANSPARENT,
                 shape=ft.RoundedRectangleBorder(radius=6))
-            button.tooltip = (f'{label} first. Click for ' + ('oldest' if label == 'Newest' else
-                'newest' if label == 'Oldest' else 'slowest' if label == 'Fastest' else 'fastest') + ' first.'
-                if active else f'Sort {label.lower()} first.')
+            button.tooltip = (present(message('{0} first. Click for ', label) + (message('oldest') if label == 'Newest' else message('newest') if label == 'Oldest' else message('slowest') if label == 'Fastest' else message('fastest')) + message(' first.') if active else message('Sort {0} first.', label.lower())))
         self.older_solves_button.visible = shown < len(solves)
         indices = list(range(len(solves)))
         if self.history_sort == 'newest':
             indices.reverse()
-        elif self.history_sort in ('fastest', 'slowest'):
+        elif self.history_sort in (message('fastest'), message('slowest')):
             # Sorting is a view only. Keep stored chronology and original IDs
             # for averages, result controls, deletion and analysis callbacks.
             indices.sort(key=lambda i: (solves[i].dnf,
@@ -897,36 +895,36 @@ class PracticePage(ThemeAwarePage, ft.Column):
                 ft.Container(
                     ft.Column([
                         ft.Row([
-                            ft.Text(f"#{idx + 1}", width=36, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
+                            ft.Text(present(compose('#{0}', idx + 1)), width=36, size=11, color=ft.Colors.ON_SURFACE_VARIANT),
                             ft.Container(
-                                content=ft.Text(result, size=16, weight=ft.FontWeight.W_600, color=result_color),
-                                expand=True, tooltip="Click to copy time + scramble",
+                                content=ft.Text(present(result), size=16, weight=ft.FontWeight.W_600, color=result_color),
+                                expand=True, tooltip=tr('Click to copy time + scramble'),
                                 padding=ft.Padding.symmetric(vertical=4),
                                 on_click=lambda e, s=solve: self._copy_time_and_scramble(s),
                             ),
-                            ft.IconButton(feature_icon('memo', 18), width=32, height=32, padding=4, tooltip="Scramble Memo · saved solve",
+                            ft.IconButton(feature_icon('memo', 18), width=32, height=32, padding=4, tooltip=tr('Scramble Memo · saved solve'),
                                           on_click=lambda e, s=solve.scramble: self._open_solve_memo(s)),
                             ft.IconButton(feature_icon('walkthrough', 18), width=32, height=32, padding=4,
-                                          tooltip="3-style corner analysis · saved solve",
+                                          tooltip=tr('3-style corner analysis · saved solve'),
                                           on_click=lambda e, s=solve.scramble: self._open_corner_walkthrough(s)),
-                            ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, width=32, height=32, padding=4, tooltip="Delete solve",
+                            ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=17, width=32, height=32, padding=4, tooltip=tr('Delete solve'),
                                           on_click=lambda e, i=idx: self._delete_solve(i)),
                         ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                         ft.GestureDetector(
-                            content=ft.Text(solve.scramble, size=11, max_lines=2,
-                                            color=ft.Colors.ON_SURFACE_VARIANT, tooltip="Click to copy scramble"),
-                            on_tap=lambda e, text=solve.scramble: self._copy_text(text, "Scramble copied"),
+                            content=ft.Text(present(solve.scramble), size=11, max_lines=2,
+                                            color=ft.Colors.ON_SURFACE_VARIANT, tooltip=tr('Click to copy scramble')),
+                            on_tap=lambda e, text=solve.scramble: self._copy_text(text, message('Scramble copied')),
                         ),
                     ], spacing=2),
                     padding=ft.Padding.symmetric(horizontal=4, vertical=10),
                     border=ft.Border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
                 )
             )
-        self.history.controls = rows or [ft.Text("No solves yet.", italic=True, color=ft.Colors.ON_SURFACE)]
+        self.history.controls = rows or [ft.Text(tr('No solves yet.'), italic=True, color=ft.Colors.ON_SURFACE)]
         if update:
             self._safe_update()
 
-    def _copy_text(self, text: str, message: str = "Copied"):
+    def _copy_text(self, text: str, message: str = message('Copied')):
         try:
             self.page.set_clipboard(text)
             self._show_copy_notice(message)
@@ -937,7 +935,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
     def _show_copy_notice(self, message: str):
         self._copy_notice_token += 1
         token = self._copy_notice_token
-        self.copy_notice.value = message
+        self.copy_notice.value = present(message)
         self.copy_notice.opacity = 1
         self._safe_update()
         self.page.run_task(self._fade_copy_notice, token)
@@ -963,7 +961,7 @@ class PracticePage(ThemeAwarePage, ft.Column):
             result = _format_centiseconds(_effective_centiseconds(solve))
             if getattr(solve, "plus2", False):
                 result += "+"
-        self._copy_text(f"{result} - {solve.scramble}", "Time + scramble copied")
+        self._copy_text(compose('{0} - {1}', result, solve.scramble), message('Time + scramble copied'))
 
     def _delete_solve(self, index: int):
         self.state.delete_practice_solve(index)
@@ -984,11 +982,11 @@ class PracticePage(ThemeAwarePage, ft.Column):
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Reset timer session?", color=ft.Colors.ON_SURFACE),
-            content=ft.Text("This deletes all saved timer solves in the current session.", color=ft.Colors.ON_SURFACE),
+            title=ft.Text(tr('Reset timer session?'), color=ft.Colors.ON_SURFACE),
+            content=ft.Text(tr('This deletes all saved timer solves in the current session.'), color=ft.Colors.ON_SURFACE),
             actions=[
-                ft.TextButton("Cancel", on_click=lambda e: close(dialog)),
-                ft.TextButton("Reset", on_click=lambda e: reset(dialog)),
+                ft.TextButton(tr('Cancel'), on_click=lambda e: close(dialog)),
+                ft.TextButton(tr('Reset'), on_click=lambda e: reset(dialog)),
             ],
         )
         show_themed_dialog(self.page, dialog, self.state.data.dark_mode, self.state.data.light_theme)

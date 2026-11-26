@@ -3,7 +3,18 @@
 A compact training workspace for blindfolded 3×3 Rubik’s Cube solving.
 Build a letter scheme and pair dictionary, train memo, time solves, trace
 scrambles and study algorithms. Built with Python and Flet; runs in a browser
-or as a desktop app. Current version: **2.58.0**.
+or as a desktop app. Current version: **2.59.0**.
+
+## Language / 语言
+
+Open **Settings → General → Language / 语言** and choose **English** or
+**简体中文**. The interface switches immediately and remembers the choice in
+this browser, including when signed out. New browsers start in English.
+Your scheme names, sticker letters, mnemonics, notes, algorithms and times
+keep their original values. Language is separate from backups and cloud sync.
+
+在 **设置 → 常规 → 语言 / Language** 中选择界面语言。此设置会保存在当前浏览器中。
+编码方案、字母对联想词、公式和训练记录不会被翻译或改写。
 
 ## Training statistics
 

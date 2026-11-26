@@ -1,4 +1,6 @@
 """A responsive chart with a persistent canvas and pointer/touch readout."""
+from core.messages import message, compose
+from ui.language import present
 from bisect import bisect_left
 
 import flet as ft
@@ -22,7 +24,7 @@ def chart_bounds(values, percent):
 
 
 def note(text="", size=12):
-    return ft.Text(text, size=size, color=ft.Colors.ON_SURFACE_VARIANT)
+    return ft.Text(present(text), size=size, color=ft.Colors.ON_SURFACE_VARIANT)
 
 
 def legend_mark(label, width, height, color):
@@ -56,13 +58,13 @@ class TrendChart:
                         height=PLOT_HEIGHT, expand=True)
         self.start, self.end = note(), note()
         self.x_axis = ft.Row([self.start, self.end], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-        self.observed_key = legend_mark("Attempt", 6, 6, ft.Colors.ON_SURFACE_VARIANT)
-        self.line_key = legend_mark("Cumulative", 17, 3, ft.Colors.PRIMARY)
+        self.observed_key = legend_mark(message('Attempt'), 6, 6, ft.Colors.ON_SURFACE_VARIANT)
+        self.line_key = legend_mark(message('Cumulative'), 17, 3, ft.Colors.PRIMARY)
         legend = [self.observed_key, self.line_key]
         if timer and not percent:
-            legend.append(ft.Row([ft.Text("×", size=16, color=ft.Colors.ERROR), note("DNF")], spacing=4, tight=True))
+            legend.append(ft.Row([ft.Text("×", size=16, color=ft.Colors.ERROR), note(message('DNF'))], spacing=4, tight=True))
         if not percent:
-            legend.append(note("Lower is faster"))
+            legend.append(note(message('Lower is faster')))
         self.view = panel(ft.Column([
             self.title, self.headline, ft.Container(self.description,height=52),
             ft.Row([ft.Stack(self.axis, width=56, height=PLOT_HEIGHT), plot], spacing=4, height=PLOT_HEIGHT),
@@ -71,17 +73,17 @@ class TrendChart:
         ], spacing=5, tight=True,horizontal_alignment=ft.CrossAxisAlignment.STRETCH), padding=14)
 
     def set_series(self, title, headline, detail, points, window=None, *, ao5=False):
-        self.title.value, self.headline.value = title, headline
+        self.title.value, self.headline.value = present(title), present(headline)
         self.points = points
         self.ao5 = ao5
-        self.idle = detail + " Hover or tap for values."
+        self.idle = detail + message(' Hover or tap for values.')
         self.clear_inspection()
         grouped = any(p.group.attempts > 1 for p in points)
-        self.observed_key.controls[1].value = ("Group rate" if self.percent else "Group median") if grouped else "Attempt"
-        self.line_key.controls[1].value = "Cumulative" if window is None else f"Rolling {window}"
+        self.observed_key.controls[1].value = present((message('Group rate') if self.percent else message('Group median')) if grouped else message('Attempt'))
+        self.line_key.controls[1].value = present(message('Cumulative') if window is None else message('Rolling {0}', window))
         self.observed_key.visible = not ao5
         if ao5:
-            self.line_key.controls[1].value = "Group median Ao5" if grouped else "Recorded Ao5"
+            self.line_key.controls[1].value = present(message('Group median Ao5') if grouped else message('Recorded Ao5'))
         # Cumulative endpoint numbers already appear in the summary above.
         self.headline.visible = not ao5 and window is not None
         raw = [None if ao5 else p.group.accuracy if self.percent else p.group.median for p in points]
@@ -93,17 +95,17 @@ class TrendChart:
         self.series = (raw, trend, lo, hi, bool(values))
         for label, value in zip(self.axis, (hi, (hi+lo)/2, lo)):
             label.visible = bool(values)
-            label.value = f"{value:.0f}%" if self.percent else format_time(value)
+            label.value = present(compose('{0:.0f}%', value) if self.percent else format_time(value))
         single = len(points) == 1
-        self.start.value = f"Attempt {points[0].number}" if single else f"#{points[0].number}"
-        self.end.value, self.end.visible = f"#{points[-1].number}", not single
+        self.start.value = present(message('Attempt {0}', points[0].number) if single else compose('#{0}', points[0].number))
+        self.end.value, self.end.visible = present(compose('#{0}', points[-1].number)), not single
         self.x_axis.alignment = ft.MainAxisAlignment.CENTER if single else ft.MainAxisAlignment.SPACE_BETWEEN
         self._draw()
 
     def clear_inspection(self):
         self.selected_index = None
         self.guide.opacity = 0
-        self.description.value = self.idle
+        self.description.value = present(self.idle)
 
     def _x(self, i):
         span = self.numbers[-1] - self.numbers[0]
@@ -120,34 +122,33 @@ class TrendChart:
     def _readout(self, i):
         p = self.points[i]
         group,a = p.group,p.attempt
-        def rate(v): return "—" if v is None else f"{v:.1f}%"
+        def rate(v): return "—" if v is None else compose('{0:.1f}%', v)
         def time(v): return "—" if v is None else format_time(v)
         if self.ao5:
             if group.attempts == 1:
-                result = time(a.time) if a.time is not None else "DNF"
-                return f"Ao5 · {result}\nAttempts #{p.number-4}–{p.number}"
-            return (f"Ao5s ending #{p.number-group.attempts+1}–{p.number} · Median {time(group.median)}\n"
-                    f"{group.timed}/{group.attempts} valid averages")
+                result = time(a.time) if a.time is not None else message('DNF')
+                return message('Ao5 · {0}\nAttempts #{1}–{2}', result, p.number - 4, p.number)
+            return (message('Ao5s ending #{0}–{1} · Median {2}\n{3}/{4} valid averages', p.number - group.attempts + 1, p.number, time(group.median), group.timed, group.attempts))
         if group.attempts > 1:
-            label = f"#{p.number-group.attempts+1}–{p.number}"
-            value = (f"{rate(group.accuracy)} · {group.correct}/{group.scored}" if self.percent else
-                     f"Median {time(group.median)}")
+            label = compose('#{0}–{1}', p.number - group.attempts + 1, p.number)
+            value = (compose('{0} · {1}/{2}', rate(group.accuracy), group.correct, group.scored) if self.percent else
+                     message('Median {0}', time(group.median)))
             if self.timer and not self.percent and (misses := group.attempts-group.timed):
-                value += f" · {misses} DNF" + ("s" if misses != 1 else "")
+                value += message(' · {0} DNF', misses) + (message("s") if misses != 1 else "")
         else:
-            label = f"#{p.number}"
+            label = compose('#{0}', p.number)
             if self.timer and a.time is None:
-                result = "DNF" if a.dnf_elapsed is None else f"DNF ({time(a.dnf_elapsed)})"
+                result = message('DNF') if a.dnf_elapsed is None else f"DNF ({time(a.dnf_elapsed)})"
             else:
                 result = time(a.time)
             if a.plus2:
                 result += " (+2)"
             if self.percent:
-                value = rate(group.accuracy) + " · " + (result if self.timer else f"{a.correct}/{a.scored} letters")
+                value = rate(group.accuracy) + " · " + (result if self.timer else message('{0}/{1} letters', a.correct, a.scored))
             else:
                 value = result
         trend = rate(p.rolling.accuracy) if self.percent else time(p.rolling.median)
-        return f"{label} · {value}\n{self.line_key.controls[1].value}: {trend}"
+        return compose('{0} · {1}\n{2}: {3}', label, value, self.line_key.controls[1].value, trend)
 
     def _update_if_mounted(self, *controls):
         try:
@@ -165,7 +166,7 @@ class TrendChart:
         if i != self.selected_index:
             self.selected_index = i
             self.guide.left, self.guide.opacity = self._x(i)-.75, .8
-            self.description.value = self._readout(i)
+            self.description.value = present(self._readout(i))
             self._update_if_mounted(self.guide,self.description)
 
     def _leave(self, e):

@@ -1,4 +1,5 @@
 """Device-side coordination: locally durable saves first, version-checked writes."""
+from core.messages import message, error_message
 import asyncio
 from data.cloud_client import CloudError
 from data.cloud_merge import identify, merge, validate
@@ -12,7 +13,7 @@ class CloudSync:
         self.session = self.base = None
         self.revision = 0
         self.differences, self.choices = [], {}
-        self.message = "Keep a private copy of your training data across devices."
+        self.message = message('Keep a private copy of your training data across devices.')
         self.changed = self.applied = lambda: None
         self.lock = asyncio.Lock()
         self._scheduled = self._dirty = self._installing = False
@@ -25,7 +26,7 @@ class CloudSync:
             self.blocked = bool(self.session and self.repo.cloud_owner is not None
                                 and self.repo.cloud_owner!=self.session["user"]["id"])
             if self.blocked:
-                self.message = "This browser holds another WCA account’s local workspace. Sign in with its owner, or use a separate browser profile for this account."
+                self.message = message('This browser holds another WCA account’s local workspace. Sign in with its owner, or use a separate browser profile for this account.')
             elif self.session and self.session["enabled"]:
                 saved = await self.client.call("base",tag=self.session["tag"])
                 if saved and self.repo.cloud_anchor == (self.session["user"]["id"],saved["revision"]):
@@ -34,9 +35,9 @@ class CloudSync:
                     await self.repo.track_cloud(*self.repo.cloud_anchor)
                 self.consent = True
             elif self.session:
-                self.message = "Signed in. Nothing from this browser has been uploaded."
+                self.message = message('Signed in. Nothing from this browser has been uploaded.')
         except Exception as exc:
-            self.message = str(exc) or "Cloud sync is unavailable."
+            self.message = error_message(exc) or message('Cloud sync is unavailable.')
         self.ready = True
         self.changed()
         if self.consent: await self.sync()
@@ -69,7 +70,7 @@ class CloudSync:
     def later(self):
         self.differences=[]; self.choices={}
         if self.session and not self.session["enabled"]: self.consent=False
-        self.message="Your device and cloud copies are unchanged."
+        self.message=message('Your device and cloud copies are unchanged.')
         self.changed()
 
     async def decide(self, which):
@@ -96,16 +97,16 @@ class CloudSync:
             try:
                 await self.client.call("erase" if erase else "logout",tag=tag)
                 await self._forget(tag)
-                self.message = ("Cloud copy deleted; all devices signed out." if erase else "Signed out.")+" Your local data is still here."
+                self.message = (message('Cloud copy deleted; all devices signed out.') if erase else message('Signed out.'))+message(' Your local data is still here.')
             except CloudError as exc:
                 if exc.status==401:
-                    await self._forget(tag);self.message="Session ended. Your local data is still here."
+                    await self._forget(tag);self.message=message('Session ended. Your local data is still here.')
                 elif not erase:
                     await self._forget(tag)
-                    self.message="Signed out on this device. The offline session could not be revoked remotely."
-                else: self.message="The cloud deletion was not confirmed. Reconnect and try again."
+                    self.message=message('Signed out on this device. The offline session could not be revoked remotely.')
+                else: self.message=message('The cloud deletion was not confirmed. Reconnect and try again.')
             except Exception:
-                self.message="Could not finish disconnecting. Retry in Settings."
+                self.message=message('Could not finish disconnecting. Retry in Settings.')
             finally: self.busy=False; self.changed()
 
     async def sync(self):
@@ -120,26 +121,26 @@ class CloudSync:
                     revision=response["revision"]
                     same = response.get("unchanged") is True
                     if same and (self.base is None or self.revision!=revision):
-                        raise ValueError("Unexpected cloud version. Please retry.")
+                        raise ValueError(message('Unexpected cloud version. Please retry.'))
                     remote=self.base if same else response["workspace"]
                     if type(revision) is not int or revision<0 or (revision==0)!=(remote is None):
-                        raise ValueError("Unexpected cloud version. Your local data is unchanged.")
+                        raise ValueError(message('Unexpected cloud version. Your local data is unchanged.'))
                     if remote is not None and not same: remote=validate(remote)
                     await self.repo.wait_saved()
                     raw=self.state.data.to_dict()
                     if same and raw==self.base and self.session["enabled"]:
                         self.differences=[]; self.choices.clear()
-                        self.message="Up to date · Saved on this device and in the cloud."
+                        self.message=message('Up to date · Saved on this device and in the cloud.')
                         return
                     device=identify(raw)
                     merged,diffs=merge(self.base,device,remote,self.choices) if remote is not None and not same else (device,[])
                     self.differences=diffs
                     if diffs:
-                        self.message="Choose which edits to keep. Neither copy has been replaced."
+                        self.message=message('Choose which edits to keep. Neither copy has been replaced.')
                         return
                     # Never swap schemes under a running timer, training round or editor.
                     if raw!=merged and not self.safe():
-                        self.message="Cloud changes are ready. Open Settings to apply them."
+                        self.message=message('Cloud changes are ready. Open Settings to apply them.')
                         return
                     merged=validate(merged)
                     if remote!=merged:
@@ -150,7 +151,7 @@ class CloudSync:
                         revision=result["revision"]
                     if self.state.data.to_dict()!=raw: continue
                     if raw!=merged and not self.safe():
-                        self.message="Cloud changes are ready. Open Settings to apply them."
+                        self.message=message('Cloud changes are ready. Open Settings to apply them.')
                         return
                     if raw!=merged:
                         self._installing=True
@@ -164,18 +165,18 @@ class CloudSync:
                     self.base,self.revision=merged,revision
                     self.session["enabled"]=True
                     self.choices.clear()
-                    self.message="Up to date · Saved on this device and in the cloud."
+                    self.message=message('Up to date · Saved on this device and in the cloud.')
                     if self.state.data.to_dict()!=merged: self.request()
                     return
-                self.message="Another device is still saving. Select Sync now to compare again."
+                self.message=message('Another device is still saving. Select Sync now to compare again.')
             except CloudError as exc:
                 if exc.status==401:
                     await self._forget(tag)
-                    self.message="Your session ended. Sign in again to sync this browser."
-                else: self.message=str(exc)
+                    self.message=message('Your session ended. Sign in again to sync this browser.')
+                else: self.message=error_message(exc)
             except (ValueError,TypeError,KeyError,OSError) as exc:
-                self.message=str(exc) or "Cloud sync paused. Your local data is still here."
+                self.message=error_message(exc) or message('Cloud sync paused. Your local data is still here.')
             except Exception:
-                self.message="Cloud sync is unavailable. Your local data is still here."
+                self.message=message('Cloud sync is unavailable. Your local data is still here.')
             finally:
                 self.busy=False; self.changed()

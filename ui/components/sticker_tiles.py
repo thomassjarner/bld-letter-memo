@@ -1,4 +1,6 @@
 """Fixed square letter inputs shared by the cube net and face cards."""
+from core.messages import message, compose, join_text
+from ui.language import present, tr
 import flet as ft
 
 from core.cube_definitions import CATEGORY_PIECES, find_piece_for_sticker
@@ -34,17 +36,17 @@ class StickerTiles:
         if len(sticker) == 1:
             content, tooltip = None, center_tooltip
         else:
-            category = "corners" if len(sticker) == 3 else "edges"
+            category = message('corners') if len(sticker) == 3 else message('edges')
             cat = self.category_schemes[category]
             value = cat.stickers.get(sticker, "")
             locked = value == "BUFFER" or sticker in buffer_stickers(category, cat)
             if locked:
                 exact = sticker == (cat.buffer_sticker or cat.buffer_piece)
-                content = ft.Text("★" if exact else "●", size=18, weight=ft.FontWeight.BOLD, color=fg)
-                tooltip = f"{sticker} · {'Buffer sticker' if exact else 'Buffer piece'}"
+                content = ft.Text(present('★' if exact else '●'), size=18, weight=ft.FontWeight.BOLD, color=fg)
+                tooltip = compose('{0} · {1}', sticker, message('Buffer sticker') if exact else message('Buffer piece'))
             else:
                 field = ft.TextField(
-                    value=value, tooltip=f"{category.title()} · {sticker}",
+                    value=value, tooltip=present(compose('{0} · {1}', category.title(), sticker)),
                     max_length=1, counter="", dense=True, collapsed=True,
                     fit_parent_size=True, autocorrect=False,
                     capitalization=ft.TextCapitalization.CHARACTERS,
@@ -59,16 +61,16 @@ class StickerTiles:
                     on_blur=lambda e, s=sticker: self.set_focus(s, False),
                 )
                 self.fields[sticker] = field
-                content = ft.Semantics(content=field, label=f"{category.title()} sticker {sticker}")
+                content = ft.Semantics(content=present(field), label=tr('{0} sticker {1}', category.title(), sticker))
                 tooltip = field.tooltip
                 if sticker in self.duplicated:
                     border_color = ft.Colors.ERROR
-                    tooltip += f" · Duplicate letter {value}"
+                    tooltip += message(' · Duplicate letter {0}', value)
                 self.resting_borders[sticker] = border_color
                 self.focus_colors[sticker] = fg
         cell = ft.Container(content, bgcolor=bg, border_radius=4,
                             border=ft.Border.all(STICKER_BORDER, border_color),
-                            alignment=ft.Alignment.CENTER, padding=0, tooltip=tooltip)
+                            alignment=ft.Alignment.CENTER, padding=0, tooltip=present(tooltip))
         self.cells[sticker] = cell
         return cell
 
@@ -112,6 +114,6 @@ class StickerTiles:
         parts = []
         for category, groups in self.duplicates.items():
             if groups:
-                details = "; ".join(f"{letter}: {', '.join(stickers)}" for letter, stickers in groups.items())
-                parts.append(f"{category.title()}: {details}")
-        return "Duplicate letters · " + " · ".join(parts) if parts else ""
+                details = "; ".join(compose('{0}: {1}', letter, join_text(', ', stickers)) for letter, stickers in groups.items())
+                parts.append(compose('{0}: {1}', category.title(), details))
+        return message('Duplicate letters · ') + join_text(' · ', parts) if parts else ""

@@ -4,6 +4,7 @@ Every mutating method saves via the repository immediately afterward, so
 the app is always autosaved. Pages register on_change callbacks so they
 can refresh when something they don't own changes.
 """
+from core.messages import message, compose
 
 from typing import Callable, List, Optional
 
@@ -12,11 +13,12 @@ from core.cube_definitions import CATEGORY_PIECES
 from data.models import AppData, CaseAlgorithm, CornerCaseRecord, CategoryScheme, LetterScheme, PlaygroundAlgorithm
 from data.repository import AppDataRepository
 
-BUFFER_MARKER = "BUFFER"
+BUFFER_MARKER = message('BUFFER')
 
 
 class AppState:
     def __init__(self, repository: AppDataRepository):
+        self.language = "en"  # Device preference; never part of the synced workspace.
         self._repo = repository
         self.data: AppData = self._repo.load()
         self._listeners: List[Callable[[], None]] = []
@@ -41,10 +43,10 @@ class AppState:
             cb(status)
 
     def _save(self, notify: bool = True) -> None:
-        self._set_save_status("Saving…")
+        self._set_save_status(message('Saving…'))
         self._repo.save(self.data)
         if not getattr(self._repo, 'asynchronous_saves', False):
-            self._set_save_status("Saved")
+            self._set_save_status(message('Saved'))
         if notify:
             self._notify()
 
@@ -114,7 +116,7 @@ class AppState:
         i = 2
         while f"{base} ({i})" in self.data.schemes:
             i += 1
-        return f"{base} ({i})"
+        return compose('{0} ({1})', base, i)
 
     # ---- editing a scheme's stickers/buffer -------------------------------
 
@@ -401,17 +403,17 @@ class AppState:
         from core.algorithms import parse_algorithm
         from core.corner_cases import corner_cases, identify_case
         if key not in corner_cases() or identify_case(parse_algorithm(source)) != key:
-            raise ValueError('This algorithm solves a different case. Check target order and UFR buffer.')
+            raise ValueError(message('This algorithm solves a different case. Check target order and UFR buffer.'))
         current = self.data.corner_case_library.get(key)
         existing = next((a for a in current.algorithms if a.id == algorithm_id), None) if current else None
         if algorithm_id and existing is None:
-            raise ValueError('The algorithm no longer exists. Save it as a new alternative.')
+            raise ValueError(message('The algorithm no longer exists. Save it as a new alternative.'))
         record = self.data.corner_case_library.setdefault(key, CornerCaseRecord())
         if existing:
-            existing.name, existing.alg = name.strip() or 'Personal alg', source.strip()
+            existing.name, existing.alg = name.strip() or message('Personal alg'), source.strip()
             algorithm = existing
         else:
-            algorithm = CaseAlgorithm(str(uuid4()), name.strip() or 'Personal alg', source.strip())
+            algorithm = CaseAlgorithm(str(uuid4()), name.strip() or message('Personal alg'), source.strip())
             record.algorithms.append(algorithm)
         record.preferred_algorithm = algorithm.id
         self._save(notify=False)
@@ -420,9 +422,9 @@ class AppState:
     def update_corner_case(self, key, *, status=None, notes=None, favorite=None, preferred=None):
         from core.corner_cases import corner_cases
         if key not in corner_cases():
-            raise ValueError('Unknown UFR corner case.')
-        if status is not None and status not in ('new', 'learning', 'learned'):
-            raise ValueError('Choose New, Learning or Learned.')
+            raise ValueError(message('Unknown UFR corner case.'))
+        if status is not None and status not in (message('new'), message('learning'), message('learned')):
+            raise ValueError(message('Choose New, Learning or Learned.'))
         current = self.data.corner_case_library.get(key)
         if preferred:
             from core.algorithms import parse_algorithm
@@ -432,9 +434,9 @@ class AppState:
             if algorithm is None:
                 algorithm = next((a for a in builtin_algorithms(key) if a.id == preferred), None)
             if algorithm is None:
-                raise ValueError('Choose an existing algorithm.')
+                raise ValueError(message('Choose an existing algorithm.'))
             if identify_case(parse_algorithm(algorithm.alg)) != key:
-                raise ValueError('This algorithm solves another case. Correct it before making it preferred.')
+                raise ValueError(message('This algorithm solves another case. Correct it before making it preferred.'))
         record = self.data.corner_case_library.setdefault(key, CornerCaseRecord())
         for name, value in (('status', status), ('notes', notes), ('favorite', favorite), ('preferred_algorithm', preferred)):
             if value is not None:
@@ -458,12 +460,12 @@ class AppState:
         parse_algorithm(source)
         existing = next((a for a in self.data.playground_algorithms if a.id == algorithm_id), None)
         if algorithm_id and existing is None:
-            raise ValueError('The saved algorithm no longer exists. Save it as a new algorithm.')
+            raise ValueError(message('The saved algorithm no longer exists. Save it as a new algorithm.'))
         if existing is None:
-            existing = PlaygroundAlgorithm(str(uuid4()), name.strip() or 'Untitled alg', source.strip(), notes)
+            existing = PlaygroundAlgorithm(str(uuid4()), name.strip() or message('Untitled alg'), source.strip(), notes)
             self.data.playground_algorithms.append(existing)
         else:
-            existing.name, existing.alg, existing.notes = name.strip() or 'Untitled alg', source.strip(), notes
+            existing.name, existing.alg, existing.notes = name.strip() or message('Untitled alg'), source.strip(), notes
         self._save(notify=False)
         return existing.id
 
@@ -486,16 +488,16 @@ class AppState:
     @property
     def practice_session_names(self) -> List[str]:
         self.data.ensure_default_sessions()
-        return ["Session 1", "Session 2", "Session 3"]
+        return [message('Session 1'), message('Session 2'), message('Session 3')]
 
     @property
     def practice_session_labels(self) -> dict[str, str]:
         # Stable storage IDs keep existing histories and backups compatible.
-        return {"Session 1": "Session 1", "Session 2": "edges only", "Session 3": "corners only"}
+        return {"Session 1": message('Session 1'), "Session 2": message('edges only'), "Session 3": message('corners only')}
 
     @staticmethod
     def practice_session_category(name: str) -> str:
-        return {"Session 2": "edges", "Session 3": "corners"}.get(name, "all")
+        return {"Session 2": message('edges'), "Session 3": message('corners')}.get(name, "all")
 
     def switch_practice_session(self, name: str) -> None:
         self.data.ensure_default_sessions()

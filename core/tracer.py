@@ -4,6 +4,7 @@ The cube simulator is deliberately separate from BLD tracing.  It applies
 face/wide moves to labelled stickers, then re-orients the finished cube to
 the scheme's memo orientation before tracing permutation cycles.
 """
+from core.messages import message
 from dataclasses import dataclass, field
 from collections import deque
 import re
@@ -54,7 +55,7 @@ def _at(state, sticker): return state[_key(sticker)]
 
 def _apply(state, token):
     m=TOKEN.match(token)
-    if not m: raise ScrambleError(f"Unsupported move: {token}")
+    if not m: raise ScrambleError(message('Unsupported move: {0}', token))
     face,wide,suffix=m.groups(); axis,layer,clock=MOVES[face]
     amount=2 if suffix and suffix.startswith("2") else (-1 if suffix=="'" else 1)
     q=clock*amount; ai={"x":0,"y":1,"z":2}[axis]
@@ -86,7 +87,7 @@ def _canonical_transformed_sticker(sticker: str, face_map: Dict[str, str]) -> st
     for candidate in order:
         if candidate[0] == normal and set(candidate) == piece_faces:
             return candidate
-    raise ScrambleError(f"Could not transform sticker {sticker}")
+    raise ScrambleError(message('Could not transform sticker {0}', sticker))
 
 
 def _orient(state, up_color, front_color):
@@ -98,7 +99,7 @@ def _orient(state, up_color, front_color):
     the key distinction that makes alternative orientations trace correctly.
     """
     if up_color not in COLOR_FACE or front_color not in COLOR_FACE or up_color == front_color:
-        raise ScrambleError("Invalid memo orientation")
+        raise ScrambleError(message('Invalid memo orientation'))
     wanted_u = COLOR_FACE[up_color]
     wanted_f = COLOR_FACE[front_color]
     q = deque([state]); seen = set(); oriented = None
@@ -114,13 +115,13 @@ def _orient(state, up_color, front_color):
         for ax in "xyz":
             q.append(_whole(candidate, ax, 1))
     if oriented is None:
-        raise ScrambleError("Up/front colors must be adjacent")
+        raise ScrambleError(message('Up/front colors must be adjacent'))
 
     # After the physical re-orientation, map absolute color-face identities to
     # relative U/L/F/R/B/D names using the centers now visible on each face.
     face_map = {_at(oriented, relative_face): relative_face for relative_face in "ULFRBD"}
     if set(face_map) != set("ULFRBD"):
-        raise ScrambleError("Invalid center orientation")
+        raise ScrambleError(message('Invalid center orientation'))
     return {
         key: _canonical_transformed_sticker(home_sticker, face_map)
         for key, home_sticker in oriented.items()
@@ -138,7 +139,7 @@ def simulate(scramble, up="W", front="G", scramble_from_own_orientation=False):
     state = _solved()
     tokens = scramble.strip().split()
     if not tokens:
-        raise ScrambleError("Enter a scramble first")
+        raise ScrambleError(message('Enter a scramble first'))
     for token in tokens:
         state = _apply(state, token)
     if scramble_from_own_orientation:
@@ -378,7 +379,7 @@ def _trace_category(
             if t_piece==start_piece:
                 break
             cur=t
-        else: raise ScrambleError("Cycle tracing did not close")
+        else: raise ScrambleError(message('Cycle tracing did not close'))
 
     # Orientation-only pieces can either be memoed visually, or converted
     # into two ordinary targets (shoot into the piece, then shoot back).
@@ -408,9 +409,9 @@ def _memo_swap_edge_identities(state, buffer_piece: str, partner_piece: str):
     edge permutation parity while preserving the normal tracing machinery.
     """
     if buffer_piece not in EDGE_PIECES or partner_piece not in EDGE_PIECES:
-        raise ScrambleError("Invalid 3-style edge parity partner")
+        raise ScrambleError(message('Invalid 3-style edge parity partner'))
     if buffer_piece == partner_piece:
-        raise ScrambleError("3-style edge parity partner must differ from the edge buffer")
+        raise ScrambleError(message('3-style edge parity partner must differ from the edge buffer'))
 
     a0, a1 = buffer_piece, buffer_piece[::-1]
     b0, b1 = partner_piece, partner_piece[::-1]
@@ -442,7 +443,7 @@ class ScrambleTracer:
             buffer_piece = find_piece_for_sticker(buffer_sticker, EDGE_PIECES) if buffer_sticker else None
             partner = scheme.edge_parity_partner or "UR"
             if not buffer_piece:
-                raise ScrambleError("Select an edge buffer before using 3-style parity handling")
+                raise ScrambleError(message('Select an edge buffer before using 3-style parity handling'))
             edge_state = _memo_swap_edge_identities(state, buffer_piece, partner)
             three_style_parity_applied = True
 
@@ -466,17 +467,14 @@ class ScrambleTracer:
             # odd, while the virtual edge memo-swap makes the edge trace even.
             if len(et) % 2 != 0:
                 raise ScrambleError(
-                    "Internal 3-style trace check failed: parity-adjusted edge "
-                    "memo should contain an even number of targets."
+                    message('Internal 3-style trace check failed: parity-adjusted edge memo should contain an even number of targets.')
                 )
         else:
             # Ordinary mode, and 3-style solves whose corner trace is even, use
             # the normal legal-cube parity invariant.
             if len(ct) % 2 != len(et) % 2:
                 raise ScrambleError(
-                    "Internal trace check failed: corner and edge target counts "
-                    "have different parity. The memo was not shown because the "
-                    "tracing result is invalid."
+                    message('Internal trace check failed: corner and edge target counts have different parity. The memo was not shown because the tracing result is invalid.')
                 )
 
         return TraceResult(

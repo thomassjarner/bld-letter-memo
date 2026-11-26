@@ -26,3 +26,10 @@ Unmodified solver source, used under its offered MIT license.
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
+
+
+## Interface font
+
+BLD Memo Hans is a renamed subset of Noto Sans CJK SC, © 2014–2021 Adobe.
+It is distributed under the SIL Open Font License 1.1. The license is included
+in [assets/fonts/OFL.txt](assets/fonts/OFL.txt). Source: https://github.com/notofonts/noto-cjk.

@@ -1,4 +1,5 @@
 """Read-only commutator components and move-to-notation tracking."""
+from core.messages import message
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -97,13 +98,13 @@ def commutator_study(source):
             kind, parts = n
             if kind == 'conj':
                 a = items(parts[0], path + (0,))
-                return [('Setup', a)] + sections(parts[1], path + (1,)) + [('Undo setup', undo(a))]
+                return [(message('Setup'), a)] + sections(parts[1], path + (1,)) + [(message('Undo setup'), undo(a))]
             if kind == 'comm':
                 a, b = items(parts[0], path + (0,)), items(parts[1], path + (1,))
-                return [('A', a), ('B', b), ('Undo A', undo(a)), ('Undo B', undo(b))]
+                return [('A', a), ('B', b), (message('Undo A'), undo(a)), (message('Undo B'), undo(b))]
             if kind == 'inverse':
                 return [((label[5:6].upper() + label[6:]) if label.startswith('Undo ') else
-                         'Undo setup' + label[5:] if label.startswith('Setup') else 'Undo ' + label, undo(m))
+                         message('Undo setup') + label[5:] if label.startswith('Setup') else message('Undo ') + label, undo(m))
                         for label, m in reversed(sections(parts, path + (0,)))]
             if kind == 'repeat':
                 return [(f'{label} · {i + 1}/{parts[1]}', m) for i in range(parts[1])
@@ -112,12 +113,12 @@ def commutator_study(source):
                 result, pending = [], ()
                 for i, child in enumerate(parts):
                     if _structured(child):
-                        if pending: result.append(('Moves', pending)); pending = ()
+                        if pending: result.append((message('Moves'), pending)); pending = ()
                         result.extend(sections(child, path + (i,)))
                     else: pending += items(child, path + (i,))
-                if pending: result.append(('Moves', pending))
+                if pending: result.append((message('Moves'), pending))
                 return result
-            return [('Algorithm', items(n, path))]
+            return [(message('Algorithm'), items(n, path))]
 
         render(node)
         tracked, components = [], []

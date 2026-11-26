@@ -1,9 +1,14 @@
+from core.messages import message
+from ui.language import present, tr
+import asyncio
 import flet as ft
 
 from data.cloud_client import BrowserCloud
 from data.cloud_sync import CloudSync
 from data.cloud_endpoint import SYNC_URL
 from data.shared_preferences_repository import SharedPreferencesAppDataRepository
+from ui.language import configure_language
+from core.messages import normalize_language
 from ui.design import build_theme, icon_action
 from ui.feature_icons import feature_icon
 from ui.navigation_motion import route_switcher, set_reduced_motion
@@ -19,20 +24,20 @@ from ui.pages.settings_page import SettingsPage
 from ui.state import AppState
 
 DESTINATIONS = [
-    ("Home", "home"),
-    ("Letter Schemes", "schemes"),
-    ("Letter Pairs", "pairs"),
-    ("Scramble Memo", "memo"),
-    ("Method Library", "library"),
-    ("Practice", "practice"),
-    ("Timer", "timer"),
-    ("Settings", "settings"),
+    (message('Home'), "home"),
+    (message('Letter Schemes'), "schemes"),
+    (message('Letter Pairs'), "pairs"),
+    (message('Scramble Memo'), "memo"),
+    (message('Method Library'), "library"),
+    (message('Practice'), "practice"),
+    (message('Timer'), "timer"),
+    (message('Settings'), "settings"),
 ]
 HOME_INDEX, SCHEMES_INDEX, PAIRS_INDEX, SCRAMBLE_INDEX, METHOD_INDEX, PRACTICE_INDEX, TIMER_INDEX, SETTINGS_INDEX = range(8)
 
 
 async def main(page: ft.Page):
-    page.title = "BLD Letter Memo · 2.58.0"
+    page.title = "BLD Letter Memo · 2.59.0"
     page.theme = build_theme()
     page.dark_theme = build_theme(dark=True)
     page.padding = 0
@@ -40,6 +45,10 @@ async def main(page: ft.Page):
 
     repository = await SharedPreferencesAppDataRepository.create(page)
     state = AppState(repository)
+    if hasattr(repository, "load_language"):
+        state.language = await repository.load_language()
+    configure_language(page, state.language)
+    page.dark_theme = build_theme(dark=True)
     page.theme = build_theme(light_theme=state.data.light_theme)
     page.theme_mode = ft.ThemeMode.DARK if state.data.dark_mode else ft.ThemeMode.LIGHT
     current_index = HOME_INDEX
@@ -51,11 +60,11 @@ async def main(page: ft.Page):
     settings_page = SettingsPage(data=state)
     method_page = CaseLibraryPage(data=state)
 
-    save_status = [ft.Text("Saved", size=11, color=ft.Colors.ON_SURFACE_VARIANT) for _ in range(3)]
+    save_status = [ft.Text(tr('Saved'), size=11, color=ft.Colors.ON_SURFACE_VARIANT) for _ in range(3)]
 
     def on_save_status(status):
         for control in save_status:
-            control.value = status
+            control.value = present(status)
             if control.page is not None:
                 control.update()
     state.on_save_status(on_save_status)
@@ -106,7 +115,7 @@ async def main(page: ft.Page):
         else:
             navigate_to(next(i for i, (label, _) in enumerate(DESTINATIONS) if label == name))
 
-    practice_page.open_trainer_callback = lambda: open_home_destination("3-style corner trainer")
+    practice_page.open_trainer_callback = lambda: open_home_destination(message('3-style corner trainer'))
     home_page = build_home(open_home_destination, data=state)
     pages = [home_page, schemes_page, pairs_page, scramble_page, method_page, practice_page, timer_page, settings_page]
     for i, view in enumerate(pages):
@@ -139,7 +148,7 @@ async def main(page: ft.Page):
 
     def theme_button():
         return icon_action(ft.Icons.LIGHT_MODE_OUTLINED if state.data.dark_mode else ft.Icons.DARK_MODE_OUTLINED,
-                           "Switch to light mode" if state.data.dark_mode else "Switch to dark mode", toggle_theme,
+                           message('Switch to light mode') if state.data.dark_mode else message('Switch to dark mode'), toggle_theme,
                            size=40)
 
     def brand(compact=False):
@@ -147,7 +156,7 @@ async def main(page: ft.Page):
             ft.Icon(ft.Icons.VIEW_IN_AR_OUTLINED, size=28, color=ft.Colors.PRIMARY, key="brand_mark"),
             *([] if compact else [ft.Column([
                 ft.Text("BLD Letter Memo", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-                ft.Text("Blindfold training · v2.58.0", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
+                ft.Text(tr("Blindfold training · v{0}", "2.59.0"), size=10, color=ft.Colors.ON_SURFACE_VARIANT),
             ], spacing=1)]),
         ], spacing=9, tight=True)
 
@@ -157,11 +166,11 @@ async def main(page: ft.Page):
         color = ft.Colors.ON_PRIMARY_CONTAINER if selected else ft.Colors.ON_SURFACE_VARIANT
         content = ft.Row([
             feature_icon(icon, size=18, selected=selected),
-            ft.Text(label, size=13, color=color, weight=ft.FontWeight.W_600,
+            ft.Text(present(label), size=13, color=color, weight=ft.FontWeight.W_600,
                     max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
         ], spacing=8, tight=True)
         return ft.TextButton(
-            content=content, tooltip=label, height=40, width=156 if compact else None,
+            content=present(content), tooltip=present(label), height=40, width=156 if compact else None,
             style=ft.ButtonStyle(
                 bgcolor=ft.Colors.PRIMARY_CONTAINER if selected else ft.Colors.TRANSPARENT,
                 shape=ft.RoundedRectangleBorder(radius=8),
@@ -197,7 +206,7 @@ async def main(page: ft.Page):
         if not popout_open: restore_training_focus()
 
     popout_button = ft.Container(
-        ft.FilledButton("Menu", icon=ft.Icons.MENU, on_click=toggle_popout),
+        ft.FilledButton(tr('Menu'), icon=ft.Icons.MENU, on_click=toggle_popout),
         left=12, bottom=12,
     )
 
@@ -219,12 +228,12 @@ async def main(page: ft.Page):
         popout_panel.visible = style == "popout" and popout_open
         nav_row = ft.Row([nav_button(i) for i in range(len(DESTINATIONS))],
                          spacing=2, scroll=ft.ScrollMode.AUTO, expand=not narrow)
-        page_menu = ft.PopupMenuButton(icon=ft.Icons.MENU, tooltip="Open navigation", icon_size=20,
+        page_menu = ft.PopupMenuButton(icon=ft.Icons.MENU, tooltip=tr('Open navigation'), icon_size=20,
             width=40, height=40, bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST, icon_color=ft.Colors.PRIMARY,
             menu_position=ft.PopupMenuPosition.UNDER, on_cancel=restore_training_focus, items=[
                 ft.PopupMenuItem(content=ft.Row([
                     feature_icon(icon, size=18),
-                    ft.Text(label, size=13, color=ft.Colors.ON_SURFACE, expand=True),
+                    ft.Text(present(label), size=13, color=ft.Colors.ON_SURFACE, expand=True),
                     ft.Icon(ft.Icons.CHECK, size=17, color=ft.Colors.PRIMARY, visible=i == current_index),
                 ], spacing=10, width=210), height=44,
                     on_click=lambda e, index=i: navigate_to(index), data=label)
@@ -234,7 +243,7 @@ async def main(page: ft.Page):
         top_nav.height = 98 if narrow and not compact else 60
         top_nav.content = ft.Row([
             brand(compact=width < 700),
-            ft.Text(DESTINATIONS[current_index][0], size=14, weight=ft.FontWeight.W_600,
+            ft.Text(present(DESTINATIONS[current_index][0]), size=14, weight=ft.FontWeight.W_600,
                     color=ft.Colors.ON_SURFACE, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS,
                     expand=True, key="current_destination"),
             page_menu, tools,
@@ -273,7 +282,7 @@ async def main(page: ft.Page):
         # full viewport so headers stay aligned with long, scrollable pages.
         for view in (settings_page, scramble_page):
             view.width, view.height = viewport
-        palette = (state.data.dark_mode, state.data.light_theme)
+        palette = (state.data.dark_mode, state.data.light_theme, state.language)
         for view in (pages if palette != previous_palette else (pages[current_index],)):
             apply_palette(view, state.data.dark_mode, state.data.light_theme)
         previous_palette = palette
@@ -288,6 +297,34 @@ async def main(page: ft.Page):
         rebuild_navigation()
     settings_page.navigation_callback = apply_navigation_style
 
+    language_lock = asyncio.Lock()
+
+    async def change_language(code):
+        # Two rapid selections must reach storage in the same order as the UI.
+        async with language_lock:
+            await apply_language_choice(code)
+
+    async def apply_language_choice(code):
+        code = normalize_language(code)
+        if code == state.language:
+            return
+        try:
+            await repository.save_language(code)
+        except Exception:
+            settings_page.language_picker.value = state.language
+            settings_page.language_hint.value = tr('Could not save the language on this device. Please try again.')
+            page.update()
+            return
+        state.language = code
+        configure_language(page, code)
+        page.theme = build_theme(light_theme=state.data.light_theme)
+        page.dark_theme = build_theme(dark=True)
+        settings_page.language_picker.value = code
+        settings_page.language_hint.value = tr('Applies to this browser. Your letters, words and algorithms stay as entered.')
+        settings_page.account.render()
+        rebuild_navigation()
+
+    settings_page.language_callback = change_language
     cloud = None
 
     def navigate_to(index, *, refresh=True):
@@ -296,7 +333,7 @@ async def main(page: ft.Page):
         target = pages[index]
         if refresh and hasattr(target, "refresh"):
             target.refresh(update=False)
-        content_area.content = target
+        content_area.content = present(target)
         popout_open = False
         rebuild_navigation(update=False)
         page.update()
@@ -361,7 +398,7 @@ async def main(page: ft.Page):
             if client.returning: navigate_to(SETTINGS_INDEX)
             await cloud.initialize()
         except Exception:
-            settings_page.account.unavailable = "Could not open cloud sync. Your local workspace is still available."
+            settings_page.account.unavailable = message('Could not open cloud sync. Your local workspace is still available.')
             settings_page.account.cloud = None
             settings_page.account.render(update=current_index==SETTINGS_INDEX)
     if SYNC_URL: page.run_task(start_cloud)

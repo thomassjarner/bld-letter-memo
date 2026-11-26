@@ -1,4 +1,5 @@
 """Read-only training statistics. Attempt order works even for undated backups."""
+from core.messages import message
 from dataclasses import dataclass
 from heapq import heappop, heappush
 from statistics import median
@@ -35,9 +36,9 @@ def timer_attempts(solves):
             for s in solves]
 
 
-def memo_attempts(rounds, scheme=None, phase="total"):
-    if phase not in ("total", "memo", "recall"):
-        raise ValueError("Unknown timing phase")
+def memo_attempts(rounds, scheme=None, phase=message('total')):
+    if phase not in (message('total'), "memo", "recall"):
+        raise ValueError(message('Unknown timing phase'))
     return [Attempt(r.correct_letters, r.scored_letters,
                     {"total": r.centiseconds, "memo": r.memo_centiseconds, "recall": r.recall_centiseconds}[phase],
                     memo=r.memo_centiseconds, recall=r.recall_centiseconds)
@@ -94,7 +95,7 @@ class Summary:
 def select_range(rows, limit=None):
     """Keep original attempt numbering inside the selected session or scheme."""
     if limit is not None and limit not in WINDOWS:
-        raise ValueError("Unsupported history range")
+        raise ValueError(message('Unsupported history range'))
     offset = max(0, len(rows)-limit) if limit is not None else 0
     return (rows[offset:] if offset else rows), offset
 
@@ -136,7 +137,7 @@ def plot_ends(n):
 def summarize(rows, window=None, *, offset=0):
     """Cumulative by default. The optional chart window never changes the sample."""
     if window is not None and window not in WINDOWS:
-        raise ValueError("Unsupported chart window")
+        raise ValueError(message('Unsupported chart window'))
     n = len(rows)
     # Adjacent groups (no gaps). Large plots retain both endpoints and account
     # for every attempt; the recent table still contains the actual last 12.
@@ -167,7 +168,7 @@ def trimmed_time(times):
     finite = sorted(t for t in times if t is not None)
     dnfs = len(times) - len(finite)
     if dnfs >= 2:
-        return "DNF"
+        return message('DNF')
     middle = finite[1:] if dnfs else finite[1:-1]
     return round(sum(middle) / len(middle))
 
